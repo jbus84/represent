@@ -24,6 +24,7 @@ dev = [
     "mypy>=1.8.0",
     "pydantic-settings",
     "pyright>=1.1.403",
+    "matplotlib>=3.8.0",
 ]
 
 [tool.ruff]
@@ -35,6 +36,8 @@ line-length = 100
 typeCheckingMode = "strict"
 include = ["represent"]
 exclude = ["tests/**", "build/**", "dist/**", ".venv/**", "htmlcov/**"]
+venvPath = "."
+venv = ".venv"
 
 [tool.commitizen]
 name = "cz_conventional_commits"
@@ -98,3 +101,9 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+markers = [
+    "unit: Unit tests (fast, isolated)",
+    "e2e: End-to-end tests (slower, uses real data)",
+    "performance: Performance benchmark tests",
+    "slow: Slow tests that take significant time",
+]
