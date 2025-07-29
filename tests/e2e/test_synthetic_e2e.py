@@ -6,10 +6,9 @@ import pytest
 import numpy as np
 import polars as pl
 import time
-from pathlib import Path
 
-from represent import process_market_data, create_processor, MarketDepthProcessor
-from represent.constants import PRICE_LEVELS, TIME_BINS, OUTPUT_SHAPE, SAMPLES
+from represent import process_market_data, create_processor
+from represent.constants import OUTPUT_SHAPE, SAMPLES
 
 
 def create_realistic_synthetic_data(n_samples: int = SAMPLES, seed: int = 42) -> pl.DataFrame:

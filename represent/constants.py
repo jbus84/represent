@@ -33,7 +33,7 @@ MICRO_PIP_MULTIPLIER: Final[float] = 1.0 / MICRO_PIP_SIZE  # 100000.0
 OUTPUT_SHAPE: Final[tuple[int, int]] = (PRICE_LEVELS, TIME_BINS)
 
 # NumPy data types for optimal performance
-PRICE_DTYPE: Final[np.dtype] = np.int64  # For price calculations
-VOLUME_DTYPE: Final[np.dtype] = np.float64  # For volume calculations
-INDEX_DTYPE: Final[np.dtype] = np.int32  # For indexing operations
-OUTPUT_DTYPE: Final[np.dtype] = np.float32  # For final output array
+PRICE_DTYPE: Final[np.dtype] = np.dtype(np.int64)  # For price calculations
+VOLUME_DTYPE: Final[np.dtype] = np.dtype(np.float64)  # For volume calculations
+INDEX_DTYPE: Final[np.dtype] = np.dtype(np.int32)  # For indexing operations
+OUTPUT_DTYPE: Final[np.dtype] = np.dtype(np.float32)  # For final output array

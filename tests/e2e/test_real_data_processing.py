@@ -6,10 +6,9 @@ import pytest
 import numpy as np
 import polars as pl
 import time
-from pathlib import Path
 
 from represent import process_market_data, create_processor, MarketDepthProcessor
-from represent.constants import PRICE_LEVELS, TIME_BINS, OUTPUT_SHAPE
+from represent.constants import OUTPUT_SHAPE
 
 
 class TestRealDataProcessing:

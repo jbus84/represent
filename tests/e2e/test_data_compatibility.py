@@ -4,9 +4,7 @@ Tests various data formats and edge cases with real data.
 """
 import pytest
 import numpy as np
-import polars as pl
 import pandas as pd
-from pathlib import Path
 
 from represent import process_market_data, create_processor
 from represent.constants import OUTPUT_SHAPE

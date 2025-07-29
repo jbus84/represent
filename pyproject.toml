@@ -35,6 +35,8 @@ line-length = 100
 typeCheckingMode = "strict"
 include = ["represent"]
 exclude = ["tests/**", "build/**", "dist/**", ".venv/**", "htmlcov/**"]
+venvPath = "."
+venv = ".venv"
 
 [tool.commitizen]
 name = "cz_conventional_commits"

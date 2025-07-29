@@ -131,7 +131,7 @@ class MarketDepthProcessor:
         
         if valid_mask.any():
             # Get coordinates of valid entries
-            time_indices, level_indices = np.where(valid_mask)
+            time_indices, _ = np.where(valid_mask)
             y_coords = indices_array[valid_mask]
             x_coords = time_indices
             volumes = volumes_array[valid_mask]
