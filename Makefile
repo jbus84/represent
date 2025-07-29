@@ -1,4 +1,4 @@
-.PHONY: install test lint typecheck format build clean help test-performance test-fast test-coverage coverage-report coverage-html
+.PHONY: install test lint typecheck format build clean help test-performance test-fast test-fast-cov test-coverage coverage-report coverage-html
 
 # Default target
 help:
@@ -6,6 +6,7 @@ help:
 	@echo "  install          - Install dependencies and setup environment"
 	@echo "  test             - Run all tests with coverage (requires 80%)"
 	@echo "  test-fast        - Run tests excluding performance tests with coverage"
+	@echo "  test-fast-cov    - Run fast tests with coverage report (alias for test-fast)"
 	@echo "  test-performance - Run only performance tests"
 	@echo "  test-coverage    - Run tests with coverage report"
 	@echo "  coverage-report  - Generate coverage report"
@@ -28,6 +29,9 @@ test:
 	uv run pytest --run-performance -v
 
 test-fast:
+	uv run pytest -v
+
+test-fast-cov:
 	uv run pytest -v
 
 test-performance:
