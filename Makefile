@@ -1,25 +1,26 @@
-.PHONY: install test lint typecheck format build clean help test-performance test-fast test-fast-cov test-coverage coverage-report coverage-html test-unit test-e2e test-e2e-fast
+.PHONY: install test lint typecheck format build clean help test-performance test-fast test-fast-cov test-coverage coverage-report coverage-html test-unit test-e2e test-e2e-fast generate-visualization
 
 # Default target
 help:
 	@echo "Available targets:"
-	@echo "  install          - Install dependencies and setup environment"
-	@echo "  test             - Run all tests with coverage (requires 80%)"
-	@echo "  test-fast        - Run tests excluding performance tests with coverage"
-	@echo "  test-fast-cov    - Run fast tests with coverage report (alias for test-fast)"
-	@echo "  test-unit        - Run only unit tests"
-	@echo "  test-e2e         - Run only end-to-end tests (with real data)"
-	@echo "  test-e2e-fast    - Run only fast end-to-end tests"
-	@echo "  test-performance - Run only performance tests"
-	@echo "  test-coverage    - Run tests with coverage report"
-	@echo "  coverage-report  - Generate coverage report"
-	@echo "  coverage-html    - Generate HTML coverage report"
-	@echo "  lint             - Run linting checks"
-	@echo "  typecheck        - Run type checking"
-	@echo "  format           - Format code"
-	@echo "  build            - Build package"
-	@echo "  clean            - Clean build artifacts"
-	@echo "  check-commit     - Lints and commits"
+	@echo "  install                - Install dependencies and setup environment"
+	@echo "  test                   - Run all tests with coverage (requires 80%)"
+	@echo "  test-fast              - Run tests excluding performance tests with coverage"
+	@echo "  test-fast-cov          - Run fast tests with coverage report (alias for test-fast)"
+	@echo "  test-unit              - Run only unit tests"
+	@echo "  test-e2e               - Run only end-to-end tests (with real data)"
+	@echo "  test-e2e-fast          - Run only fast end-to-end tests"
+	@echo "  test-performance       - Run only performance tests"
+	@echo "  test-coverage          - Run tests with coverage report"
+	@echo "  coverage-report        - Generate coverage report"
+	@echo "  coverage-html          - Generate HTML coverage report"
+	@echo "  lint                   - Run linting checks"
+	@echo "  typecheck              - Run type checking"
+	@echo "  format                 - Format code"
+	@echo "  build                  - Build package"
+	@echo "  clean                  - Clean build artifacts"
+	@echo "  check-commit           - Lints and commits"
+	@echo "  generate-visualization - Generate the example visualization"
 
 install:
 	uv sync --all-extras
@@ -27,6 +28,9 @@ install:
 check-commit: ## Run pre-commit checks and commit
 	.venv/bin/pre-commit run --all-files
 	.venv/bin/cz commit --all
+
+generate-visualization:
+	uv run python examples/generate_visualization.py
 
 test:
 	uv run pytest --run-performance -v
