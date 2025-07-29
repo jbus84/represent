@@ -1,0 +1,32 @@
+name: Performance Tests
+
+on:
+  workflow_dispatch:  # Allow manual trigger
+  schedule:
+    - cron: '0 6 * * 1'  # Run weekly on Mondays at 6 AM UTC
+
+jobs:
+  performance-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+      - name: Create virtual environment and install dependencies
+        run: |
+          uv venv
+          uv pip install -e ".[dev]"
+      - name: Run Performance Tests
+        run: make test-performance
+      - name: Run Large Dataset Tests  
+        run: uv run pytest -m "large_dataset" --tb=short --durations=10
+      - name: Performance Test Summary
+        if: always()
+        run: |
+          echo "🚀 Performance tests completed"
+          echo "📊 Check the logs above for timing information and any failures"
+          echo "⏱️  Duration information shows the slowest tests"
