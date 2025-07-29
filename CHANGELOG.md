@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v1.2.0 (2025-07-29)
+
+### Documentation
+
+- **readme**: Update the readme
+  ([`5035a7b`](https://github.com/jbus84/represent/commit/5035a7b9f15ee114120528ef9eefcfe0b14cf1b7))
+
+### Features
+
+- **dataloader**: Add dataloader and tests
+  ([`cb4b375`](https://github.com/jbus84/represent/commit/cb4b375a4a03ad64c079f38a619729d14767ab50))
+
+- **example**: Add pytorch dataloading examples
+  ([`34a6df4`](https://github.com/jbus84/represent/commit/34a6df45f26bfe0a194c4f01ea790ea664907e92))
+
+
 ## v1.1.0 (2025-07-29)
 
 ### Features
