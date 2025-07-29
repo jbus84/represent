@@ -39,17 +39,20 @@ The project uses Python 3.12, uv for package management, and modern Python packa
 
 ```bash
 # Primary development commands (use these)
-make install     # Install dependencies and setup environment
-make test        # Run test suite
-make lint        # Run linting checks
-make typecheck   # Run type checking
-make format      # Format code
-make build       # Build package
-make clean       # Clean build artifacts
+make install      # Install dependencies and setup environment
+make test         # Run all tests with coverage (requires 80%)
+make test-fast    # Run tests excluding performance tests with coverage
+make test-coverage # Run tests with coverage report
+make coverage-html # Generate HTML coverage report
+make lint         # Run linting checks
+make typecheck    # Run type checking
+make format       # Format code
+make build        # Build package
+make clean        # Clean build artifacts
 
 # Direct uv commands (fallback when Makefile targets don't exist)
 uv sync --all-extras
-uv run pytest
+uv run pytest --cov=represent
 uv run ruff check .
 uv run pyright
 uv build
@@ -92,11 +95,13 @@ TIME_BINS = 500          # Time dimension
 - Organize tests by domain matching source structure
 - Use realistic fixtures, avoid excessive mocking in integration tests
 - Test error conditions and recovery scenarios
+- **MANDATORY: 80% code coverage minimum** - all PRs must maintain this threshold
 - **MANDATORY: Performance test critical paths with benchmarks**
 - **Every PR must include performance regression tests**
 - **Benchmark against target latencies: <10ms for array generation, <1ms for single record processing**
 - **Memory usage tests** - ensure no memory leaks in long-running processes
 - **Load tests** - verify performance under sustained 10K+ records/second
+- **Coverage reporting** - use `make test-coverage` and `make coverage-html` for detailed reports
 
 
 ## Development Workflow
@@ -215,14 +220,16 @@ BID_VOL_COLUMNS = [f"bid_sz_{str(i).zfill(2)}" for i in range(10)]
 When working on this codebase:
 
 1. **PERFORMANCE FIRST** - Every code change must be evaluated for performance impact. Profile before and after.
-2. **Use Makefile first** - Always check for and use Makefile targets before running direct commands
-3. **Zero tolerance for performance regressions** - Any change that increases latency must be rejected
-4. **Benchmark everything** - Include performance tests with every significant change
-5. **Memory efficiency** - Use pre-allocated buffers, avoid dynamic allocation in hot paths
-6. **Follow the domain organization** - Don't suggest technical layer organization
-7. **Always add error handling** - But ensure error paths are also optimized
-8. **Validate data efficiently** - Pre-validate schemas, use lookup tables over calculations
-9. **Think about operations** - Include monitoring for performance metrics specifically
-10. **Test thoroughly** - Include performance regression tests (use `make test`)
-11. **Document performance decisions** - Explain why specific optimizations were chosen
-12. **Optimize first, then simplify** - Performance takes precedence over elegance in this system
+2. **80% COVERAGE MANDATORY** - All code must maintain 80% test coverage minimum (use `make test-coverage`)
+3. **Use Makefile first** - Always check for and use Makefile targets before running direct commands
+4. **Zero tolerance for performance regressions** - Any change that increases latency must be rejected
+5. **Zero tolerance for coverage drops** - Any change that drops coverage below 80% must be rejected
+6. **Benchmark everything** - Include performance tests with every significant change
+7. **Memory efficiency** - Use pre-allocated buffers, avoid dynamic allocation in hot paths
+8. **Follow the domain organization** - Don't suggest technical layer organization
+9. **Always add error handling** - But ensure error paths are also optimized
+10. **Validate data efficiently** - Pre-validate schemas, use lookup tables over calculations
+11. **Think about operations** - Include monitoring for performance metrics specifically
+12. **Test thoroughly** - Include performance regression tests (use `make test`)
+13. **Document performance decisions** - Explain why specific optimizations were chosen
+14. **Optimize first, then simplify** - Performance takes precedence over elegance in this system
