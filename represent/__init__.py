@@ -1,3 +1,1 @@
-"""Represent package for LOB feature extraction."""
-
-__version__: str = "0.1.0"
+__version__ = "1.0.0"

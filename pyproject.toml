@@ -1,6 +1,6 @@
 [project]
 name = "represent"
-version = "0.1.0"
+version = "1.0.0"
 description = "LOB features"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -38,7 +38,7 @@ exclude = ["tests/**", "build/**", "dist/**", ".venv/**", "htmlcov/**"]
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.1.0"
+version = "1.0.0"
 tag_format = "v$version"
 
 [tool.semantic_release]
