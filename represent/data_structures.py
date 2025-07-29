@@ -44,8 +44,9 @@ class RingBuffer:
     
     def get_recent_data(self, count: int) -> np.ndarray:
         """Get most recent count items without copying."""
-        if count > self._size:
-            count = self._size
+        actual_size = self._capacity if self._full else self._size
+        if count > actual_size:
+            count = actual_size
         
         if count == 0:
             return np.empty((0, 75), dtype=VOLUME_DTYPE)
@@ -62,7 +63,7 @@ class RingBuffer:
     @property
     def size(self) -> int:
         """Current number of items in buffer."""
-        return self._size
+        return self._capacity if self._full else self._size
     
     @property
     def is_full(self) -> bool:

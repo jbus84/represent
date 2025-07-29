@@ -10,6 +10,8 @@ dependencies = [
     "databento>=0.35.0",
     "zstandard>=0.22.0",
     "psutil>=5.9.0",
+    "torch>=2.0.0",
+    "matplotlib>=3.10.3",
 ]
 [project.optional-dependencies]
 dev = [
@@ -35,7 +37,7 @@ line-length = 100
 [tool.pyright]
 typeCheckingMode = "strict"
 include = ["represent"]
-exclude = ["tests/**", "build/**", "dist/**", ".venv/**", "htmlcov/**"]
+exclude = ["tests/**", "examples/**", "build/**", "dist/**", ".venv/**", "htmlcov/**"]
 venvPath = "."
 venv = ".venv"
 
@@ -60,9 +62,13 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "commitizen>=4.8.3",
+    "mypy>=1.17.0",
+    "pre-commit>=4.2.0",
     "pytest>=8.4.1",
     "pytest-asyncio>=1.1.0",
     "pytest-cov>=6.2.1",
+    "ruff>=0.12.5",
 ]
 
 [tool.coverage.run]
