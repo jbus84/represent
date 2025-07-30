@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.3.0 (2025-07-30)
+
+### Features
+
+- **features**: Add new target features
+  ([`af85bd1`](https://github.com/jbus84/represent/commit/af85bd154c76a237719e80cae830e5e0394e8fcd))
+
+
 ## v1.2.0 (2025-07-29)
 
 ### Documentation
