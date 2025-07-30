@@ -4,34 +4,48 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a **high-performance** Python package called "represent" that creates normalized market depth representations from limit order book (LOB) data. The core objective is to produce the `normed_abs_combined` numpy array (shape 402x500) that represents normalized cumulative market volume differences between ask and bid sides across price levels and time bins.
+This is a **high-performance** Python package called "represent" that creates normalized market depth representations from limit order book (LOB) data. The core objective is to produce market depth arrays that can include multiple features:
+
+1. **Base Feature**: `normed_abs_combined` numpy array (shape 402x500) - normalized cumulative market volume differences between ask and bid sides
+2. **Extended Features**: Additional dimensions for variance and trade count data
+3. **Multi-dimensional Output**: Configurable ND arrays with features in PyTorch-compatible dimensions
 
 **CRITICAL: This system must be extremely performance-optimized for real-time trading applications. Every millisecond matters.**
 
 ### Core Functionality
 
-The package processes market depth data to create visual representations of limit order book dynamics:
+The package processes market depth data to create multi-dimensional representations of limit order book dynamics:
 
 1. **Price Binning**: Converts raw prices to integer micro-pip format and maps them to 402 price levels (200 bid + 200 ask + 2 for mid-price)
 2. **Time Aggregation**: Groups tick data into 500 time bins (100 ticks per bin by default)
-3. **Volume Mapping**: Maps order book volumes to a 2D grid (price levels × time bins)
-4. **Cumulative Volume**: Calculates cumulative market depth for ask and bid sides
-5. **Normalization**: Creates the final `normed_abs_combined` array showing normalized volume differences with sign preservation (positive for ask dominance, negative for bid dominance)
+3. **Feature Extraction**: Extracts multiple features from market data:
+   - **Volume**: Order book volumes mapped to 2D grid (price levels × time bins)
+   - **Variance**: Price variance calculated from `market_depth_extraction_micro_pips_var` 
+   - **Trade Counts**: Count data available in DBN files
+4. **Cumulative Processing**: Calculates cumulative market depth for ask and bid sides across all features
+5. **Multi-dimensional Output**: Creates configurable output arrays:
+   - **Single Feature**: (402, 500) - traditional 2D representation
+   - **Multi-feature**: (N, 402, 500) - ND array with features in first dimension (PyTorch compatible)
+   - **Feature Selection**: Configurable combination of volume, variance, and trade counts
 
 ### Input Data Sources
 
 - **DBN Files**: Databento compressed market data files (.dbn.zst format)
+  - Contains volume, variance (`market_depth_extraction_micro_pips_var`), and trade count data
+  - Must support extraction of multiple feature types from same source
 - **Streaming Data**: Real-time market data in Polars DataFrame format
-- **Market Data**: 10-level market by price (MBP-10) limit order book data
+- **Market Data**: 10-level market by price (MBP-10) limit order book data with extended features
 
 ### PyTorch Integration
 
 The package serves as a **ultra-fast** PyTorch-compatible data loading module that:
-- Dynamically generates `normed_abs_combined` arrays for ML model inputs with **<10ms latency**
+- Dynamically generates multi-dimensional feature arrays for ML model inputs with **<10ms latency**
+- Supports configurable feature selection (volume, variance, trade counts) with **same performance targets**
 - Provides **zero-copy** batching and streaming capabilities for training
 - Maintains rolling windows of 50K historical samples with **O(1) insertion/removal**
 - Processes data in batches of 500 records with **vectorized operations only**
 - Uses **memory-mapped files** and **pre-allocated buffers** for maximum throughput
+- **Feature dimension management**: Automatically handles PyTorch-compatible tensor shapes (N_features, 402, 500)
 
 ## Development Setup
 
@@ -66,7 +80,134 @@ TICKS_PER_BIN = 100      # Tick aggregation
 SAMPLES = 50000          # Historical context window
 PRICE_LEVELS = 402       # Total price bins (200 bid + 200 ask + 2 mid)
 TIME_BINS = 500          # Time dimension
+
+# Extended Features
+FEATURE_TYPES = ['volume', 'variance', 'trade_counts']  # Available feature types
+DEFAULT_FEATURES = ['volume']  # Default feature selection for backward compatibility
+MAX_FEATURES = 3         # Maximum number of features that can be selected
+
+# Feature Index Mapping (consistent ordering in multi-feature tensors)
+FEATURE_INDEX_MAP = {
+    'volume': 0,
+    'variance': 1, 
+    'trade_counts': 2
+}
 ```
+
+## Extended Features Architecture
+
+### Feature Types and Data Sources
+
+1. **Volume Features** (Default/Existing):
+   - Source: `ask_sz_XX`, `bid_sz_XX` columns
+   - Processing: Same as current `normed_abs_combined` logic
+   - Output: Normalized cumulative volume differences
+
+2. **Variance Features** (New):
+   - Source: `market_depth_extraction_micro_pips_var` from DBN files
+   - Processing: Extract variance data, map to price levels, apply cumulative processing
+   - Output: Normalized cumulative variance differences across price levels
+
+3. **Trade Count Features** (New):
+   - Source: Trade count data available in DBN files (ask_ct_XX, bid_ct_XX columns)
+   - Processing: Count aggregation, map to price levels, apply cumulative processing  
+   - Output: Normalized cumulative trade count differences across price levels
+
+### API Design for Feature Selection
+
+```python
+# Single feature (backward compatible) - always 2D output
+processor = create_processor(features=['volume'])
+result = processor.process(data)  # Shape: (402, 500)
+
+# Two features - always 3D output  
+processor = create_processor(features=['volume', 'variance'])
+result = processor.process(data)  # Shape: (2, 402, 500)
+
+# Three features - always 3D output
+processor = create_processor(features=['volume', 'variance', 'trade_counts'])
+result = processor.process(data)  # Shape: (3, 402, 500)
+
+# Individual feature selection
+processor = create_processor(features=['variance'])  # Just variance
+result = processor.process(data)  # Shape: (402, 500)
+
+processor = create_processor(features=['trade_counts'])  # Just trade counts  
+result = processor.process(data)  # Shape: (402, 500)
+
+# PyTorch integration - output shape determined by feature count
+dataset = MarketDepthDataset(features=['volume'])  # 2D tensors
+batch = dataset.get_current_representation()  # Shape: (402, 500)
+
+dataset = MarketDepthDataset(features=['volume', 'variance'])  # 3D tensors
+batch = dataset.get_current_representation()  # Shape: (2, 402, 500)
+```
+
+### Output Shape Rules
+
+**Simple Dimensional Logic:**
+- **1 feature**: Output shape `(402, 500)` - 2D tensor
+- **2 features**: Output shape `(2, 402, 500)` - 3D tensor with feature dimension first
+- **3 features**: Output shape `(3, 402, 500)` - 3D tensor with feature dimension first
+
+**Feature Index Mapping:**
+```python
+FEATURE_INDEX_MAP = {
+    'volume': 0,
+    'variance': 1, 
+    'trade_counts': 2
+}
+
+# For multi-feature tensors, features are ordered by index
+features=['variance', 'volume'] → shape (2, 402, 500) where:
+# result[0] = volume (index 0)
+# result[1] = variance (index 1)
+```
+
+### Configuration Options
+
+**Simple Configuration Example:**
+```python
+# Configuration is now simply based on feature selection
+processor = create_processor(
+    features=['volume', 'variance', 'trade_counts'],  # Shape: (3, 402, 500)
+    normalize_features=True,     # Normalize each feature independently  
+    cache_features=True,         # Cache processed features for reuse
+    validate_features=True,      # Validate feature availability at initialization
+)
+
+# DataLoader configuration
+dataset = MarketDepthDataset(
+    features=['volume', 'variance'],  # Shape: (2, 402, 500)
+    buffer_size=SAMPLES,
+    validate_features=True,
+)
+```
+
+**Shape Determination Logic:**
+```python
+def determine_output_shape(features):
+    """Simple logic: shape determined by feature count."""
+    if len(features) == 1:
+        return (PRICE_LEVELS, TIME_BINS)  # (402, 500)
+    else:
+        return (len(features), PRICE_LEVELS, TIME_BINS)  # (N, 402, 500)
+    
+# Examples:
+features=['volume'] → shape (402, 500)
+features=['volume', 'variance'] → shape (2, 402, 500) 
+features=['volume', 'variance', 'trade_counts'] → shape (3, 402, 500)
+features=['variance'] → shape (402, 500)
+```
+
+### Performance Requirements for Extended Features
+
+**CRITICAL: Extended features must maintain same performance targets:**
+- **Feature Processing**: <10ms for any combination of features (1-3 features)
+- **Memory Usage**: Linear scaling - max 3x base memory for all 3 features
+- **Batch Processing**: Same <50ms target regardless of feature count
+- **Cache Efficiency**: Pre-allocate buffers for all enabled features
+- **Shape Handling**: Zero overhead for output shape determination based on feature count
 
 ## Development Standards
 
@@ -90,6 +231,16 @@ TIME_BINS = 500          # Time dimension
 - Map prices to 402-level grid centered on mid-price **using lookup tables, not calculations**
 - **Pre-allocate all arrays** - no dynamic memory allocation in processing loops
 - **Use numba/cython** for critical path functions if pure NumPy isn't fast enough
+
+#### Extended Features Processing Requirements:
+- **Feature-agnostic processing**: Same pipeline handles volume, variance, and trade counts
+- **Memory pre-allocation**: Allocate buffers for maximum enabled features at initialization
+- **Vectorized multi-feature operations**: Process all enabled features in single pass
+- **Feature dimension management**: Handle (N_features, 402, 500) shapes efficiently
+- **Backward compatibility**: Single feature mode must perform identically to original
+- **Schema validation**: Validate feature availability in data source at startup
+- **Feature extraction**: Extract variance from `market_depth_extraction_micro_pips_var` efficiently
+- **Count aggregation**: Handle trade count data with same performance as volume data
 
 ### Testing (Performance Focused)
 - Organize tests by domain matching source structure
@@ -193,10 +344,11 @@ BID_VOL_COLUMNS = [f"bid_sz_{str(i).zfill(2)}" for i in range(10)]
 ## Performance Requirements (NON-NEGOTIABLE)
 
 **CRITICAL LATENCY TARGETS:**
-- **Single Record Processing**: <1ms per record
-- **Array Generation**: <10ms for complete `normed_abs_combined` array (402x500)
-- **Batch Processing**: <50ms for 500-record batch end-to-end
-- **Rolling Window Updates**: <5ms for 50K sample window maintenance
+- **Single Record Processing**: <1ms per record (any feature combination)
+- **Array Generation**: <10ms for complete arrays (single feature: 402x500, multi-feature: Nx402x500)
+- **Feature Processing**: <2ms additional latency per additional feature (linear scaling)
+- **Batch Processing**: <50ms for 500-record batch end-to-end (any feature combination)
+- **Rolling Window Updates**: <5ms for 50K sample window maintenance (any feature combination)
 
 **THROUGHPUT REQUIREMENTS:**
 - **Sustained**: 10K+ records/second without performance degradation
@@ -204,10 +356,11 @@ BID_VOL_COLUMNS = [f"bid_sz_{str(i).zfill(2)}" for i in range(10)]
 - **Parallel Processing**: Must scale linearly with CPU cores
 
 **MEMORY CONSTRAINTS:**
-- **Core Processing**: <1GB RAM for processing components
-- **Total System**: <4GB for complete application including buffers
+- **Core Processing**: <1GB RAM for single feature, <3GB for all features
+- **Total System**: <4GB for single feature, <12GB for complete application with all features
 - **Memory Allocation**: Zero dynamic allocation in hot paths
 - **Cache Efficiency**: >95% L1 cache hit rate for price lookups
+- **Feature Scaling**: Linear memory usage per additional feature (no exponential growth)
 
 **ARCHITECTURAL PERFORMANCE REQUIREMENTS:**
 - **Context Size**: Maintain exactly 50K samples in O(1) ring buffer
@@ -233,3 +386,23 @@ When working on this codebase:
 12. **Test thoroughly** - Include performance regression tests (use `make test`)
 13. **Document performance decisions** - Explain why specific optimizations were chosen
 14. **Optimize first, then simplify** - Performance takes precedence over elegance in this system
+
+### Extended Features Implementation Guidelines
+
+When implementing extended features (variance, trade counts):
+
+1. **Backward Compatibility**: Existing API must work unchanged with `features=['volume']` default
+2. **Feature Selection**: Support `features` parameter in all processor creation functions  
+3. **Simple Dimension Logic**: Output shape determined solely by feature count (1→2D, 2+→3D)
+4. **Feature Ordering**: Use consistent FEATURE_INDEX_MAP ordering in multi-feature tensors
+5. **Data Source Validation**: Check feature availability in data at initialization
+6. **Memory Pre-allocation**: Allocate for maximum requested features upfront
+7. **Vectorized Processing**: Process all features in single data pass when possible
+8. **PyTorch Integration**: Ensure DataLoader handles both 2D and 3D tensors correctly
+9. **Performance Testing**: Benchmark each feature combination against targets
+10. **Schema Evolution**: Handle data sources that may not have all features available
+11. **Feature Extraction**: Implement efficient extraction from `market_depth_extraction_micro_pips_var`
+12. **Configuration Validation**: Validate feature selection and availability at creation time
+13. **Output Shape Consistency**: Ensure predictable tensor shapes based on feature count
+14. **Individual Features**: Support any single feature as 2D output (volume, variance, or trade_counts)
+15. **Caching Strategy**: Implement optional feature caching for repeated processing

@@ -3,7 +3,11 @@ Core functionality that provides backward compatibility.
 This module bridges the optimized implementation with existing tests.
 """
 
+import polars as pl
+import numpy as np
+from typing import Optional, Union
 from .pipeline import process_market_data
+from .constants import FeatureType
 
 
 def placeholder_function() -> str:
@@ -17,4 +21,6 @@ def uncovered_function() -> str:
 
 
 # Alias for backward compatibility with tests
-reference_pipeline = process_market_data
+def reference_pipeline(df: pl.DataFrame, features: Optional[Union[list[str], list[FeatureType]]] = None) -> np.ndarray:
+    """Backward compatibility wrapper for process_market_data."""
+    return process_market_data(df, features=features)

@@ -1,4 +1,13 @@
-# Market Depth Visualization Example
+# Market Depth Visualization Examples
+
+This directory contains examples demonstrating how to use the `represent` library to process market data and generate visualizations.
+
+## Examples
+
+1. **Basic Market Depth Visualization** (`generate_visualization.py`) - Processes real market data and creates a basic heatmap
+2. **Extended Features Visualization** (`extended_features_visualization.py`) - Comprehensive demonstration of the new extended features functionality
+
+## Basic Market Depth Visualization
 
 This example demonstrates how to use the `represent` library to process real market data and generate a visualization of the resulting market depth representation.
 
@@ -76,3 +85,57 @@ if __name__ == '__main__':
 Running the script will produce the following visualization of the market depth representation:
 
 ![Market Depth Visualization](market_depth_visualization.png)
+
+## Extended Features Visualization
+
+The `extended_features_visualization.py` script provides a comprehensive demonstration of the new extended features functionality introduced in the `df/extended-features` branch.
+
+### Features Demonstrated
+
+This script showcases:
+
+1. **Single Feature Extraction**: Process individual features (volume, variance, trade_counts)
+2. **Multi-Feature Processing**: Extract multiple features simultaneously with 3D output
+3. **RGB Visualization**: Create RGB composite images where each feature maps to a color channel
+4. **Performance Analysis**: Benchmark processing times for different feature combinations
+5. **API Usage Examples**: Demonstrate all extended API patterns
+
+### Key Visualizations Generated
+
+1. **Single Features Plot**: Individual heatmaps for each feature type
+2. **RGB Composite**: Three-channel visualization (Red=Volume, Green=Variance, Blue=Trade Counts)
+3. **Feature Analysis**: Statistical distributions and comparisons
+4. **Time Series Cross-Sections**: Feature behavior at different price levels
+5. **Performance Charts**: Processing time analysis across feature combinations
+
+### Usage
+
+```bash
+# Run the extended features example
+uv run python examples/extended_features_visualization.py
+```
+
+### Output
+
+The script generates:
+- 5 PNG visualization files showing different aspects of the feature data
+- A comprehensive analysis report with statistics and performance metrics
+- Demonstrates RGB color mapping for multi-feature visualization
+
+### Key Results
+
+- **Performance**: All feature combinations process within <20ms (well under the 50ms target)
+- **Dimensions**: Single features return (402, 500), multiple features return (N, 402, 500)
+- **Backward Compatibility**: Existing volume-only processing unchanged
+- **Feature Types**: 
+  - Volume: Traditional market depth based on order sizes
+  - Variance: Market volatility extracted from `market_depth_extraction_micro_pips_var`
+  - Trade Counts: Activity levels based on transaction counts
+
+### RGB Color Interpretation
+
+In the RGB composite visualization:
+- **Red Channel (Volume)**: Intensity represents volume-based market depth
+- **Green Channel (Variance)**: Intensity shows market variance/volatility patterns  
+- **Blue Channel (Trade Counts)**: Intensity indicates trade activity levels
+- **Combined Colors**: Mixed colors show correlated patterns across features
