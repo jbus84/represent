@@ -1,4 +1,4 @@
-.PHONY: install test lint typecheck format build clean help test-performance test-fast test-fast-cov test-coverage coverage-report coverage-html test-unit test-e2e test-e2e-fast generate-visualization performance-analysis
+.PHONY: install test lint typecheck format build clean help test-performance test-fast test-fast-cov test-coverage coverage-report coverage-html test-unit test-e2e test-e2e-fast generate-visualization performance-analysis extended-features-demo
 
 # Default target
 help:
@@ -22,6 +22,7 @@ help:
 	@echo "  check-commit           - Lints and commits"
 	@echo "  generate-visualization - Generate the example visualization"
 	@echo "  performance-analysis   - Run PyTorch dataloader performance analysis"
+	@echo "  extended-features-demo - Run extended features visualization demo"
 
 install:
 	uv sync --all-extras
@@ -35,6 +36,9 @@ generate-visualization:
 
 performance-analysis:
 	uv run python examples/dataloader_performance_demo.py
+
+extended-features-demo:
+	uv run python examples/extended_features_visualization.py
 
 test:
 	uv run pytest --run-performance -v

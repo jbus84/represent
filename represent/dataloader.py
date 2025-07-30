@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader, IterableDataset
 from .constants import (
     SAMPLES, TICKS_PER_BIN, TIME_BINS, OUTPUT_SHAPE, VOLUME_DTYPE,
     ASK_PRICE_COLUMNS, BID_PRICE_COLUMNS, ASK_VOL_COLUMNS, BID_VOL_COLUMNS,
-    ASK_COUNT_COLUMNS, BID_COUNT_COLUMNS
+    ASK_COUNT_COLUMNS, BID_COUNT_COLUMNS, DEFAULT_FEATURES, FeatureType, get_output_shape
 )
 from .data_structures import RingBuffer
 from .pipeline import MarketDepthProcessor
@@ -40,7 +40,8 @@ class MarketDepthDataset(IterableDataset[torch.Tensor]):
         batch_size: int = 500,
         buffer_size: int = SAMPLES,
         use_memory_mapping: bool = True,
-        preload_batches: int = 4
+        preload_batches: int = 4,
+        features: Optional[Union[list[str], list[FeatureType]]] = None
     ):
         """
         Initialize market depth dataset.
@@ -51,6 +52,8 @@ class MarketDepthDataset(IterableDataset[torch.Tensor]):
             buffer_size: Size of historical context buffer
             use_memory_mapping: Enable memory mapping for large files
             preload_batches: Number of batches to preload for performance
+            features: List of features to extract. Options: 'volume', 'variance', 'trade_counts'
+                     Defaults to ['volume'] for backward compatibility.
         """
         super().__init__()
         
@@ -58,17 +61,21 @@ class MarketDepthDataset(IterableDataset[torch.Tensor]):
         self.buffer_size = buffer_size
         self.use_memory_mapping = use_memory_mapping
         self.preload_batches = preload_batches
+        self.features = features if features is not None else DEFAULT_FEATURES.copy()
         
         # Initialize high-performance components
         self._ring_buffer = RingBuffer(capacity=buffer_size)
-        self._processor = MarketDepthProcessor()
+        self._processor = MarketDepthProcessor(features=self.features)
+        
+        # Get dynamic output shape based on features
+        self.output_shape = get_output_shape(self.features)
         
         # Pre-allocate tensors for zero-copy operations (force CPU)
-        self._tensor_buffer = torch.zeros(OUTPUT_SHAPE, dtype=torch.float32, device='cpu')
-        self._batch_buffer = torch.zeros((preload_batches, *OUTPUT_SHAPE), dtype=torch.float32, device='cpu')
+        self._tensor_buffer = torch.zeros(self.output_shape, dtype=torch.float32, device='cpu')
+        self._batch_buffer = torch.zeros((preload_batches, *self.output_shape), dtype=torch.float32, device='cpu')
         
         # ULTRA-FAST MODE: Pre-allocate result buffer for <10ms performance
-        self._fast_result_buffer = np.zeros(OUTPUT_SHAPE, dtype=np.float32)
+        self._fast_result_buffer = np.zeros(self.output_shape, dtype=np.float32)
         self._enable_ultra_fast_mode = True
         
         # Thread-safe batch preloading
@@ -204,7 +211,9 @@ class MarketDepthDataset(IterableDataset[torch.Tensor]):
         Get current market depth representation from ring buffer.
         
         Returns:
-            PyTorch tensor of shape (402, 500) with normalized depth data
+            PyTorch tensor with normalized depth data:
+            - Single feature: shape (402, 500)
+            - Multiple features: shape (N, 402, 500) where N is number of features
         """
         if not self._ring_buffer.is_full:
             raise RuntimeError("Ring buffer not full - need at least 50K samples for processing")
@@ -395,7 +404,7 @@ class MarketDepthDataset(IterableDataset[torch.Tensor]):
             raise RuntimeError("No data source configured")
         
         for batch_df in self._data_iterator:
-            # Process batch through pipeline
+            # Process batch through pipeline with extended features
             result_array = self._processor.process(batch_df)
             
             # Convert to tensor
@@ -481,9 +490,12 @@ class HighPerformanceDataLoader:
                 drop_last=True
             )
         
+        # Get output shape from first dataset sample to handle variable feature dimensions
+        sample_output_shape = dataset.output_shape if hasattr(dataset, 'output_shape') else OUTPUT_SHAPE
+        
         # Pre-allocated batch tensor (force CPU to avoid MPS issues in tests)
         self._batch_tensor = torch.zeros(
-            (batch_size, *OUTPUT_SHAPE), 
+            (batch_size, *sample_output_shape), 
             dtype=torch.float32,
             pin_memory=pin_memory,
             device='cpu'
@@ -802,7 +814,8 @@ def create_streaming_dataloader(
     buffer_size: int = SAMPLES,
     batch_size: int = 8,
     num_workers: int = 8,
-    device: str = "cpu"
+    device: str = "cpu",
+    features: Optional[list[str]] = None
 ) -> Tuple[MarketDepthDataset, HighPerformanceDataLoader]:
     """
     Create a streaming dataloader for real-time market data processing.
@@ -812,6 +825,8 @@ def create_streaming_dataloader(
         batch_size: Number of samples per batch
         num_workers: Number of worker processes
         device: Target device for tensors
+        features: List of features to extract. Options: 'volume', 'variance', 'trade_counts'
+                 Defaults to ['volume'] for backward compatibility.
         
     Returns:
         Tuple of (dataset, dataloader) ready for streaming data
@@ -821,7 +836,8 @@ def create_streaming_dataloader(
         data_source=None,  # Streaming mode
         buffer_size=buffer_size,
         use_memory_mapping=False,  # Not applicable for streaming
-        preload_batches=4
+        preload_batches=4,
+        features=features
     )
     
     # Create high-performance dataloader
@@ -840,7 +856,8 @@ def create_file_dataloader(
     batch_size: int = 8,
     num_workers: int = 8,
     device: str = "cpu",
-    use_memory_mapping: bool = True
+    use_memory_mapping: bool = True,
+    features: Optional[list[str]] = None
 ) -> HighPerformanceDataLoader:
     """
     Create a dataloader for processing market data files.
@@ -851,6 +868,8 @@ def create_file_dataloader(
         num_workers: Number of worker processes
         device: Target device for tensors
         use_memory_mapping: Enable memory mapping for large files
+        features: List of features to extract. Options: 'volume', 'variance', 'trade_counts'
+                 Defaults to ['volume'] for backward compatibility.
         
     Returns:
         High-performance dataloader ready for training
@@ -860,7 +879,8 @@ def create_file_dataloader(
         data_source=file_path,
         batch_size=TICKS_PER_BIN,  # Process in standard chunks
         use_memory_mapping=use_memory_mapping,
-        preload_batches=8
+        preload_batches=8,
+        features=features
     )
     
     # Create dataloader

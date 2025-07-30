@@ -1676,7 +1676,7 @@ wheels = [
 
 [[package]]
 name = "represent"
-version = "1.0.1"
+version = "1.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "databento" },
