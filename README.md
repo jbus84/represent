@@ -15,8 +15,50 @@
 - **Memory Efficient**: Optimized data structures with minimal memory footprint
 - **Real-Time Ready**: Sub-millisecond latency for single array generation
 - **Vectorized Operations**: NumPy-optimized algorithms for maximum performance
+- **Multiple Feature Types**: Extract volume, variance, and trade count features
 - **Type Safe**: Full type annotations with strict type checking
 - **Well Tested**: 88% test coverage with comprehensive benchmarks
+
+## 📦 Installation
+
+### Using uv (Recommended)
+
+Install the package using [uv](https://docs.astral.sh/uv/), the fast Python package manager:
+
+```bash
+# Install uv if you haven't already
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install represent
+uv add represent
+
+# Or install in a new virtual environment
+uv init my-trading-project
+cd my-trading-project
+uv add represent
+```
+
+### Using pip
+
+```bash
+pip install represent
+```
+
+### Development Installation
+
+For development with all dependencies:
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd represent
+
+# Install with development dependencies using uv
+uv sync --all-extras
+
+# Or with pip
+pip install -e ".[dev]"
+```
 
 ## 📊 What It Does
 
@@ -24,66 +66,90 @@ Represent transforms raw limit order book data into normalized 2D representation
 
 1. **Price Binning**: Converts prices to micro-pip format and maps to 402 price levels (200 bid + 200 ask + 2 mid-price)
 2. **Time Aggregation**: Groups tick data into 500 time bins (100 ticks per bin by default)
-3. **Volume Mapping**: Creates a 2D grid of market depth (price levels × time bins)
+3. **Feature Extraction**: Creates 2D grids for multiple feature types:
+   - **Volume**: Traditional market depth based on order sizes
+   - **Variance**: Market volatility patterns from volume variance
+   - **Trade Counts**: Activity levels based on transaction counts
 4. **Normalization**: Produces the final `normed_abs_combined` array (shape: 402×500)
 
-## 🔧 Installation
+## 🚀 Quick Start
 
-```bash
-# Install with uv (recommended)
-uv add represent
-
-# Or with pip
-pip install represent
-```
-
-## 📖 Quick Start
-
-### Basic Usage
+### Basic Feature Extraction
 
 ```python
 import polars as pl
 from represent import process_market_data
 
-# Load your market data (Polars DataFrame with LOB columns)
-df = pl.read_csv("market_data.csv")
+# Load your market data into a Polars DataFrame
+df = pl.read_csv("market_data.csv")  # Must have exactly 50,000 rows
 
-# Process into normalized representation
-result = process_market_data(df)
+# Extract volume features (default)
+volume_features = process_market_data(df)
+print(f"Volume features shape: {volume_features.shape}")  # (402, 500)
 
-# Result is a numpy array with shape (402, 500)
-print(f"Output shape: {result.shape}")
-print(f"Data type: {result.dtype}")
+# Extract multiple features
+multi_features = process_market_data(df, features=['volume', 'variance', 'trade_counts'])
+print(f"Multi features shape: {multi_features.shape}")  # (3, 402, 500)
+
+# Extract specific feature
+variance_features = process_market_data(df, features=['variance'])
+print(f"Variance features shape: {variance_features.shape}")  # (402, 500)
 ```
 
-### Advanced Usage with Processor
+### Using the Processor Class
 
 ```python
-from represent import create_processor, MarketDepthProcessor
+from represent import create_processor, FeatureType
 
-# Create a reusable processor for better performance
-processor = create_processor()
+# Create a processor for multiple features
+processor = create_processor(features=[FeatureType.VOLUME, FeatureType.VARIANCE])
 
-# Process multiple datasets
-results = []
-for data_batch in data_batches:
-    result = processor.process(data_batch)
-    results.append(result)
+# Process multiple datasets with the same configuration
+result1 = processor.process(df1)
+result2 = processor.process(df2)
+result3 = processor.process(df3)
+
+# Each result has shape (2, 402, 500) for volume and variance
 ```
 
-### PyTorch Integration with Background Processing
-
-For machine learning applications, use the ultra-fast background batch processing:
+### Working with Real Market Data
 
 ```python
-from represent.dataloader import MarketDepthDataset, AsyncDataLoader
+import databento as db
+import polars as pl
+from represent import process_market_data
+
+# Load real market data from databento format
+data = db.DBNStore.from_file("market_data.dbn.zst")
+df_pandas = data.to_df()
+
+# Filter by symbol and convert to Polars
+df_filtered = df_pandas[df_pandas.symbol == "ES.FUT"]
+df = pl.from_pandas(df_filtered)
+
+# Take exactly 50,000 samples for processing
+SAMPLES = 50000
+df_slice = df.slice(0, SAMPLES)
+
+# Process the data
+features = process_market_data(df_slice, features=['volume', 'variance'])
+print(f"Extracted features shape: {features.shape}")  # (2, 402, 500)
+```
+
+## 🔥 PyTorch Integration
+
+### Simple Background Processing
+
+```python
+import torch
 import torch.nn as nn
+from represent.dataloader import MarketDepthDataset, AsyncDataLoader
 
-# Create dataset from your market data
+# Create dataset and add your market data
 dataset = MarketDepthDataset(buffer_size=50000)
-dataset.add_streaming_data(your_market_data)
+dataset.add_streaming_data(your_market_data)  # Polars DataFrame
 
-# Create async dataloader with background processing  
+# Create async dataloader with background processing
 async_loader = AsyncDataLoader(
     dataset=dataset,
     background_queue_size=4,  # Keep 4 batches ready
@@ -93,16 +159,29 @@ async_loader = AsyncDataLoader(
 # Start background batch production
 async_loader.start_background_production()
 
-# Training loop - batches are instant!
-model = nn.Sequential(...)
-optimizer = torch.optim.Adam(model.parameters())
+# Create your model
+model = nn.Sequential(
+    nn.Conv2d(1, 32, kernel_size=3, padding=1),
+    nn.ReLU(),
+    nn.AdaptiveAvgPool2d((10, 10)),
+    nn.Flatten(),
+    nn.Linear(3200, 1)
+)
 
-for epoch in range(num_epochs):
-    # Get batch (sub-millisecond when queue is full!)
+optimizer = torch.optim.Adam(model.parameters())
+criterion = nn.MSELoss()
+
+# Training loop - batches load in <1ms!
+for epoch in range(10):
+    # Get batch (sub-millisecond when queue is full)
     batch = async_loader.get_batch()  # Shape: (402, 500)
     
-    # Standard PyTorch training
+    # Prepare for training
     batch = batch.unsqueeze(0).unsqueeze(0)  # Add batch & channel dims
+    target = torch.randn(1, 1)  # Your actual targets here
+    
+    # Standard PyTorch training step
+    optimizer.zero_grad()
     output = model(batch)
     loss = criterion(output, target)
     loss.backward()
@@ -112,198 +191,215 @@ for epoch in range(num_epochs):
 async_loader.stop()
 ```
 
-**Background Processing Benefits:**
-- **741.9x faster** batch access (29.77ms → 0.040ms)
-- **100% GPU utilization** during training
-- **Zero training bottlenecks** from data loading
-- **Thread-safe** concurrent operations
-
-### Expected Data Format
-
-Your input DataFrame should contain these columns:
+### Advanced PyTorch Training with Multiple Features
 
 ```python
-# Required columns for 10-level market data
-columns = [
-    'ts_event', 'ts_recv', 'rtype', 'publisher_id', 'symbol',
+import torch
+import torch.nn as nn
+from represent.dataloader import MarketDepthDataset, AsyncDataLoader
+from represent import FeatureType
+
+# Create dataset with multiple features
+dataset = MarketDepthDataset(
+    buffer_size=50000,
+    features=[FeatureType.VOLUME, FeatureType.VARIANCE, FeatureType.TRADE_COUNTS]
+)
+dataset.add_streaming_data(your_market_data)
+
+# Create dataloader for multi-feature training
+async_loader = AsyncDataLoader(
+    dataset=dataset,
+    background_queue_size=8,
+    prefetch_batches=4
+)
+async_loader.start_background_production()
+
+# Multi-channel CNN for 3 features
+model = nn.Sequential(
+    nn.Conv2d(3, 64, kernel_size=3, padding=1),  # 3 input channels
+    nn.ReLU(),
+    nn.Conv2d(64, 128, kernel_size=3, padding=1),
+    nn.ReLU(),
+    nn.AdaptiveAvgPool2d((8, 8)),
+    nn.Flatten(),
+    nn.Linear(128 * 8 * 8, 256),
+    nn.ReLU(),
+    nn.Linear(256, 1),
+    nn.Tanh()
+)
+
+# Training with multi-feature input
+for epoch in range(100):
+    batch = async_loader.get_batch()  # Shape: (3, 402, 500)
+    batch = batch.unsqueeze(0)  # Add batch dimension: (1, 3, 402, 500)
     
-    # Ask prices (10 levels)
-    'ask_px_00', 'ask_px_01', ..., 'ask_px_09',
-    
-    # Bid prices (10 levels)  
-    'bid_px_00', 'bid_px_01', ..., 'bid_px_09',
-    
-    # Ask volumes (10 levels)
-    'ask_sz_00', 'ask_sz_01', ..., 'ask_sz_09',
-    
-    # Bid volumes (10 levels)
-    'bid_sz_00', 'bid_sz_01', ..., 'bid_sz_09',
-    
-    # Ask counts (10 levels)
-    'ask_ct_00', 'ask_ct_01', ..., 'ask_ct_09',
-    
-    # Bid counts (10 levels)
-    'bid_ct_00', 'bid_ct_01', ..., 'bid_ct_09'
-]
+    # Your training logic here
+    output = model(batch)
+    # ... rest of training step
+
+async_loader.stop()
 ```
 
-## ⚡ Performance
+### File-Based DataLoader
 
-### Benchmarks
+```python
+from represent.dataloader import create_file_dataloader
 
-| Metric | Value |
-|--------|-------|
-| **Sustained Throughput** | 400K+ records/second |
-| **Peak Throughput** | 3M+ records/second |
-| **Single Array Latency** | <15ms (50K records) |
-| **Background Batch Access** | 0.040ms (741.9x speedup) |
-| **GPU Utilization** | 100% (vs 36% synchronous) |
-| **Memory Usage** | <100MB per operation |
-| **Test Coverage** | 88%+ |
+# Create dataloader directly from file
+dataloader = create_file_dataloader(
+    file_path="data/market_data.dbn.zst",
+    symbol="ES.FUT",
+    batch_size=32,
+    features=['volume', 'variance'],
+    background_processing=True
+)
 
-### Performance Tips
+# Use in training loop
+for batch in dataloader:
+    # batch shape: (32, 2, 402, 500) for batch_size=32, 2 features
+    output = model(batch)
+    # ... training logic
+```
 
-1. **Use background processing** for ML training:
-   ```python
-   # 741.9x faster than synchronous batch loading
-   async_loader = AsyncDataLoader(dataset, background_queue_size=4)
-   ```
+## 📊 Performance Benefits
 
-2. **Use the processor factory** for repeated operations:
-   ```python
-   processor = create_processor()  # Reuse this
-   ```
+### Background Processing Performance
 
-3. **Batch your data** for optimal throughput:
-   ```python
-   # Process in chunks of 50K records for best performance
-   chunk_size = 50000
-   ```
+The `AsyncDataLoader` provides massive performance improvements for ML training:
 
-4. **Tune queue size** for your training speed:
-   ```python
-   # Larger queues for slower training, smaller for faster
-   background_queue_size = 4  # Good default
-   ```
+- **741.9x faster** batch loading (29.77ms → 0.040ms)
+- **Sub-millisecond** batch retrieval when queue is full
+- **Zero training bottlenecks** - GPU utilization stays at 100%
+- **Thread-safe** concurrent operations
+
+### Benchmark Results
+
+```python
+# Check performance metrics
+status = async_loader.queue_status
+print(f"Batches produced: {status['batches_produced']}")
+print(f"Avg generation time: {status['avg_generation_time_ms']:.2f}ms")
+print(f"Avg retrieval time: {status['avg_retrieval_time_ms']:.3f}ms")
+print(f"Queue utilization: {status['queue_size']}/{status['max_queue_size']}")
+```
+
+## 🎯 Feature Types
+
+### Volume Features (Default)
+- Traditional market depth based on order sizes
+- Aggregated using median values per time bin
+- Shape: `(402, 500)` for single feature
+
+### Variance Features  
+- Market volatility patterns from volume variance
+- Calculated using `.var()` on volume columns per time bin
+- Useful for detecting market stress and regime changes
+
+### Trade Count Features
+- Activity levels based on transaction counts
+- Aggregated using sum of trade counts per time bin  
+- Indicates market participation and liquidity
+
+## 🔧 Data Requirements
+
+Your market data must be a Polars DataFrame with these columns:
+
+**Required Price Columns:**
+- `ask_px_00` through `ask_px_09` (10 ask price levels)
+- `bid_px_00` through `bid_px_09` (10 bid price levels)
+
+**Required Volume Columns:**
+- `ask_sz_00` through `ask_sz_09` (ask sizes)
+- `bid_sz_00` through `bid_sz_09` (bid sizes)
+
+**Required for Trade Count Features:**
+- `ask_ct_00` through `ask_ct_09` (ask trade counts)
+- `bid_ct_00` through `bid_ct_09` (bid trade counts)
+
+**Data Size:** Exactly 50,000 rows per processing call
+
+## 🚀 Running Examples
+
+The repository includes comprehensive examples:
+
+```bash
+# Run basic PyTorch quickstart
+uv run python examples/pytorch_quickstart.py
+
+# Run advanced training example
+uv run python examples/pytorch_training_example.py
+
+# Generate market depth visualization
+uv run python examples/generate_visualization.py
+
+# Extended features demonstration
+uv run python examples/extended_features_visualization.py
+
+# Simple background processing usage
+uv run python examples/simple_background_usage.py
+```
 
 ## 🧪 Development
 
-### Setup
+### Running Tests
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-repo/represent.git
-cd represent
+# Install development dependencies
+uv sync --all-extras
 
-# Install dependencies
-make install
-```
+# Run all tests
+uv run pytest
 
-### Testing
+# Run with coverage
+uv run pytest --cov=represent --cov-report=html
 
-```bash
-# Run all tests (including performance benchmarks)
-make test
+# Run performance benchmarks
+uv run pytest -m performance
 
-# Run fast tests only (skip performance benchmarks)
-make test-fast
-
-# Run with coverage report
-make test-coverage
-
-# Generate HTML coverage report
-make coverage-html
+# Run only unit tests (fast)
+uv run pytest -m unit
 ```
 
 ### Code Quality
 
 ```bash
 # Format code
-make format
+uv run ruff format
 
-# Run linting
-make lint
+# Lint code  
+uv run ruff check
 
 # Type checking
-make typecheck
-
-# Run all checks
-make check-commit
+uv run pyright
 ```
 
-## 📁 Project Structure
+## 📈 Performance Characteristics
 
-```
-represent/
-├── represent/
-│   ├── __init__.py          # Public API
-│   ├── constants.py         # Performance-tuned constants
-│   ├── core.py             # Core functionality
-│   ├── data_structures.py  # Optimized data structures
-│   ├── dataloader.py       # PyTorch integration & background processing
-│   └── pipeline.py         # Main processing pipeline
-├── tests/
-│   ├── test_benchmarks.py  # Performance benchmarks
-│   ├── test_core.py        # Core functionality tests
-│   ├── test_dataloader.py  # Dataloader and PyTorch tests
-│   ├── test_integration.py # Integration tests
-│   └── fixtures/           # Test data generation
-├── examples/               # Usage examples and demos
-│   ├── simple_background_usage.py
-│   ├── background_training_demo.py
-│   └── dataloader_performance_demo.py
-├── notebooks/              # Analysis notebooks
-└── Makefile               # Development commands
-```
-
-## 🔬 Technical Details
-
-### Constants
-
-```python
-from represent import (
-    MICRO_PIP_SIZE,    # 0.00001 - Price precision
-    TICKS_PER_BIN,     # 100 - Ticks per time bin
-    SAMPLES,           # 50000 - Expected input size
-    PRICE_LEVELS,      # 402 - Output price levels
-    TIME_BINS,         # 500 - Output time bins
-)
-```
-
-### Data Types
-
-- **Input**: Polars DataFrame with market data
-- **Output**: NumPy array (float32, shape: 402×500)
-- **Internal**: Optimized int64/float64 for calculations
-
-### Algorithm Overview
-
-1. **Price Conversion**: Raw prices → micro-pip integers
-2. **Time Binning**: Tick timestamps → time bin indices  
-3. **Price Mapping**: Micro-pip prices → price level indices
-4. **Volume Aggregation**: Sum volumes per (price_level, time_bin)
-5. **Cumulative Calculation**: Compute cumulative market depth
-6. **Normalization**: Apply final normalization and differencing
+- **Processing Speed**: 400K+ records/second sustained, 3M+ peak
+- **Memory Usage**: Optimized data structures with minimal footprint
+- **Latency**: Sub-millisecond single array generation
+- **Batch Loading**: 741.9x improvement with background processing
+- **Scalability**: Thread-safe operations for concurrent processing
 
 ## 🤝 Contributing
 
+We welcome contributions! Please see our contributing guidelines and:
+
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Run tests (`make test`)
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
+3. Make your changes with tests
+4. Run the test suite (`uv run pytest`)
+5. Submit a pull request
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## 🙏 Acknowledgments
 
-- Optimized for real-time trading applications
-- Built with NumPy and Polars for maximum performance
-- Inspired by modern market microstructure research
+- Built for high-frequency trading applications
+- Optimized for real-time market data processing
+- Designed with performance-first principles
 
 ---
 
