@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.4.0 (2025-07-30)
+
+### Features
+
+- Comprehensive README update with uv installation and PyTorch examples
+  ([`20e1bed`](https://github.com/jbus84/represent/commit/20e1bedfb65ef20c05cbbf42c09fcd28eea5e9d2))
+
+
 ## v1.3.0 (2025-07-30)
 
 ### Features
