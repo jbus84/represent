@@ -255,6 +255,14 @@ features=['variance'] → shape (402, 500)
 - **Coverage reporting** - use `make test-coverage` and `make coverage-html` for detailed reports
 
 
+## Recent Updates
+
+### Classification Logic Integration
+- Added classification class generation logic from `notebooks/market_depth_extraction_micro_pips.py` 
+- Integrated price movement-based classification with configurable bin thresholds
+- Enhanced PyTorch dataloader with classification target generation capabilities
+- Updated tests to cover new classification functionality
+
 ## Development Workflow
 
 ### Environment Setup

@@ -22,7 +22,7 @@ from .data_structures import RingBuffer
 from .pipeline import MarketDepthProcessor
 
 
-class MarketDepthDataset(IterableDataset[torch.Tensor]):
+class MarketDepthDataset(IterableDataset[Tuple[torch.Tensor, torch.Tensor]]):
     """
     High-performance PyTorch dataset for streaming market data.
     
@@ -32,6 +32,7 @@ class MarketDepthDataset(IterableDataset[torch.Tensor]):
     - Zero-copy tensor creation where possible
     - Memory-mapped file support for large datasets
     - <10ms latency for normed_abs_combined array generation
+    - Classification target generation based on price movement analysis
     """
     
     def __init__(
@@ -41,7 +42,8 @@ class MarketDepthDataset(IterableDataset[torch.Tensor]):
         buffer_size: int = SAMPLES,
         use_memory_mapping: bool = True,
         preload_batches: int = 4,
-        features: Optional[Union[list[str], list[FeatureType]]] = None
+        features: Optional[Union[list[str], list[FeatureType]]] = None,
+        classification_config: Optional[Dict[str, Any]] = None
     ):
         """
         Initialize market depth dataset.
@@ -54,6 +56,7 @@ class MarketDepthDataset(IterableDataset[torch.Tensor]):
             preload_batches: Number of batches to preload for performance
             features: List of features to extract. Options: 'volume', 'variance', 'trade_counts'
                      Defaults to ['volume'] for backward compatibility.
+            classification_config: Configuration for classification (bins, lookforward params, etc.)
         """
         super().__init__()
         
@@ -62,6 +65,13 @@ class MarketDepthDataset(IterableDataset[torch.Tensor]):
         self.use_memory_mapping = use_memory_mapping
         self.preload_batches = preload_batches
         self.features = features if features is not None else DEFAULT_FEATURES.copy()
+        
+        # Classification configuration - always enabled
+        default_config = self._get_default_classification_config()
+        if classification_config:
+            # Merge user config with defaults
+            default_config.update(classification_config)
+        self.classification_config = default_config
         
         # Initialize high-performance components
         self._ring_buffer = RingBuffer(capacity=buffer_size)
@@ -95,6 +105,76 @@ class MarketDepthDataset(IterableDataset[torch.Tensor]):
         # Initialize data source
         if data_source is not None:
             self._initialize_data_source()
+    
+    def _get_default_classification_config(self) -> Dict[str, Any]:
+        """Get default classification configuration based on notebook logic."""
+        return {
+            'micro_pip_size': 0.00001,
+            'true_pip_size': 0.0001,
+            'ticks_per_bin': 100,
+            'lookforward_offset': 500,
+            'lookforward_input': 5000,
+            'lookback_rows': 5000,
+            'nbins': 13,
+            'bin_thresholds': {
+                13: {
+                    100: {  # ticks_per_bin
+                        5000: {  # lookforward_input
+                            'bin_1': 0.47,
+                            'bin_2': 1.55,
+                            'bin_3': 2.69,
+                            'bin_4': 3.92,
+                            'bin_5': 5.45,
+                            'bin_6': 7.73
+                        },
+                        3000: {
+                            'bin_1': 0.5,
+                            'bin_2': 1.7,
+                            'bin_3': 3.0,
+                            'bin_4': 4.3,
+                            'bin_5': 6.0,
+                            'bin_6': 8.45
+                        }
+                    }
+                },
+                9: {
+                    10: {
+                        'bin_1': 0.31,
+                        'bin_2': 0.91,
+                        'bin_3': 1.6,
+                        'bin_4': 2.55
+                    },
+                    100: {
+                        'bin_1': 0.51,
+                        'bin_2': 2.25,
+                        'bin_3': 4.0,
+                        'bin_4': 6.35
+                    }
+                },
+                7: {
+                    10: {
+                        'bin_1': 0.3,
+                        'bin_2': 0.9,
+                        'bin_3': 1.7
+                    },
+                    100: {
+                        'bin_1': 0.7,
+                        'bin_2': 2.7,
+                        'bin_3': 5.5
+                    }
+                },
+                5: {
+                    10: {
+                        'bin_1': 0.5,
+                        'bin_2': 1.5
+                    },
+                    100: {
+                        'bin_1': 1.0,
+                        'bin_2': 3.0
+                    }
+                }
+            }
+        }
     
     def _initialize_data_source(self) -> None:
         """Initialize data source with optimal loading strategy."""
@@ -142,20 +222,27 @@ class MarketDepthDataset(IterableDataset[torch.Tensor]):
         
         self._data_iterator = self._create_batch_iterator()
     
-    def _create_batch_iterator(self) -> Iterator[pl.DataFrame]:
+    def _create_batch_iterator(self) -> Optional[Iterator[pl.DataFrame]]:
         """Create efficient batch iterator over data."""
         if self._current_data is None:
-            return
+            return None
         
         total_rows = len(self._current_data)
         
-        # Ensure we process in SAMPLES-sized chunks for consistency
-        for start_idx in range(0, total_rows - SAMPLES + 1, self.batch_size):
-            end_idx = min(start_idx + SAMPLES, total_rows)
-            
-            if end_idx - start_idx == SAMPLES:
-                batch = self._current_data.slice(start_idx, SAMPLES)
-                yield batch
+        # Check if we have enough data for at least one batch
+        if total_rows < SAMPLES:
+            return None
+        
+        def batch_generator():
+            # Ensure we process in SAMPLES-sized chunks for consistency
+            for start_idx in range(0, total_rows, self.batch_size):
+                end_idx = min(start_idx + self.batch_size, total_rows)
+                
+                if end_idx - start_idx == self.batch_size and self._current_data is not None:
+                    batch = self._current_data.slice(start_idx, self.batch_size)
+                    yield batch
+        
+        return batch_generator()
     
     def add_streaming_data(self, data: Union[np.ndarray, pl.DataFrame]) -> None:
         """
@@ -398,18 +485,153 @@ class MarketDepthDataset(IterableDataset[torch.Tensor]):
         
         return tensor
     
-    def __iter__(self) -> Iterator[torch.Tensor]:
-        """Iterate over market depth representations."""
+    def _generate_classification_targets_for_batch_vectorized(self, batch_df: pl.DataFrame) -> torch.Tensor:
+        """
+        Generate classification targets for a batch of data using vectorized operations.
+        """
+        config = self.classification_config
+        lookback_rows = config['lookback_rows']
+        lookforward_offset = config['lookforward_offset']
+        lookforward_input = config['lookforward_input']
+        
+        # Add mid_price column if not present
+        if 'mid_price' not in batch_df.columns:
+            batch_df = batch_df.with_columns(
+                ((pl.col(ASK_PRICE_COLUMNS[0]) + pl.col(BID_PRICE_COLUMNS[0])) / 2).alias('mid_price')
+            )
+
+        # Vectorized calculations
+        targets_df = batch_df.with_columns([
+            pl.col('mid_price').shift(1).rolling_mean(window_size=lookback_rows).alias('lookback_mean'),
+            pl.col('mid_price').shift(-lookforward_offset - lookforward_input).rolling_mean(window_size=lookforward_input).alias('lookforward_mean'),
+        ]).drop_nulls()
+
+        if targets_df.is_empty():
+            return torch.tensor([config['nbins'] // 2], dtype=torch.long)
+
+        targets_df = targets_df.with_columns(
+            mean_change=((pl.col('lookforward_mean') - pl.col('lookback_mean')) / pl.col('lookback_mean'))
+        )
+
+        # Apply classification function across the series
+        class_labels_expr = self._calculate_classification_label_vectorized(
+            pl.col('mean_change'),
+            config['nbins'],
+            config['ticks_per_bin'],
+            config['lookforward_input'],
+            config['true_pip_size']
+        )
+
+        targets_df = targets_df.with_columns(class_labels_expr.alias('class_label'))
+        
+        return torch.tensor(targets_df['class_label'].to_numpy(), dtype=torch.long)
+
+    def _calculate_classification_label_vectorized(self, mean_change: pl.Expr, nbins: int, ticks_per_bin: int, 
+                                                   lookforward_input: int, true_pip_size: float) -> pl.Expr:
+        """Vectorized classification label calculation."""
+        bin_thresholds = self.classification_config['bin_thresholds']
+        
+        thresholds = bin_thresholds.get(nbins, {}).get(ticks_per_bin, {}).get(lookforward_input)
+        if thresholds is None:
+            thresholds = {'bin_1': 0.5, 'bin_2': 1.5, 'bin_3': 3.0}
+
+        bin_values = {key: float(value) * true_pip_size for key, value in thresholds.items()}
+
+        # Default to the middle bin
+        num_bins_half = nbins // 2
+        
+        # Start with the default case
+        labels_expr = pl.lit(num_bins_half, dtype=pl.Int32)
+
+        # Dynamically apply thresholds
+        sorted_bins = sorted(bin_values.items(), key=lambda item: int(item[0].split('_')[1]))
+
+        # Positive changes
+        for i, (_, value) in enumerate(reversed(sorted_bins)):
+            labels_expr = pl.when(mean_change > value).then(pl.lit(num_bins_half + i + 1, dtype=pl.Int32)).otherwise(labels_expr)
+
+        # Negative changes
+        for i, (_, value) in enumerate(sorted_bins):
+            labels_expr = pl.when(mean_change <= -value).then(pl.lit(num_bins_half - i - 1, dtype=pl.Int32)).otherwise(labels_expr)
+            
+        return labels_expr
+
+    def __iter__(self) -> Iterator[Tuple[torch.Tensor, torch.Tensor]]:
+        """Iterate over market depth representations with classification targets."""
         if self._data_iterator is None:
             raise RuntimeError("No data source configured")
         
         for batch_df in self._data_iterator:
             # Process batch through pipeline with extended features
-            result_array = self._processor.process(batch_df)
+            if self._enable_ultra_fast_mode:
+                # Inlined and adapted version of _get_representation_ultra_fast
+                
+                # 1. Convert DataFrame to padded numpy array
+                numeric_cols = [c for c in batch_df.columns if batch_df[c].dtype != pl.Utf8]
+                np_array = batch_df.select(numeric_cols).to_numpy()
+                
+                rows, cols = np_array.shape
+                if cols < 75:
+                    recent_data = np.zeros((rows, 75), dtype=VOLUME_DTYPE)
+                    recent_data[:, :cols] = np_array
+                else:
+                    recent_data = np_array[:, :75]
+
+                # 2. Fast processing logic
+                price_start = 5
+                ask_prices_start = price_start
+                bid_prices_start = ask_prices_start + 10
+                ask_vols_start = bid_prices_start + 10
+                bid_vols_start = ask_vols_start + 10
+
+                ask_prices = recent_data[:, ask_prices_start:ask_prices_start+10]
+                bid_prices = recent_data[:, bid_prices_start:bid_prices_start+10]
+                ask_volumes = recent_data[:, ask_vols_start:ask_vols_start+10]
+                bid_volumes = recent_data[:, bid_vols_start:bid_vols_start+10]
+
+                ask_prices_int = (ask_prices * 100000).astype(np.int64)
+                bid_prices_int = (bid_prices * 100000).astype(np.int64)
+
+                mid_price = np.mean([ask_prices_int[:, 0].mean(), bid_prices_int[:, 0].mean()])
+
+                self._fast_result_buffer.fill(0.0)
+
+                price_range = 200
+                price_offset = int(mid_price) - price_range
+
+                sample_step = max(1, SAMPLES // (TIME_BINS * 10))  # Sample fewer points
+
+                for i in range(0, SAMPLES, sample_step):
+                    time_bin = min(i // TICKS_PER_BIN, TIME_BINS - 1)
+                    for level in range(min(3, ask_prices_int.shape[1], bid_prices_int.shape[1])):
+                        if level < ask_prices_int.shape[1] and i < ask_prices_int.shape[0]:
+                            ask_price = ask_prices_int[i, level]
+                            ask_vol = ask_volumes[i, level] if i < ask_volumes.shape[0] and level < ask_volumes.shape[1] else 0
+                            ask_price_idx = ask_price - price_offset
+                            if 0 <= ask_price_idx < 402 and time_bin < TIME_BINS:
+                                self._fast_result_buffer[ask_price_idx, time_bin] += ask_vol
+                        if level < bid_prices_int.shape[1] and i < bid_prices_int.shape[0]:
+                            bid_price = bid_prices_int[i, level]
+                            bid_vol = bid_volumes[i, level] if i < bid_volumes.shape[0] and level < bid_volumes.shape[1] else 0
+                            bid_price_idx = bid_price - price_offset
+                            if 0 <= bid_price_idx < 402 and time_bin < TIME_BINS:
+                                self._fast_result_buffer[bid_price_idx, time_bin] -= bid_vol
+                
+                max_val = np.abs(self._fast_result_buffer).max()
+                if max_val > 0:
+                    self._fast_result_buffer /= max_val
+                
+                self._batch_count += 1
+                
+                input_tensor = torch.from_numpy(self._fast_result_buffer.copy())  # type: ignore[arg-type]
+            else:
+                result_array = self._processor.process(batch_df)
+                input_tensor = torch.from_numpy(result_array).to(dtype=torch.float32)  # type: ignore[arg-type]
             
-            # Convert to tensor
-            tensor = torch.from_numpy(result_array).to(dtype=torch.float32)  # type: ignore[arg-type]
-            yield tensor
+            # Use the new vectorized method for classification targets
+            targets = self._generate_classification_targets_for_batch_vectorized(batch_df)
+            
+            yield input_tensor, targets
     
     def __len__(self) -> int:
         """Return number of available batches."""
@@ -435,6 +657,311 @@ class MarketDepthDataset(IterableDataset[torch.Tensor]):
     def is_ready_for_processing(self) -> bool:
         """Whether ring buffer has enough data for processing."""
         return self._ring_buffer.is_full
+    
+    def generate_classification_targets(self, df: pl.DataFrame, stop_row: int) -> Dict[str, Any]:
+        """
+        Generate classification targets based on price movement analysis.
+        
+        Args:
+            df: DataFrame with market data including mid_price column
+            stop_row: Current position in the data
+            
+        Returns:
+            Dictionary containing classification and regression targets
+        """
+        
+        config = self.classification_config
+        lookback_rows = config['lookback_rows']
+        lookforward_offset = config['lookforward_offset']
+        lookforward_input = config['lookforward_input']
+        lookforward_rows = lookforward_input + lookforward_offset
+        true_pip_size = config['true_pip_size']
+        nbins = config['nbins']
+        ticks_per_bin = config['ticks_per_bin']
+        
+        # Calculate price changes
+        target_start_row = stop_row + 1 + lookforward_offset
+        target_stop_row = stop_row + lookforward_rows
+        
+        # Ensure we have enough data
+        if target_stop_row >= len(df) or stop_row < lookback_rows:
+            return {}
+        
+        # Calculate mid price if not present
+        if 'mid_price' not in df.columns:
+            df = df.with_columns(
+                ((pl.col(ASK_PRICE_COLUMNS[0]) + pl.col(BID_PRICE_COLUMNS[0])) / 2).alias('mid_price')
+            )
+        
+        # Extract price data
+        lookback_mean = df['mid_price'][stop_row - lookback_rows:stop_row].mean()
+        lookforward_mean = df['mid_price'][target_start_row:target_stop_row].mean()
+        sample_mid_price = df['mid_price'][stop_row]
+        sample_point_price = df['mid_price'][target_stop_row - 2]
+        lookforward_min = df['mid_price'][target_start_row:target_stop_row].min()
+        lookforward_max = df['mid_price'][target_start_row:target_stop_row].max()
+        
+        # Calculate changes - ensure we have numeric values
+        lookforward_mean_val = float(lookforward_mean) if lookforward_mean is not None else 0.0  # type: ignore[arg-type]
+        lookback_mean_val = float(lookback_mean) if lookback_mean is not None else 0.0  # type: ignore[arg-type]
+        sample_point_price_val = float(sample_point_price) if sample_point_price is not None else 0.0  # type: ignore[arg-type]
+        sample_mid_price_val = float(sample_mid_price) if sample_mid_price is not None else 0.0  # type: ignore[arg-type]
+        
+        # Avoid division by zero
+        if lookback_mean_val == 0:
+            lookback_mean_val = 1e-8
+        if sample_mid_price_val == 0:
+            sample_mid_price_val = 1e-8
+            
+        mean_change = (lookforward_mean_val - lookback_mean_val) / lookback_mean_val
+        sample_change = (sample_point_price_val - lookback_mean_val) / lookback_mean_val
+        point_change = (sample_point_price_val - sample_mid_price_val) / sample_mid_price_val
+        
+        # Generate classification label
+        class_label = self._calculate_classification_label(mean_change, nbins, ticks_per_bin, lookforward_input, true_pip_size)
+        
+        return {
+            'class_label': class_label,
+            'mean_change': float(mean_change),
+            'sample_change': float(sample_change),
+            'point_change': float(point_change),
+            'high_mid_reg': float(((float(lookforward_max) if lookforward_max is not None else 0.0) - sample_mid_price_val) / sample_mid_price_val),  # type: ignore[arg-type]
+            'mid_low_reg': float(-((sample_mid_price_val - (float(lookforward_min) if lookforward_min is not None else 0.0)) / (float(lookforward_min) if lookforward_min is not None else 1.0))),  # type: ignore[arg-type]
+            'lookforward_mean': lookforward_mean_val,
+            'lookback_mean': lookback_mean_val
+        }
+    
+    def _calculate_classification_label(self, mean_change: float, nbins: int, ticks_per_bin: int, 
+                                      lookforward_input: int, true_pip_size: float) -> int:
+        """
+        Calculate classification label based on price movement thresholds.
+        
+        Args:
+            mean_change: Mean price change value
+            nbins: Number of classification bins
+            ticks_per_bin: Ticks per time bin
+            lookforward_input: Lookforward window size
+            true_pip_size: True pip size for scaling
+            
+        Returns:
+            Classification label (0 to nbins-1)
+        """
+        bin_thresholds = self.classification_config['bin_thresholds']
+        
+        # Get appropriate thresholds based on configuration
+        thresholds: Optional[Dict[str, float]] = None
+        
+        if nbins in bin_thresholds:
+            if ticks_per_bin in bin_thresholds[nbins]:
+                candidate = bin_thresholds[nbins][ticks_per_bin]
+                if isinstance(candidate, dict):
+                    # Handle nested structure for different lookforward_input values
+                    if lookforward_input in candidate:
+                        candidate_value = candidate[lookforward_input]  # type: ignore[assignment]
+                        if isinstance(candidate_value, dict):
+                            thresholds = candidate_value  # type: ignore[assignment]
+                    else:
+                        # Use first available threshold set
+                        first_value = list(candidate.values())[0]  # type: ignore[assignment]
+                        if isinstance(first_value, dict):
+                            thresholds = first_value  # type: ignore[assignment]
+                        else:
+                            thresholds = candidate  # type: ignore[assignment]
+                else:
+                    # Direct threshold values
+                    thresholds = candidate  # type: ignore[assignment]
+            else:
+                # Fallback to first available ticks_per_bin
+                first_ticks = list(bin_thresholds[nbins].keys())[0]
+                candidate = bin_thresholds[nbins][first_ticks]
+                if isinstance(candidate, dict):
+                    if lookforward_input in candidate:
+                        candidate_value = candidate[lookforward_input]  # type: ignore[assignment]
+                        if isinstance(candidate_value, dict):
+                            thresholds = candidate_value  # type: ignore[assignment]
+                    else:
+                        first_value = list(candidate.values())[0]  # type: ignore[assignment]
+                        if isinstance(first_value, dict):
+                            thresholds = first_value  # type: ignore[assignment]
+                        else:
+                            thresholds = candidate  # type: ignore[assignment]
+                else:
+                    thresholds = candidate  # type: ignore[assignment]
+        
+        # Default fallback thresholds if nothing found
+        if thresholds is None:
+            thresholds = {'bin_1': 0.5, 'bin_2': 1.5, 'bin_3': 3.0}
+        
+        # Convert thresholds to actual values
+        bin_values: Dict[str, float] = {}
+        for key, value in thresholds.items():
+            bin_values[key] = float(value) * true_pip_size
+        
+        # Calculate classification based on number of bins
+        if nbins == 13:
+            return self._classify_13_bins(mean_change, bin_values)
+        elif nbins == 9:
+            return self._classify_9_bins(mean_change, bin_values)
+        elif nbins == 7:
+            return self._classify_7_bins(mean_change, bin_values)
+        elif nbins == 5:
+            return self._classify_5_bins(mean_change, bin_values)
+        else:
+            # Default 3-bin classification
+            return self._classify_3_bins(mean_change, bin_values)
+    
+    def _classify_13_bins(self, mean_change: float, bin_values: Dict[str, float]) -> int:
+        """13-bin classification logic from notebook."""
+        bin_1 = bin_values.get('bin_1', 0.47 * 0.0001)
+        bin_2 = bin_values.get('bin_2', 1.55 * 0.0001)
+        bin_3 = bin_values.get('bin_3', 2.69 * 0.0001)
+        bin_4 = bin_values.get('bin_4', 3.92 * 0.0001)
+        bin_5 = bin_values.get('bin_5', 5.45 * 0.0001)
+        bin_6 = bin_values.get('bin_6', 7.73 * 0.0001)
+        
+        if mean_change >= bin_6:
+            return 12
+        elif mean_change > bin_5:
+            return 11
+        elif mean_change > bin_4:
+            return 10
+        elif mean_change > bin_3:
+            return 9
+        elif mean_change > bin_2:
+            return 8
+        elif mean_change > bin_1:
+            return 7
+        elif mean_change > -bin_1:
+            return 6
+        elif mean_change > -bin_2:
+            return 5
+        elif mean_change > -bin_3:
+            return 4
+        elif mean_change > -bin_4:
+            return 3
+        elif mean_change > -bin_5:
+            return 2
+        elif mean_change > -bin_6:
+            return 1
+        else:
+            return 0
+    
+    def _classify_9_bins(self, mean_change: float, bin_values: Dict[str, float]) -> int:
+        """9-bin classification logic from notebook."""
+        bin_1 = bin_values.get('bin_1', 0.51 * 0.0001)
+        bin_2 = bin_values.get('bin_2', 2.25 * 0.0001)
+        bin_3 = bin_values.get('bin_3', 4.0 * 0.0001)
+        bin_4 = bin_values.get('bin_4', 6.35 * 0.0001)
+        
+        if mean_change >= bin_4:
+            return 8
+        elif mean_change > bin_3:
+            return 7
+        elif mean_change > bin_2:
+            return 6
+        elif mean_change > bin_1:
+            return 5
+        elif mean_change > -bin_1:
+            return 4
+        elif mean_change > -bin_2:
+            return 3
+        elif mean_change > -bin_3:
+            return 2
+        elif mean_change > -bin_4:
+            return 1
+        else:
+            return 0
+    
+    def _classify_7_bins(self, mean_change: float, bin_values: Dict[str, float]) -> int:
+        """7-bin classification logic from notebook."""
+        bin_1 = bin_values.get('bin_1', 0.7 * 0.0001)
+        bin_2 = bin_values.get('bin_2', 2.7 * 0.0001)
+        bin_3 = bin_values.get('bin_3', 5.5 * 0.0001)
+        
+        if mean_change > bin_3:
+            return 6
+        elif mean_change > bin_2:
+            return 5
+        elif mean_change > bin_1:
+            return 4
+        elif mean_change > -bin_1:
+            return 3
+        elif mean_change > -bin_2:
+            return 2
+        elif mean_change > -bin_3:
+            return 1
+        else:
+            return 0
+    
+    def _classify_5_bins(self, mean_change: float, bin_values: Dict[str, float]) -> int:
+        """5-bin classification logic from notebook."""
+        bin_1 = bin_values.get('bin_1', 1.0 * 0.0001)
+        bin_2 = bin_values.get('bin_2', 3.0 * 0.0001)
+        
+        if mean_change > bin_2:
+            return 4
+        elif mean_change > bin_1:
+            return 3
+        elif mean_change > -bin_1:
+            return 2
+        elif mean_change > -bin_2:
+            return 1
+        else:
+            return 0
+    
+    def _classify_3_bins(self, mean_change: float, bin_values: Dict[str, float]) -> int:
+        """3-bin classification (up, neutral, down)."""
+        bin_1 = bin_values.get('bin_1', 0.5 * 0.0001)
+        
+        if mean_change > bin_1:
+            return 2  # Up
+        elif mean_change > -bin_1:
+            return 1  # Neutral
+        else:
+            return 0  # Down
+    
+    def _generate_classification_targets_for_batch(self, batch_df: pl.DataFrame) -> torch.Tensor:
+        """
+        Generate classification targets for a batch of data.
+        
+        Args:
+            batch_df: DataFrame containing the batch data
+            
+        Returns:
+            Tensor of classification labels
+        """
+        config = self.classification_config
+        lookback_rows = config['lookback_rows']
+        lookforward_rows = config['lookforward_input'] + config['lookforward_offset']
+        
+        # Find valid positions where we can generate targets
+        batch_size = len(batch_df)
+        valid_positions: List[int] = []
+        
+        # We need enough data before and after each position
+        for i in range(lookback_rows, batch_size - lookforward_rows):
+            valid_positions.append(i)
+        
+        if not valid_positions:
+            # Return default class (middle class) if no valid positions
+            default_class = config['nbins'] // 2  # Middle class
+            return torch.tensor([default_class], dtype=torch.long)
+        
+        # Generate classification targets for valid positions
+        class_labels: List[int] = []
+        
+        for pos in valid_positions:
+            targets = self.generate_classification_targets(batch_df, pos)
+            
+            if targets:  # Only add if targets were successfully generated
+                class_labels.append(targets['class_label'])
+            else:
+                # Use default class if target generation fails
+                default_class = config['nbins'] // 2
+                class_labels.append(default_class)
+        
+        # Return tensor of classification labels
+        return torch.tensor(class_labels, dtype=torch.long)
 
 
 class HighPerformanceDataLoader:
@@ -815,7 +1342,8 @@ def create_streaming_dataloader(
     batch_size: int = 8,
     num_workers: int = 8,
     device: str = "cpu",
-    features: Optional[list[str]] = None
+    features: Optional[list[str]] = None,
+    classification_config: Optional[Dict[str, Any]] = None
 ) -> Tuple[MarketDepthDataset, HighPerformanceDataLoader]:
     """
     Create a streaming dataloader for real-time market data processing.
@@ -827,6 +1355,7 @@ def create_streaming_dataloader(
         device: Target device for tensors
         features: List of features to extract. Options: 'volume', 'variance', 'trade_counts'
                  Defaults to ['volume'] for backward compatibility.
+        classification_config: Configuration for classification (bins, lookforward params, etc.)
         
     Returns:
         Tuple of (dataset, dataloader) ready for streaming data
@@ -837,7 +1366,8 @@ def create_streaming_dataloader(
         buffer_size=buffer_size,
         use_memory_mapping=False,  # Not applicable for streaming
         preload_batches=4,
-        features=features
+        features=features,
+        classification_config=classification_config
     )
     
     # Create high-performance dataloader
@@ -857,7 +1387,8 @@ def create_file_dataloader(
     num_workers: int = 8,
     device: str = "cpu",
     use_memory_mapping: bool = True,
-    features: Optional[list[str]] = None
+    features: Optional[list[str]] = None,
+    classification_config: Optional[Dict[str, Any]] = None
 ) -> HighPerformanceDataLoader:
     """
     Create a dataloader for processing market data files.
@@ -870,6 +1401,7 @@ def create_file_dataloader(
         use_memory_mapping: Enable memory mapping for large files
         features: List of features to extract. Options: 'volume', 'variance', 'trade_counts'
                  Defaults to ['volume'] for backward compatibility.
+        classification_config: Configuration for classification (bins, lookforward params, etc.)
         
     Returns:
         High-performance dataloader ready for training
@@ -880,7 +1412,8 @@ def create_file_dataloader(
         batch_size=TICKS_PER_BIN,  # Process in standard chunks
         use_memory_mapping=use_memory_mapping,
         preload_batches=8,
-        features=features
+        features=features,
+        classification_config=classification_config
     )
     
     # Create dataloader
