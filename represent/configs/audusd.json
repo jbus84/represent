@@ -1,0 +1,89 @@
+{
+  "currency_pair": "AUDUSD",
+  "classification": {
+    "micro_pip_size": 0.00001,
+    "true_pip_size": 0.0001,
+    "ticks_per_bin": 100,
+    "lookforward_offset": 500,
+    "lookforward_input": 5000,
+    "lookback_rows": 5000,
+    "nbins": 13,
+    "bin_thresholds": {
+      "13": {
+        "100": {
+          "5000": {
+            "bin_1": 0.47,
+            "bin_2": 1.55,
+            "bin_3": 2.69,
+            "bin_4": 3.92,
+            "bin_5": 5.45,
+            "bin_6": 7.73
+          },
+          "3000": {
+            "bin_1": 0.5,
+            "bin_2": 1.7,
+            "bin_3": 3.0,
+            "bin_4": 4.3,
+            "bin_5": 6.0,
+            "bin_6": 8.45
+          }
+        },
+        "10": {
+          "5000": {
+            "bin_1": 0.40,
+            "bin_2": 1.35,
+            "bin_3": 2.45,
+            "bin_4": 3.50,
+            "bin_5": 4.95,
+            "bin_6": 7.20
+          }
+        }
+      },
+      "9": {
+        "10": {
+          "bin_1": 0.31,
+          "bin_2": 0.91,
+          "bin_3": 1.6,
+          "bin_4": 2.55
+        },
+        "100": {
+          "bin_1": 0.51,
+          "bin_2": 2.25,
+          "bin_3": 4.0,
+          "bin_4": 6.35
+        }
+      },
+      "7": {
+        "10": {
+          "bin_1": 0.3,
+          "bin_2": 0.9,
+          "bin_3": 1.7
+        },
+        "100": {
+          "bin_1": 0.7,
+          "bin_2": 2.7,
+          "bin_3": 5.5
+        }
+      },
+      "5": {
+        "10": {
+          "bin_1": 0.5,
+          "bin_2": 1.5
+        },
+        "100": {
+          "bin_1": 1.0,
+          "bin_2": 3.0
+        }
+      }
+    }
+  },
+  "sampling": {
+    "sampling_mode": "random",
+    "coverage_percentage": 0.8,
+    "end_tick_strategy": "uniform_random",
+    "min_tick_spacing": 100,
+    "seed": 42,
+    "max_samples": null
+  },
+  "description": "Optimized configuration for AUD/USD major currency pair with empirically-derived thresholds"
+}

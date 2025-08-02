@@ -21,6 +21,7 @@ from .constants import (
 )
 from .data_structures import RingBuffer
 from .pipeline import MarketDepthProcessor
+from .config import ClassificationConfig, SamplingConfig, load_currency_config
 
 
 class MarketDepthDataset(IterableDataset[Tuple[torch.Tensor, torch.Tensor]]):
@@ -36,6 +37,8 @@ class MarketDepthDataset(IterableDataset[Tuple[torch.Tensor, torch.Tensor]]):
     - Classification target generation based on price movement analysis
     """
     
+    currency: Optional[str]
+    
     def __init__(
         self, 
         data_source: Union[str, Path, pl.DataFrame, None] = None,
@@ -44,8 +47,9 @@ class MarketDepthDataset(IterableDataset[Tuple[torch.Tensor, torch.Tensor]]):
         use_memory_mapping: bool = True,
         preload_batches: int = 4,
         features: Optional[Union[list[str], list[FeatureType]]] = None,
-        classification_config: Optional[Dict[str, Any]] = None,
-        sampling_config: Optional[Dict[str, Any]] = None
+        classification_config: Optional[Union[Dict[str, Any], ClassificationConfig]] = None,
+        sampling_config: Optional[Union[Dict[str, Any], SamplingConfig]] = None,
+        currency: Optional[str] = None
     ):
         """
         Initialize market depth dataset.
@@ -59,7 +63,12 @@ class MarketDepthDataset(IterableDataset[Tuple[torch.Tensor, torch.Tensor]]):
             features: List of features to extract. Options: 'volume', 'variance', 'trade_counts'
                      Defaults to ['volume'] for backward compatibility.
             classification_config: Configuration for classification (bins, lookforward params, etc.)
+                                 Can be dict or ClassificationConfig instance
             sampling_config: Configuration for random sampling of end ticks from dataset
+                           Can be dict or SamplingConfig instance
+            currency: Currency pair (e.g., 'AUDUSD') to load currency-specific configuration.
+                     If provided, overrides classification_config and sampling_config with
+                     currency-optimized settings.
         """
         super().__init__()
         
@@ -69,18 +78,32 @@ class MarketDepthDataset(IterableDataset[Tuple[torch.Tensor, torch.Tensor]]):
         self.preload_batches = preload_batches
         self.features = features if features is not None else DEFAULT_FEATURES.copy()
         
-        # Classification configuration - always enabled
-        default_config = self._get_default_classification_config()
-        if classification_config:
-            # Merge user config with defaults
-            default_config.update(classification_config)
-        self.classification_config = default_config
-        
-        # Random sampling configuration
-        default_sampling_config = self._get_default_sampling_config()
-        if sampling_config:
-            default_sampling_config.update(sampling_config)
-        self.sampling_config = default_sampling_config
+        # Handle currency-specific configuration
+        if currency:
+            currency_config = load_currency_config(currency)
+            self.classification_config = currency_config.classification
+            self.sampling_config = currency_config.sampling
+            self.currency = currency.upper()
+        else:
+            # Handle classification configuration
+            if isinstance(classification_config, ClassificationConfig):
+                self.classification_config = classification_config
+            elif classification_config is not None:
+                # Convert dict to Pydantic model for validation
+                self.classification_config = ClassificationConfig(**classification_config)
+            else:
+                self.classification_config = ClassificationConfig()
+            
+            # Handle sampling configuration
+            if isinstance(sampling_config, SamplingConfig):
+                self.sampling_config = sampling_config
+            elif sampling_config is not None:
+                # Convert dict to Pydantic model for validation
+                self.sampling_config = SamplingConfig(**sampling_config)
+            else:
+                self.sampling_config = SamplingConfig()
+            
+            self.currency = None
         
         # Initialize high-performance components
         self._ring_buffer = RingBuffer(capacity=buffer_size)
@@ -120,86 +143,6 @@ class MarketDepthDataset(IterableDataset[Tuple[torch.Tensor, torch.Tensor]]):
         if data_source is not None:
             self._initialize_data_source()
     
-    def _get_default_sampling_config(self) -> Dict[str, Any]:
-        """Get default random sampling configuration."""
-        return {
-            'sampling_mode': 'consecutive',  # 'consecutive' | 'random'
-            'coverage_percentage': 1.0,  # Process 100% of dataset by default
-            'end_tick_strategy': 'uniform_random',  # How to select end ticks
-            'min_tick_spacing': 100,  # Minimum spacing between sampled end ticks
-            'seed': 42,  # For reproducible random sampling
-            'max_samples': None,  # Maximum number of samples to process (None = no limit)
-        }
-    
-    def _get_default_classification_config(self) -> Dict[str, Any]:
-        """Get default classification configuration based on notebook logic."""
-        return {
-            'micro_pip_size': 0.00001,
-            'true_pip_size': 0.0001,
-            'ticks_per_bin': 100,
-            'lookforward_offset': 500,
-            'lookforward_input': 5000,
-            'lookback_rows': 5000,
-            'nbins': 13,
-            'bin_thresholds': {
-                13: {
-                    100: {  # ticks_per_bin
-                        5000: {  # lookforward_input
-                            'bin_1': 0.47,
-                            'bin_2': 1.55,
-                            'bin_3': 2.69,
-                            'bin_4': 3.92,
-                            'bin_5': 5.45,
-                            'bin_6': 7.73
-                        },
-                        3000: {
-                            'bin_1': 0.5,
-                            'bin_2': 1.7,
-                            'bin_3': 3.0,
-                            'bin_4': 4.3,
-                            'bin_5': 6.0,
-                            'bin_6': 8.45
-                        }
-                    }
-                },
-                9: {
-                    10: {
-                        'bin_1': 0.31,
-                        'bin_2': 0.91,
-                        'bin_3': 1.6,
-                        'bin_4': 2.55
-                    },
-                    100: {
-                        'bin_1': 0.51,
-                        'bin_2': 2.25,
-                        'bin_3': 4.0,
-                        'bin_4': 6.35
-                    }
-                },
-                7: {
-                    10: {
-                        'bin_1': 0.3,
-                        'bin_2': 0.9,
-                        'bin_3': 1.7
-                    },
-                    100: {
-                        'bin_1': 0.7,
-                        'bin_2': 2.7,
-                        'bin_3': 5.5
-                    }
-                },
-                5: {
-                    10: {
-                        'bin_1': 0.5,
-                        'bin_2': 1.5
-                    },
-                    100: {
-                        'bin_1': 1.0,
-                        'bin_2': 3.0
-                    }
-                }
-            }
-        }
     
     def _analyze_and_select_end_ticks(self) -> None:
         """
@@ -212,12 +155,10 @@ class MarketDepthDataset(IterableDataset[Tuple[torch.Tensor, torch.Tensor]]):
             return
         
         total_rows = len(self._current_data)
-        config = self.sampling_config
-        class_config = self.classification_config
         
         # Calculate minimum requirements for valid end ticks
-        lookforward_offset = class_config.get('lookforward_offset', 500)
-        lookforward_input = class_config.get('lookforward_input', 5000)
+        lookforward_offset = self.classification_config.lookforward_offset
+        lookforward_input = self.classification_config.lookforward_input
         min_lookforward = lookforward_offset + lookforward_input
         
         # Valid end tick range: must have SAMPLES rows before and sufficient lookforward data after
@@ -233,21 +174,21 @@ class MarketDepthDataset(IterableDataset[Tuple[torch.Tensor, torch.Tensor]]):
         all_valid_positions = list(range(min_end_tick, max_end_tick + 1))
         
         # Apply sampling based on configuration
-        if config['sampling_mode'] == 'random':
+        if self.sampling_config.sampling_mode == 'random':
             # Set random seed for reproducibility
-            if config.get('seed') is not None:
-                random.seed(config['seed'])
+            if self.sampling_config.seed is not None:
+                random.seed(self.sampling_config.seed)
             
             # Calculate number of samples based on coverage percentage
-            coverage = min(1.0, max(0.0, config['coverage_percentage']))
-            max_samples = config.get('max_samples')
+            coverage = min(1.0, max(0.0, self.sampling_config.coverage_percentage))
+            max_samples = self.sampling_config.max_samples
             
             target_samples = int(len(all_valid_positions) * coverage)
             if max_samples is not None:
                 target_samples = min(target_samples, max_samples)
             
             # Apply minimum spacing constraint before sampling
-            min_spacing = config.get('min_tick_spacing', 100)
+            min_spacing = self.sampling_config.min_tick_spacing
             if min_spacing > 1:
                 # Create evenly spaced candidates that satisfy spacing requirement
                 spaced_positions: List[int] = []
@@ -267,8 +208,8 @@ class MarketDepthDataset(IterableDataset[Tuple[torch.Tensor, torch.Tensor]]):
             
         else:
             # Consecutive sampling (default behavior)
-            coverage = min(1.0, max(0.0, config['coverage_percentage']))
-            max_samples = config.get('max_samples')
+            coverage = min(1.0, max(0.0, self.sampling_config.coverage_percentage))
+            max_samples = self.sampling_config.max_samples
             
             target_samples = int(len(all_valid_positions) * coverage)
             if max_samples is not None:
@@ -626,10 +567,9 @@ class MarketDepthDataset(IterableDataset[Tuple[torch.Tensor, torch.Tensor]]):
     
     def _generate_targets_for_windowed_batch(self, batch_df: pl.DataFrame) -> torch.Tensor:
         """Generate classification targets for windowed batch from random sampling."""
-        config = self.classification_config
-        lookback_rows = config['lookback_rows']
-        lookforward_offset = config['lookforward_offset']
-        lookforward_input = config['lookforward_input']
+        lookback_rows = self.classification_config.lookback_rows
+        lookforward_offset = self.classification_config.lookforward_offset
+        lookforward_input = self.classification_config.lookforward_input
         
         # Extract end tick metadata
         end_tick_pos = batch_df['_end_tick_position'][0]
@@ -645,7 +585,7 @@ class MarketDepthDataset(IterableDataset[Tuple[torch.Tensor, torch.Tensor]]):
         # The end tick position is relative to the original dataset
         # We need to calculate the lookback and lookforward from the full dataset
         if self._current_data is None:
-            return torch.tensor([config['nbins'] // 2], dtype=torch.long)
+            return torch.tensor([self.classification_config.nbins // 2], dtype=torch.long)
         
         # Calculate lookback mean from the historical data in our window
         # The end tick position in the window is (end_tick_pos - window_start)
@@ -653,7 +593,7 @@ class MarketDepthDataset(IterableDataset[Tuple[torch.Tensor, torch.Tensor]]):
         
         if end_tick_in_window < lookback_rows:
             # Not enough lookback data in window
-            return torch.tensor([config['nbins'] // 2], dtype=torch.long)
+            return torch.tensor([self.classification_config.nbins // 2], dtype=torch.long)
         
         # Calculate lookback mean from window data
         lookback_start = max(0, end_tick_in_window - lookback_rows)
@@ -667,7 +607,7 @@ class MarketDepthDataset(IterableDataset[Tuple[torch.Tensor, torch.Tensor]]):
         
         if lookforward_end >= len(self._current_data):
             # Not enough lookforward data
-            return torch.tensor([config['nbins'] // 2], dtype=torch.long)
+            return torch.tensor([self.classification_config.nbins // 2], dtype=torch.long)
         
         # Extract lookforward data from original dataset with mid_price
         lookforward_data = self._current_data.slice(lookforward_start, lookforward_input)
@@ -680,7 +620,7 @@ class MarketDepthDataset(IterableDataset[Tuple[torch.Tensor, torch.Tensor]]):
         
         # Calculate mean change and classify
         if lookback_mean is None or lookforward_mean is None or lookback_mean == 0:
-            return torch.tensor([config['nbins'] // 2], dtype=torch.long)
+            return torch.tensor([self.classification_config.nbins // 2], dtype=torch.long)
         
         # Ensure we have numeric values for the calculation
         # Handle case where Polars mean() might return non-numeric types
@@ -690,24 +630,23 @@ class MarketDepthDataset(IterableDataset[Tuple[torch.Tensor, torch.Tensor]]):
             lookforward_val = float(lookforward_mean) if isinstance(lookforward_mean, (int, float)) else float(str(lookforward_mean))  # type: ignore[arg-type]
         except (TypeError, ValueError):
             # If conversion fails, return middle bin
-            return torch.tensor([config['nbins'] // 2], dtype=torch.long)
+            return torch.tensor([self.classification_config.nbins // 2], dtype=torch.long)
         
         mean_change = (lookforward_val - lookback_val) / lookback_val
         
         # Apply classification
         class_label = self._calculate_single_classification_label(
-            mean_change, config['nbins'], config['ticks_per_bin'],
-            config['lookforward_input'], config['true_pip_size']
+            mean_change, self.classification_config.nbins, self.classification_config.ticks_per_bin,
+            self.classification_config.lookforward_input, self.classification_config.true_pip_size
         )
         
         return torch.tensor([class_label], dtype=torch.long)
     
     def _generate_targets_consecutive_mode(self, batch_df: pl.DataFrame) -> torch.Tensor:
         """Generate targets using the original consecutive mode approach."""
-        config = self.classification_config
-        lookback_rows = config['lookback_rows']
-        lookforward_offset = config['lookforward_offset']
-        lookforward_input = config['lookforward_input']
+        lookback_rows = self.classification_config.lookback_rows
+        lookforward_offset = self.classification_config.lookforward_offset
+        lookforward_input = self.classification_config.lookforward_input
         
         # Add mid_price column if not present
         if 'mid_price' not in batch_df.columns:
@@ -722,7 +661,7 @@ class MarketDepthDataset(IterableDataset[Tuple[torch.Tensor, torch.Tensor]]):
         ]).drop_nulls()
 
         if targets_df.is_empty():
-            return torch.tensor([config['nbins'] // 2], dtype=torch.long)
+            return torch.tensor([self.classification_config.nbins // 2], dtype=torch.long)
 
         targets_df = targets_df.with_columns(
             mean_change=((pl.col('lookforward_mean') - pl.col('lookback_mean')) / pl.col('lookback_mean'))
@@ -731,10 +670,10 @@ class MarketDepthDataset(IterableDataset[Tuple[torch.Tensor, torch.Tensor]]):
         # Apply classification function across the series
         class_labels_expr = self._calculate_classification_label_vectorized(
             pl.col('mean_change'),
-            config['nbins'],
-            config['ticks_per_bin'],
-            config['lookforward_input'],
-            config['true_pip_size']
+            self.classification_config.nbins,
+            self.classification_config.ticks_per_bin,
+            self.classification_config.lookforward_input,
+            self.classification_config.true_pip_size
         )
 
         targets_df = targets_df.with_columns(class_labels_expr.alias('class_label'))
@@ -923,11 +862,7 @@ class MarketDepthDataset(IterableDataset[Tuple[torch.Tensor, torch.Tensor]]):
     def _calculate_classification_label_vectorized(self, mean_change: pl.Expr, nbins: int, ticks_per_bin: int, 
                                                    lookforward_input: int, true_pip_size: float) -> pl.Expr:
         """Vectorized classification label calculation."""
-        bin_thresholds = self.classification_config['bin_thresholds']
-        
-        thresholds = bin_thresholds.get(nbins, {}).get(ticks_per_bin, {}).get(lookforward_input)
-        if thresholds is None:
-            thresholds = {'bin_1': 0.5, 'bin_2': 1.5, 'bin_3': 3.0}
+        thresholds = self.classification_config.get_thresholds(ticks_per_bin, lookforward_input)
 
         bin_values = {key: float(value) * true_pip_size for key, value in thresholds.items()}
 
@@ -1068,14 +1003,13 @@ class MarketDepthDataset(IterableDataset[Tuple[torch.Tensor, torch.Tensor]]):
             Dictionary containing classification and regression targets
         """
         
-        config = self.classification_config
-        lookback_rows = config['lookback_rows']
-        lookforward_offset = config['lookforward_offset']
-        lookforward_input = config['lookforward_input']
+        lookback_rows = self.classification_config.lookback_rows
+        lookforward_offset = self.classification_config.lookforward_offset
+        lookforward_input = self.classification_config.lookforward_input
         lookforward_rows = lookforward_input + lookforward_offset
-        true_pip_size = config['true_pip_size']
-        nbins = config['nbins']
-        ticks_per_bin = config['ticks_per_bin']
+        true_pip_size = self.classification_config.true_pip_size
+        nbins = self.classification_config.nbins
+        ticks_per_bin = self.classification_config.ticks_per_bin
         
         # Calculate price changes
         target_start_row = stop_row + 1 + lookforward_offset
@@ -1144,51 +1078,9 @@ class MarketDepthDataset(IterableDataset[Tuple[torch.Tensor, torch.Tensor]]):
         Returns:
             Classification label (0 to nbins-1)
         """
-        bin_thresholds = self.classification_config['bin_thresholds']
+        thresholds = self.classification_config.get_thresholds(ticks_per_bin, lookforward_input)
         
-        # Get appropriate thresholds based on configuration
-        thresholds: Optional[Dict[str, float]] = None
-        
-        if nbins in bin_thresholds:
-            if ticks_per_bin in bin_thresholds[nbins]:
-                candidate = bin_thresholds[nbins][ticks_per_bin]
-                if isinstance(candidate, dict):
-                    # Handle nested structure for different lookforward_input values
-                    if lookforward_input in candidate:
-                        candidate_value = candidate[lookforward_input]  # type: ignore[assignment]
-                        if isinstance(candidate_value, dict):
-                            thresholds = candidate_value  # type: ignore[assignment]
-                    else:
-                        # Use first available threshold set
-                        first_value = list(candidate.values())[0]  # type: ignore[assignment]
-                        if isinstance(first_value, dict):
-                            thresholds = first_value  # type: ignore[assignment]
-                        else:
-                            thresholds = candidate  # type: ignore[assignment]
-                else:
-                    # Direct threshold values
-                    thresholds = candidate  # type: ignore[assignment]
-            else:
-                # Fallback to first available ticks_per_bin
-                first_ticks = list(bin_thresholds[nbins].keys())[0]
-                candidate = bin_thresholds[nbins][first_ticks]
-                if isinstance(candidate, dict):
-                    if lookforward_input in candidate:
-                        candidate_value = candidate[lookforward_input]  # type: ignore[assignment]
-                        if isinstance(candidate_value, dict):
-                            thresholds = candidate_value  # type: ignore[assignment]
-                    else:
-                        first_value = list(candidate.values())[0]  # type: ignore[assignment]
-                        if isinstance(first_value, dict):
-                            thresholds = first_value  # type: ignore[assignment]
-                        else:
-                            thresholds = candidate  # type: ignore[assignment]
-                else:
-                    thresholds = candidate  # type: ignore[assignment]
-        
-        # Default fallback thresholds if nothing found
-        if thresholds is None:
-            thresholds = {'bin_1': 0.5, 'bin_2': 1.5, 'bin_3': 3.0}
+        # This method was already updated above in the previous edit
         
         # Convert thresholds to actual values
         bin_values: Dict[str, float] = {}
@@ -1328,9 +1220,8 @@ class MarketDepthDataset(IterableDataset[Tuple[torch.Tensor, torch.Tensor]]):
         Returns:
             Tensor of classification labels
         """
-        config = self.classification_config
-        lookback_rows = config['lookback_rows']
-        lookforward_rows = config['lookforward_input'] + config['lookforward_offset']
+        lookback_rows = self.classification_config.lookback_rows
+        lookforward_rows = self.classification_config.lookforward_input + self.classification_config.lookforward_offset
         
         # Find valid positions where we can generate targets
         batch_size = len(batch_df)
@@ -1342,7 +1233,7 @@ class MarketDepthDataset(IterableDataset[Tuple[torch.Tensor, torch.Tensor]]):
         
         if not valid_positions:
             # Return default class (middle class) if no valid positions
-            default_class = config['nbins'] // 2  # Middle class
+            default_class = self.classification_config.nbins // 2  # Middle class
             return torch.tensor([default_class], dtype=torch.long)
         
         # Generate classification targets for valid positions
@@ -1355,7 +1246,7 @@ class MarketDepthDataset(IterableDataset[Tuple[torch.Tensor, torch.Tensor]]):
                 class_labels.append(targets['class_label'])
             else:
                 # Use default class if target generation fails
-                default_class = config['nbins'] // 2
+                default_class = self.classification_config.nbins // 2
                 class_labels.append(default_class)
         
         # Return tensor of classification labels
