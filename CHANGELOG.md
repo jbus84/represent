@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.7.0 (2025-08-02)
+
+### Features
+
+- **config**: Clean up configuration logic
+  ([`47376f0`](https://github.com/jbus84/represent/commit/47376f0cc5344e8de0c01d61cff9548e812286dc))
+
+
 ## v1.6.0 (2025-08-02)
 
 ### Features
