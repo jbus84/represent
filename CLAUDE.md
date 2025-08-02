@@ -255,6 +255,14 @@ features=['variance'] → shape (402, 500)
 - **Coverage reporting** - use `make test-coverage` and `make coverage-html` for detailed reports
 
 
+## Recent Updates
+
+### Classification Logic Integration
+- Added classification class generation logic from `notebooks/market_depth_extraction_micro_pips.py` 
+- Integrated price movement-based classification with configurable bin thresholds
+- Enhanced PyTorch dataloader with classification target generation capabilities
+- Updated tests to cover new classification functionality
+
 ## Development Workflow
 
 ### Environment Setup
@@ -365,6 +373,8 @@ BID_VOL_COLUMNS = [f"bid_sz_{str(i).zfill(2)}" for i in range(10)]
 **ARCHITECTURAL PERFORMANCE REQUIREMENTS:**
 - **Context Size**: Maintain exactly 50K samples in O(1) ring buffer
 - **Batch Size**: Process exactly 500 records per batch with vectorized operations
+- **Random Sampling**: Support efficient random sampling of end ticks from large datasets
+- **Configurable Processing**: Process configurable percentage of total dataset (not all data)
 - **Data Structures**: All critical path data structures must be cache-aligned
 - **Thread Safety**: Lock-free data structures for concurrent access
 
@@ -386,6 +396,66 @@ When working on this codebase:
 12. **Test thoroughly** - Include performance regression tests (use `make test`)
 13. **Document performance decisions** - Explain why specific optimizations were chosen
 14. **Optimize first, then simplify** - Performance takes precedence over elegance in this system
+
+## Random Sampling & Dataset Processing Requirements
+
+### Random End Tick Sampling Architecture
+
+The DataLoader must support efficient random sampling of "end ticks" instead of consecutive processing:
+
+**Key Concepts:**
+- **End Tick**: The final tick in a time series window used for feature generation
+- **Target Sampling**: Classification target sampled at a configurable offset after the end tick
+- **Random Sampling**: Randomly select end ticks from the dataset rather than consecutive processing
+- **Configurable Coverage**: Process only a specified percentage of the total dataset
+
+**Implementation Requirements:**
+```python
+# Example configuration for random sampling
+dataset_config = {
+    'sampling_mode': 'random',  # 'consecutive' | 'random'
+    'coverage_percentage': 0.20,  # Process 20% of total dataset
+    'end_tick_strategy': 'uniform_random',  # How to select end ticks
+    'target_offset_ticks': 500,  # Ticks after end tick to sample target
+    'lookback_window': 2000,  # Historical ticks before end tick for features
+    'min_tick_spacing': 100,  # Minimum spacing between sampled end ticks
+    'seed': 42  # For reproducible random sampling
+}
+```
+
+**Performance Requirements for Random Sampling:**
+- **Random Selection**: <1ms to select random end tick positions
+- **Feature Generation**: Same <10ms target for any sampled end tick
+- **Memory Efficiency**: Pre-compute valid end tick ranges to avoid runtime validation
+- **Cache Efficiency**: Optimize for non-sequential data access patterns
+- **Coverage Validation**: Validate coverage percentage achieves target without overlap
+
+**Random Sampling Algorithm:**
+1. **Dataset Analysis**: Scan dataset to identify valid end tick positions
+2. **Random Selection**: Use configurable seed to randomly select end ticks from valid positions
+3. **Coverage Calculation**: Ensure selected ticks cover the requested percentage of data
+4. **Feature Extraction**: Extract features for each randomly selected end tick
+5. **Target Generation**: Sample classification targets at configured offsets
+
+### Dataset Processing Optimization
+
+**Configurable Processing Volume:**
+```python
+# Support processing subsets of large datasets
+processing_config = {
+    'total_dataset_size': 1_000_000,  # Total ticks in dataset
+    'coverage_percentage': 0.15,  # Process 15% = 150K ticks
+    'sampling_strategy': 'stratified_random',  # Ensure temporal distribution
+    'max_processing_time': 300_000,  # 5 minutes max processing time
+    'early_stopping': True,  # Stop if coverage achieved early
+}
+```
+
+**Memory Management for Large Datasets:**
+- **Lazy Loading**: Load only selected tick ranges into memory
+- **Streaming Processing**: Process selected ticks in configurable batch sizes
+- **Memory Budgets**: Respect memory constraints while processing subsets
+- **Garbage Collection**: Aggressive cleanup of processed tick data
 
 ### Extended Features Implementation Guidelines
 
