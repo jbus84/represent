@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.6.0 (2025-08-02)
+
+### Features
+
+- Implement working Pydantic configuration system
+  ([`cee83e0`](https://github.com/jbus84/represent/commit/cee83e0bf33acc9d1b45081eb9370c16ce8e3790))
+
+- **configs**: Add configurations
+  ([`f70078a`](https://github.com/jbus84/represent/commit/f70078a20c5eafb202e57097b43d133ec8ac167b))
+
+
 ## v1.5.0 (2025-08-02)
 
 ### Features
