@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.5.0 (2025-08-02)
+
+### Features
+
+- **classification**: Add classification tooling
+  ([`e8da149`](https://github.com/jbus84/represent/commit/e8da149de52751e6c6bdbaeeb3582870da56705b))
+
+- **targets**: Make sure targets are produced by the dataloader
+  ([`012d37f`](https://github.com/jbus84/represent/commit/012d37f0396e6867f9521165332c97899830f000))
+
+
 ## v1.4.0 (2025-07-30)
 
 ### Features
