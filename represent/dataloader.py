@@ -85,25 +85,32 @@ class MarketDepthDataset(IterableDataset[Tuple[torch.Tensor, torch.Tensor]]):
             self.sampling_config = currency_config.sampling
             self.currency = currency.upper()
         else:
-            # Handle classification configuration
+            # If no currency provided, use default currency (AUDUSD) as base
+            default_currency = 'AUDUSD'
+            currency_config = load_currency_config(default_currency)
+            
+            # Override with any provided configurations
             if isinstance(classification_config, ClassificationConfig):
                 self.classification_config = classification_config
             elif classification_config is not None:
-                # Convert dict to Pydantic model for validation
-                self.classification_config = ClassificationConfig(**classification_config)
+                # Start with currency defaults, then override with user settings
+                base_config = currency_config.classification.model_dump()
+                base_config.update(classification_config)
+                self.classification_config = ClassificationConfig(**base_config)
             else:
-                self.classification_config = ClassificationConfig()
+                self.classification_config = currency_config.classification
             
-            # Handle sampling configuration
             if isinstance(sampling_config, SamplingConfig):
                 self.sampling_config = sampling_config
             elif sampling_config is not None:
-                # Convert dict to Pydantic model for validation
-                self.sampling_config = SamplingConfig(**sampling_config)
+                # Start with currency defaults, then override with user settings
+                base_config = currency_config.sampling.model_dump()
+                base_config.update(sampling_config)
+                self.sampling_config = SamplingConfig(**base_config)
             else:
-                self.sampling_config = SamplingConfig()
+                self.sampling_config = currency_config.sampling
             
-            self.currency = None
+            self.currency = default_currency
         
         # Initialize high-performance components
         self._ring_buffer = RingBuffer(capacity=buffer_size)
@@ -682,182 +689,128 @@ class MarketDepthDataset(IterableDataset[Tuple[torch.Tensor, torch.Tensor]]):
     
     def _calculate_single_classification_label(self, mean_change: float, nbins: int, ticks_per_bin: int,
                                              lookforward_input: int, true_pip_size: float) -> int:
-        """Calculate classification label for a single mean change value.
+        """Calculate classification label for a single mean change value using currency configuration thresholds."""
+        # Get thresholds from currency configuration
+        thresholds = self.classification_config.get_thresholds(ticks_per_bin, lookforward_input)
         
-        This implementation matches the notebook's empirically-derived thresholds
-        from market_depth_extraction_micro_pips.py
-        """
-        # Define thresholds based on notebook's empirical analysis
+        # Convert thresholds to actual values scaled by pip size
+        bin_values: Dict[str, float] = {}
+        for key, value in thresholds.items():
+            bin_values[key] = float(value) * true_pip_size
+        
+        # Classification logic based on number of bins
         if nbins == 13:
-            if ticks_per_bin == 100:
-                if lookforward_input == 5000:
-                    bin_1 = 0.47 * true_pip_size
-                    bin_2 = 1.55 * true_pip_size
-                    bin_3 = 2.69 * true_pip_size
-                    bin_4 = 3.92 * true_pip_size
-                    bin_5 = 5.45 * true_pip_size
-                    bin_6 = 7.73 * true_pip_size
-                elif lookforward_input == 3000:
-                    bin_1 = 0.5 * true_pip_size
-                    bin_2 = 1.7 * true_pip_size
-                    bin_3 = 3 * true_pip_size
-                    bin_4 = 4.3 * true_pip_size
-                    bin_5 = 6 * true_pip_size
-                    bin_6 = 8.45 * true_pip_size
-                else:
-                    # Default fallback
-                    bin_1 = 0.5 * true_pip_size
-                    bin_2 = 1.7 * true_pip_size
-                    bin_3 = 3 * true_pip_size
-                    bin_4 = 4.3 * true_pip_size
-                    bin_5 = 6 * true_pip_size
-                    bin_6 = 8.45 * true_pip_size
-            else:
-                # Default for other ticks_per_bin values
-                bin_1 = 0.5 * true_pip_size
-                bin_2 = 1.7 * true_pip_size
-                bin_3 = 3 * true_pip_size
-                bin_4 = 4.3 * true_pip_size
-                bin_5 = 6 * true_pip_size
-                bin_6 = 8.45 * true_pip_size
+            # Extract the 6 threshold values (bin_1 through bin_6)
+            # Validation guarantees these exist
+            bins = [bin_values[f'bin_{i}'] for i in range(1, 7)]
             
-            # 13-bin classification logic (from notebook lines 255-280)
-            if mean_change >= bin_6:
+            # 13-bin classification logic
+            if mean_change >= bins[5]:      # bin_6
                 return 12
-            elif mean_change > bin_5:
+            elif mean_change > bins[4]:     # bin_5
                 return 11
-            elif mean_change > bin_4:
+            elif mean_change > bins[3]:     # bin_4
                 return 10
-            elif mean_change > bin_3:
+            elif mean_change > bins[2]:     # bin_3
                 return 9
-            elif mean_change > bin_2:
+            elif mean_change > bins[1]:     # bin_2
                 return 8
-            elif mean_change > bin_1:
+            elif mean_change > bins[0]:     # bin_1
                 return 7
-            elif mean_change > -bin_1:
+            elif mean_change > -bins[0]:    # -bin_1
                 return 6
-            elif mean_change > -bin_2:
+            elif mean_change > -bins[1]:    # -bin_2
                 return 5
-            elif mean_change > -bin_3:
+            elif mean_change > -bins[2]:    # -bin_3
                 return 4
-            elif mean_change > -bin_4:
+            elif mean_change > -bins[3]:    # -bin_4
                 return 3
-            elif mean_change > -bin_5:
+            elif mean_change > -bins[4]:    # -bin_5
                 return 2
-            elif mean_change > -bin_6:
+            elif mean_change > -bins[5]:    # -bin_6
                 return 1
             else:
                 return 0
                 
         elif nbins == 9:
-            if ticks_per_bin == 10:
-                bin_1 = 0.31 * true_pip_size
-                bin_2 = 0.91 * true_pip_size
-                bin_3 = 1.6 * true_pip_size
-                bin_4 = 2.55 * true_pip_size
-            elif ticks_per_bin == 100:
-                bin_1 = 0.51 * true_pip_size
-                bin_2 = 2.25 * true_pip_size
-                bin_3 = 4 * true_pip_size
-                bin_4 = 6.35 * true_pip_size
-            else:
-                # Default fallback
-                bin_1 = 0.51 * true_pip_size
-                bin_2 = 2.25 * true_pip_size
-                bin_3 = 4 * true_pip_size
-                bin_4 = 6.35 * true_pip_size
+            # Extract the 4 threshold values
+            # Validation guarantees these exist
+            bins = [bin_values[f'bin_{i}'] for i in range(1, 5)]
             
-            # 9-bin classification logic (from notebook lines 297-314)
-            if mean_change >= bin_4:
+            # 9-bin classification logic
+            if mean_change >= bins[3]:      # bin_4
                 return 8
-            elif mean_change > bin_3:
+            elif mean_change > bins[2]:     # bin_3
                 return 7
-            elif mean_change > bin_2:
+            elif mean_change > bins[1]:     # bin_2
                 return 6
-            elif mean_change > bin_1:
+            elif mean_change > bins[0]:     # bin_1
                 return 5
-            elif mean_change > -bin_1:
+            elif mean_change > -bins[0]:    # -bin_1
                 return 4
-            elif mean_change > -bin_2:
+            elif mean_change > -bins[1]:    # -bin_2
                 return 3
-            elif mean_change > -bin_3:
+            elif mean_change > -bins[2]:    # -bin_3
                 return 2
-            elif mean_change > -bin_4:
+            elif mean_change > -bins[3]:    # -bin_4
                 return 1
             else:
                 return 0
                 
         elif nbins == 7:
-            if ticks_per_bin == 10:
-                bin_1 = 0.3 * true_pip_size
-                bin_2 = 0.9 * true_pip_size
-                bin_3 = 1.7 * true_pip_size
-            elif ticks_per_bin == 100:
-                bin_1 = 0.7 * true_pip_size
-                bin_2 = 2.7 * true_pip_size
-                bin_3 = 5.5 * true_pip_size
-            else:
-                # Default fallback
-                bin_1 = 0.7 * true_pip_size
-                bin_2 = 2.7 * true_pip_size
-                bin_3 = 5.5 * true_pip_size
+            # Extract the 3 threshold values
+            # Validation guarantees these exist
+            bins = [bin_values[f'bin_{i}'] for i in range(1, 4)]
             
-            # 7-bin classification logic (from notebook lines 326-339)
-            if mean_change > bin_3:
+            # 7-bin classification logic
+            if mean_change > bins[2]:       # bin_3
                 return 6
-            elif mean_change > bin_2:
+            elif mean_change > bins[1]:     # bin_2
                 return 5
-            elif mean_change > bin_1:
+            elif mean_change > bins[0]:     # bin_1
                 return 4
-            elif mean_change > -bin_1:
+            elif mean_change > -bins[0]:    # -bin_1
                 return 3
-            elif mean_change > -bin_2:
+            elif mean_change > -bins[1]:    # -bin_2
                 return 2
-            elif mean_change > -bin_3:
+            elif mean_change > -bins[2]:    # -bin_3
                 return 1
             else:
                 return 0
                 
         elif nbins == 5:
-            if ticks_per_bin == 10:
-                bin_1 = true_pip_size / 2
-                bin_2 = true_pip_size * 1.5
-            elif ticks_per_bin == 100:
-                bin_1 = 1 * true_pip_size
-                bin_2 = 3 * true_pip_size
-            else:
-                # Default fallback
-                bin_1 = 1 * true_pip_size
-                bin_2 = 3 * true_pip_size
+            # Extract the 2 threshold values
+            # Validation guarantees these exist
+            bins = [bin_values[f'bin_{i}'] for i in range(1, 3)]
             
             # 5-bin classification logic
-            if mean_change > bin_2:
+            if mean_change > bins[1]:       # bin_2
                 return 4
-            elif mean_change > bin_1:
+            elif mean_change > bins[0]:     # bin_1
                 return 3
-            elif mean_change > -bin_1:
+            elif mean_change > -bins[0]:    # -bin_1
                 return 2
-            elif mean_change > -bin_2:
+            elif mean_change > -bins[1]:    # -bin_2
                 return 1
             else:
                 return 0
         
-        else:
-            # Generic fallback for other bin counts
-            thresholds = [i * true_pip_size for i in range(1, nbins // 2 + 1)]
+        elif nbins == 3:
+            # Extract the 1 threshold value
+            # Validation guarantees this exists
+            bin_1 = bin_values['bin_1']
             
-            for i, threshold in enumerate(thresholds):
-                if abs(mean_change) <= threshold:
-                    if mean_change >= 0:
-                        return nbins // 2 + i
-                    else:
-                        return nbins // 2 - i - 1
-            
-            # Outside all thresholds
-            if mean_change >= 0:
-                return nbins - 1
+            # 3-bin classification logic
+            if mean_change > bin_1:
+                return 2  # Up
+            elif mean_change > -bin_1:
+                return 1  # Neutral
             else:
-                return 0
+                return 0  # Down
+        
+        else:
+            # This should never happen due to validation
+            raise ValueError(f"Unsupported nbins value: {nbins}. Configuration validation should have caught this.")
 
     def _calculate_classification_label_vectorized(self, mean_change: pl.Expr, nbins: int, ticks_per_bin: int, 
                                                    lookforward_input: int, true_pip_size: float) -> pl.Expr:

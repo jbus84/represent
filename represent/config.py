@@ -6,7 +6,7 @@ from typing import Dict, Optional, Union
 from pathlib import Path
 import json
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class SamplingConfig(BaseModel):
@@ -163,6 +163,18 @@ class ClassificationConfig(BaseModel):
                         'bin_2': 3.0
                     }
                 }
+            },
+            3: {
+                10: {
+                    5000: {
+                        'bin_1': 0.75
+                    }
+                },
+                100: {
+                    5000: {
+                        'bin_1': 1.5
+                    }
+                }
             }
         },
         description="Hierarchical threshold configuration by bins/ticks/lookforward"
@@ -174,43 +186,82 @@ class ClassificationConfig(BaseModel):
         if v not in [3, 5, 7, 9, 13]:
             raise ValueError(f"Unsupported nbins value: {v}. Supported values: 3, 5, 7, 9, 13")
         return v
+    
+    @model_validator(mode='after')
+    def validate_bin_thresholds_completeness(self) -> 'ClassificationConfig':
+        """Validate that bin thresholds contain complete threshold sets for the specified nbins."""
+        required_bins = self._get_required_bins_for_nbins(self.nbins)
+        
+        # Check if we have thresholds for this nbins value
+        if self.nbins not in self.bin_thresholds:
+            raise ValueError(f"No bin thresholds defined for nbins={self.nbins}")
+        
+        # Check that at least one configuration exists
+        bins_config = self.bin_thresholds[self.nbins]
+        if not bins_config:
+            raise ValueError(f"Empty bin thresholds for nbins={self.nbins}")
+        
+        # Validate that each ticks_per_bin configuration has complete threshold sets
+        for ticks_per_bin, ticks_config in bins_config.items():
+            if not ticks_config:
+                raise ValueError(f"Empty configuration for nbins={self.nbins}, ticks_per_bin={ticks_per_bin}")
+            
+            for lookforward, thresholds in ticks_config.items():
+                if not thresholds:
+                    raise ValueError(f"Invalid thresholds format for nbins={self.nbins}, ticks_per_bin={ticks_per_bin}, lookforward={lookforward}")
+                
+                # Check that all required bins are present
+                missing_bins = required_bins - set(thresholds.keys())
+                if missing_bins:
+                    raise ValueError(f"Missing bin thresholds {missing_bins} for nbins={self.nbins}, ticks_per_bin={ticks_per_bin}, lookforward={lookforward}")
+                
+                # Check that all values are numeric
+                for bin_name, value in thresholds.items():
+                    if value <= 0:
+                        raise ValueError(f"Invalid threshold value {value} for {bin_name} in nbins={self.nbins}, ticks_per_bin={ticks_per_bin}, lookforward={lookforward}")
+        
+        return self
+    
+    def _get_required_bins_for_nbins(self, nbins: int) -> set[str]:
+        """Get the required bin names for a given nbins value."""
+        if nbins == 13:
+            return {'bin_1', 'bin_2', 'bin_3', 'bin_4', 'bin_5', 'bin_6'}
+        elif nbins == 9:
+            return {'bin_1', 'bin_2', 'bin_3', 'bin_4'}
+        elif nbins == 7:
+            return {'bin_1', 'bin_2', 'bin_3'}
+        elif nbins == 5:
+            return {'bin_1', 'bin_2'}
+        elif nbins == 3:
+            return {'bin_1'}
+        else:
+            raise ValueError(f"Unsupported nbins value: {nbins}")
 
     def get_thresholds(self, ticks_per_bin: Optional[int] = None, lookforward_input: Optional[int] = None) -> Dict[str, float]:
-        """Get threshold values for the current configuration."""
+        """Get threshold values for the current configuration.
+        
+        This method assumes validation has passed, so thresholds are guaranteed to exist.
+        """
         ticks = ticks_per_bin or self.ticks_per_bin
         lookforward = lookforward_input or self.lookforward_input
         
-        # Navigate the nested threshold structure
-        if self.nbins in self.bin_thresholds:
-            bins_config = self.bin_thresholds[self.nbins]
-            
-            # Try exact match first
-            if ticks in bins_config:
-                ticks_config = bins_config[ticks]
-                
-                # Handle nested lookforward configuration
-                if lookforward in ticks_config:
-                    candidate = ticks_config[lookforward]
-                    # candidate should be Dict[str, float] at this level
-                    return candidate
-                
-                # Use first available if exact lookforward not found
-                for value in ticks_config.values():
-                    # value should be Dict[str, float] at this level
-                    return value
-            
-            # Fallback to first available ticks_per_bin
-            if bins_config:
-                first_ticks = list(bins_config.keys())[0]
-                ticks_config = bins_config[first_ticks]
-                
-                # Handle nested structure
-                for value in ticks_config.values():
-                    # value should be Dict[str, float] at this level
-                    return value
+        # Get the configuration for this nbins - validation guarantees it exists
+        bins_config = self.bin_thresholds[self.nbins]
         
-        # Ultimate fallback
-        return {'bin_1': 0.5, 'bin_2': 1.5, 'bin_3': 3.0}
+        # Try exact match for ticks_per_bin
+        if ticks in bins_config:
+            ticks_config = bins_config[ticks]
+            
+            # Try exact match for lookforward_input
+            if lookforward in ticks_config:
+                return ticks_config[lookforward]
+            
+            # Use first available lookforward configuration for this ticks_per_bin
+            return next(iter(ticks_config.values()))
+        
+        # Use first available ticks_per_bin configuration
+        first_ticks_config = next(iter(bins_config.values()))
+        return next(iter(first_ticks_config.values()))
 
 
 class CurrencyConfig(BaseModel):
