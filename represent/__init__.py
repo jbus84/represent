@@ -11,10 +11,11 @@ __version__: str = "1.0.1"
 from .pipeline import process_market_data, create_processor, MarketDepthProcessor
 from .constants import (
     MICRO_PIP_SIZE, TICKS_PER_BIN, SAMPLES, PRICE_LEVELS, TIME_BINS,
-    ASK_PRICE_COLUMNS, BID_PRICE_COLUMNS, ASK_VOL_COLUMNS, BID_VOL_COLUMNS
+    ASK_PRICE_COLUMNS, BID_PRICE_COLUMNS, ASK_VOL_COLUMNS, BID_VOL_COLUMNS,
+    FeatureType, FEATURE_TYPES, DEFAULT_FEATURES, FEATURE_INDEX_MAP, MAX_FEATURES, get_output_shape
 )
 from .dataloader import (
-    MarketDepthDataset, HighPerformanceDataLoader, 
+    MarketDepthDataset, 
     BackgroundBatchProducer, AsyncDataLoader,
     create_streaming_dataloader, create_file_dataloader
 )
@@ -25,7 +26,6 @@ __all__ = [
     "create_processor", 
     "MarketDepthProcessor",
     "MarketDepthDataset",
-    "HighPerformanceDataLoader",
     "BackgroundBatchProducer",
     "AsyncDataLoader",
     "create_streaming_dataloader",
@@ -39,4 +39,10 @@ __all__ = [
     "BID_PRICE_COLUMNS", 
     "ASK_VOL_COLUMNS",
     "BID_VOL_COLUMNS",
+    "FeatureType",
+    "FEATURE_TYPES",
+    "DEFAULT_FEATURES", 
+    "FEATURE_INDEX_MAP",
+    "MAX_FEATURES",
+    "get_output_shape",
 ]

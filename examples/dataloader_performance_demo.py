@@ -25,7 +25,6 @@ import matplotlib.pyplot as plt
 
 from represent.dataloader import (
     MarketDepthDataset,
-    HighPerformanceDataLoader,
     AsyncDataLoader,
     create_streaming_dataloader
 )
@@ -262,7 +261,7 @@ def demonstrate_multicore_scaling():
             else:
                 # Multi-worker mode with error handling
                 try:
-                    dataloader = HighPerformanceDataLoader(
+                    dataloader = torch.utils.data.DataLoader(
                         dataset=dataset,
                         batch_size=4,
                         num_workers=num_workers,
