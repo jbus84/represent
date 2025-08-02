@@ -5,7 +5,7 @@ This package provides ultra-fast market depth processing capabilities
 optimized for real-time trading applications.
 """
 
-__version__: str = "1.7.0"
+__version__ = "1.7.1"
 
 # Import main API functions
 from .pipeline import process_market_data, create_processor, MarketDepthProcessor

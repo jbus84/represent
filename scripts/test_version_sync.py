@@ -44,7 +44,7 @@ def extract_init_version() -> str:
     init_path = Path("represent/__init__.py")
     content = init_path.read_text()
     
-    match = re.search(r'__version__: str = "([^"]+)"', content)
+    match = re.search(r'__version__ = "([^"]+)"', content)
     if not match:
         raise ValueError("Could not find __version__ in __init__.py")
     
@@ -95,9 +95,10 @@ def main():
         version_variables = check_semantic_release_config()
         print(f"📝 Version variables: {version_variables}")
         
-        expected_variables = ["pyproject.toml:version", "represent/__init__.py:__version__"]
+        expected_variables = ["represent/__init__.py:__version__"]
         if set(version_variables) == set(expected_variables):
-            print("✅ Semantic-release is configured to update both locations!")
+            print("✅ Semantic-release is configured to update __init__.py!")
+            print("📝 Note: pyproject.toml is handled automatically by semantic-release")
         else:
             print("❌ Semantic-release configuration issue!")
             print(f"   Expected: {expected_variables}")
