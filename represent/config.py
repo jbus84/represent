@@ -6,7 +6,7 @@ from typing import Dict, Optional, Union
 from pathlib import Path
 import json
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class SamplingConfig(BaseModel):
@@ -40,14 +40,16 @@ class SamplingConfig(BaseModel):
         description="Maximum number of samples to process (None = no limit)"
     )
 
-    @validator('sampling_mode')
-    def validate_sampling_mode(cls, v):
+    @field_validator('sampling_mode')
+    @classmethod
+    def validate_sampling_mode(cls, v: str) -> str:
         if v not in ['consecutive', 'random', 'stratified_random']:
             raise ValueError(f"Invalid sampling_mode: {v}")
         return v
 
-    @validator('end_tick_strategy')
-    def validate_end_tick_strategy(cls, v):
+    @field_validator('end_tick_strategy')
+    @classmethod
+    def validate_end_tick_strategy(cls, v: str) -> str:
         if v not in ['uniform_random', 'weighted_random', 'temporal_distribution']:
             raise ValueError(f"Invalid end_tick_strategy: {v}")
         return v
@@ -116,46 +118,59 @@ class ClassificationConfig(BaseModel):
             },
             9: {
                 10: {
-                    'bin_1': 0.31,
-                    'bin_2': 0.91,
-                    'bin_3': 1.6,
-                    'bin_4': 2.55
+                    5000: {
+                        'bin_1': 0.31,
+                        'bin_2': 0.91,
+                        'bin_3': 1.6,
+                        'bin_4': 2.55
+                    }
                 },
                 100: {
-                    'bin_1': 0.51,
-                    'bin_2': 2.25,
-                    'bin_3': 4.0,
-                    'bin_4': 6.35
+                    5000: {
+                        'bin_1': 0.51,
+                        'bin_2': 2.25,
+                        'bin_3': 4.0,
+                        'bin_4': 6.35
+                    }
                 }
             },
             7: {
                 10: {
-                    'bin_1': 0.3,
-                    'bin_2': 0.9,
-                    'bin_3': 1.7
+                    5000: {
+                        'bin_1': 0.3,
+                        'bin_2': 0.9,
+                        'bin_3': 1.7
+                    }
                 },
                 100: {
-                    'bin_1': 0.7,
-                    'bin_2': 2.7,
-                    'bin_3': 5.5
+                    5000: {
+                        'bin_1': 0.7,
+                        'bin_2': 2.7,
+                        'bin_3': 5.5
+                    }
                 }
             },
             5: {
                 10: {
-                    'bin_1': 0.5,
-                    'bin_2': 1.5
+                    5000: {
+                        'bin_1': 0.5,
+                        'bin_2': 1.5
+                    }
                 },
                 100: {
-                    'bin_1': 1.0,
-                    'bin_2': 3.0
+                    5000: {
+                        'bin_1': 1.0,
+                        'bin_2': 3.0
+                    }
                 }
             }
         },
         description="Hierarchical threshold configuration by bins/ticks/lookforward"
     )
 
-    @validator('nbins')
-    def validate_nbins(cls, v):
+    @field_validator('nbins')
+    @classmethod
+    def validate_nbins(cls, v: int) -> int:
         if v not in [3, 5, 7, 9, 13]:
             raise ValueError(f"Unsupported nbins value: {v}. Supported values: 3, 5, 7, 9, 13")
         return v
@@ -174,31 +189,25 @@ class ClassificationConfig(BaseModel):
                 ticks_config = bins_config[ticks]
                 
                 # Handle nested lookforward configuration
-                if isinstance(ticks_config, dict):
-                    if lookforward in ticks_config:
-                        candidate = ticks_config[lookforward]
-                        if isinstance(candidate, dict):
-                            return candidate
-                    
-                    # Use first available if exact lookforward not found
-                    for key, value in ticks_config.items():
-                        if isinstance(value, dict):
-                            return value
-                    
-                    # Direct threshold dict
-                    return ticks_config
+                if lookforward in ticks_config:
+                    candidate = ticks_config[lookforward]
+                    # candidate should be Dict[str, float] at this level
+                    return candidate
+                
+                # Use first available if exact lookforward not found
+                for value in ticks_config.values():
+                    # value should be Dict[str, float] at this level
+                    return value
             
             # Fallback to first available ticks_per_bin
             if bins_config:
                 first_ticks = list(bins_config.keys())[0]
                 ticks_config = bins_config[first_ticks]
                 
-                if isinstance(ticks_config, dict):
-                    # Handle nested structure
-                    for key, value in ticks_config.items():
-                        if isinstance(value, dict):
-                            return value
-                    return ticks_config
+                # Handle nested structure
+                for value in ticks_config.values():
+                    # value should be Dict[str, float] at this level
+                    return value
         
         # Ultimate fallback
         return {'bin_1': 0.5, 'bin_2': 1.5, 'bin_3': 3.0}
@@ -223,8 +232,9 @@ class CurrencyConfig(BaseModel):
         description="Human-readable description of this configuration"
     )
 
-    @validator('currency_pair')
-    def validate_currency_pair(cls, v):
+    @field_validator('currency_pair')
+    @classmethod
+    def validate_currency_pair(cls, v: str) -> str:
         if len(v) != 6 or not v.isalpha():
             raise ValueError(f"Currency pair must be 6 alphabetic characters, got: {v}")
         return v.upper()
@@ -376,7 +386,7 @@ def list_available_currencies(config_dir: Optional[Path] = None) -> list[str]:
     if not config_dir.exists():
         return []
     
-    currencies = []
+    currencies: list[str] = []
     for config_file in config_dir.glob("*.json"):
         currencies.append(config_file.stem.upper())
     
