@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.7.1 (2025-08-02)
+
+### Bug Fixes
+
+- Sync __init__.py version with pyproject.toml to fix stuck version bumping
+  ([`4ae7688`](https://github.com/jbus84/represent/commit/4ae7688f14a9e1e7261041212621f301e215265f))
+
+### Continuous Integration
+
+- **lock**: Update lock
+  ([`50a8259`](https://github.com/jbus84/represent/commit/50a825908f22a04186d58f2ad7ff99a89431b674))
+
+
 ## v1.7.0 (2025-08-02)
 
 ### Features
