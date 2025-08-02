@@ -1,0 +1,50 @@
+{
+  "currency_pair": "USDJPY",
+  "classification": {
+    "micro_pip_size": 0.001,
+    "true_pip_size": 0.01,
+    "ticks_per_bin": 100,
+    "lookforward_offset": 500,
+    "lookforward_input": 5000,
+    "lookback_rows": 5000,
+    "nbins": 9,
+    "bin_thresholds": {
+      "9": {
+        "100": {
+          "5000": {
+            "bin_1": 0.45,
+            "bin_2": 2.10,
+            "bin_3": 3.80,
+            "bin_4": 6.00
+          }
+        },
+        "10": {
+          "5000": {
+            "bin_1": 0.35,
+            "bin_2": 0.95,
+            "bin_3": 1.70,
+            "bin_4": 2.80
+          }
+        }
+      },
+      "7": {
+        "100": {
+          "5000": {
+            "bin_1": 0.65,
+            "bin_2": 2.50,
+            "bin_3": 5.20
+          }
+        }
+      }
+    }
+  },
+  "sampling": {
+    "sampling_mode": "random",
+    "coverage_percentage": 0.6,
+    "end_tick_strategy": "uniform_random",
+    "min_tick_spacing": 120,
+    "seed": 42,
+    "max_samples": null
+  },
+  "description": "JPY-specific configuration with adjusted pip sizing and volatility considerations"
+}

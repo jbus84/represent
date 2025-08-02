@@ -1,0 +1,53 @@
+{
+  "currency_pair": "EURUSD",
+  "classification": {
+    "micro_pip_size": 0.00001,
+    "true_pip_size": 0.0001,
+    "ticks_per_bin": 100,
+    "lookforward_offset": 500,
+    "lookforward_input": 5000,
+    "lookback_rows": 5000,
+    "nbins": 13,
+    "bin_thresholds": {
+      "13": {
+        "100": {
+          "5000": {
+            "bin_1": 0.45,
+            "bin_2": 1.50,
+            "bin_3": 2.60,
+            "bin_4": 3.80,
+            "bin_5": 5.30,
+            "bin_6": 7.50
+          },
+          "3000": {
+            "bin_1": 0.48,
+            "bin_2": 1.65,
+            "bin_3": 2.95,
+            "bin_4": 4.20,
+            "bin_5": 5.85,
+            "bin_6": 8.25
+          }
+        }
+      },
+      "9": {
+        "100": {
+          "5000": {
+            "bin_1": 0.50,
+            "bin_2": 2.20,
+            "bin_3": 3.95,
+            "bin_4": 6.25
+          }
+        }
+      }
+    }
+  },
+  "sampling": {
+    "sampling_mode": "random",
+    "coverage_percentage": 0.9,
+    "end_tick_strategy": "uniform_random",
+    "min_tick_spacing": 80,
+    "seed": 42,
+    "max_samples": null
+  },
+  "description": "Optimized configuration for EUR/USD most liquid currency pair with high coverage"
+}

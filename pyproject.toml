@@ -13,6 +13,7 @@ dependencies = [
     "torch>=2.0.0",
     "matplotlib>=3.10.3",
     "seaborn>=0.13.2",
+    "pydantic>=2.5.0",
 ]
 [project.optional-dependencies]
 dev = [

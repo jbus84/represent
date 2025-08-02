@@ -234,7 +234,14 @@ class TestMarketDepthDataset:
         
         # Test different bin configurations
         for nbins in [5, 7, 9, 13]:
-            dataset.classification_config['nbins'] = nbins
+            # Create new configuration with updated nbins
+            from represent.config import ClassificationConfig
+            dataset.classification_config = ClassificationConfig(
+                nbins=nbins,
+                lookforward_input=1000,
+                lookback_rows=1000,
+                lookforward_offset=100
+            )
             targets = dataset.generate_classification_targets(data, stop_row)
             
             assert 'class_label' in targets

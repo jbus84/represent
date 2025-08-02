@@ -19,6 +19,15 @@ from .dataloader import (
     BackgroundBatchProducer, AsyncDataLoader,
     create_streaming_dataloader, create_file_dataloader
 )
+from .config import (
+    ClassificationConfig,
+    SamplingConfig,
+    CurrencyConfig,
+    load_currency_config,
+    get_default_currency_config,
+    save_currency_config,
+    list_available_currencies
+)
 
 # Public API
 __all__ = [
@@ -30,6 +39,13 @@ __all__ = [
     "AsyncDataLoader",
     "create_streaming_dataloader",
     "create_file_dataloader",
+    "ClassificationConfig",
+    "SamplingConfig",
+    "CurrencyConfig",
+    "load_currency_config",
+    "get_default_currency_config",
+    "save_currency_config",
+    "list_available_currencies",
     "MICRO_PIP_SIZE",
     "TICKS_PER_BIN", 
     "SAMPLES",

@@ -631,6 +631,175 @@ The dataloader automatically handles:
 - **Memory usage**: Linear scaling with dataset size and feature count
 - **Processing speed**: <10ms for single feature, <50ms for multi-feature
 
+## ⚙️ Configuration System
+
+Represent provides a powerful Pydantic-based configuration system for currency-specific optimization and sampling strategies.
+
+### Currency-Specific Configurations
+
+Load optimized configurations for specific currency pairs:
+
+```python
+from represent.dataloader import MarketDepthDataset
+
+# Load AUDUSD-optimized configuration
+dataset = MarketDepthDataset(
+    data_source=your_data,
+    currency='AUDUSD',  # Loads optimized settings automatically
+    features=['volume', 'variance']
+)
+
+# Configuration is automatically loaded from represent/configs/audusd.json
+print(f"Bins: {dataset.classification_config.nbins}")  # 13 (optimized for AUDUSD)
+print(f"Coverage: {dataset.sampling_config.coverage_percentage}")  # 0.8
+```
+
+### Available Currency Configurations
+
+```python
+from represent.config import list_available_currencies, load_currency_config
+
+# List all available currency configurations
+currencies = list_available_currencies()
+print(currencies)  # ['AUDUSD', 'EURUSD', 'USDJPY']
+
+# Load specific currency configuration
+audusd_config = load_currency_config('AUDUSD')
+print(f"True pip size: {audusd_config.classification.true_pip_size}")  # 0.0001
+print(f"Sampling mode: {audusd_config.sampling.sampling_mode}")  # 'random'
+```
+
+### Manual Configuration
+
+Create custom configurations for specific requirements:
+
+```python
+from represent.config import ClassificationConfig, SamplingConfig
+from represent.dataloader import MarketDepthDataset
+
+# Custom classification settings
+classification = ClassificationConfig(
+    nbins=9,  # 9-bin classification
+    true_pip_size=0.01,  # JPY pair pip size
+    lookforward_input=3000,  # Shorter lookforward for volatility
+    ticks_per_bin=100,
+    lookback_rows=2000
+)
+
+# Custom sampling strategy
+sampling = SamplingConfig(
+    sampling_mode='random',
+    coverage_percentage=0.3,  # Process 30% of dataset
+    min_tick_spacing=200,  # Wider spacing
+    seed=123  # Custom seed
+)
+
+# Use custom configurations
+dataset = MarketDepthDataset(
+    data_source=your_data,
+    features=['volume', 'variance'],
+    classification_config=classification,
+    sampling_config=sampling
+)
+```
+
+### Configuration Components
+
+#### ClassificationConfig
+
+Controls price movement classification and processing parameters:
+
+```python
+ClassificationConfig(
+    micro_pip_size=0.00001,      # Price precision
+    true_pip_size=0.0001,        # Currency pip size (0.01 for JPY pairs)
+    ticks_per_bin=100,           # Ticks per time bin
+    lookforward_offset=500,      # Offset before analysis window
+    lookforward_input=5000,      # Analysis window size
+    lookback_rows=5000,          # Historical context
+    nbins=13,                    # Classification bins (3, 5, 7, 9, 13)
+    bin_thresholds={...}         # Hierarchical threshold configuration
+)
+```
+
+#### SamplingConfig
+
+Controls dataset sampling and processing strategies:
+
+```python
+SamplingConfig(
+    sampling_mode='random',           # 'consecutive', 'random', 'stratified_random'
+    coverage_percentage=0.8,          # Process 80% of dataset
+    end_tick_strategy='uniform_random', # End tick selection strategy
+    min_tick_spacing=100,             # Minimum spacing between samples
+    seed=42,                          # Reproducible sampling
+    max_samples=None                  # Optional sample limit
+)
+```
+
+### Currency-Specific Optimizations
+
+The package includes pre-configured optimizations for major currency pairs:
+
+```python
+# AUDUSD: Major pair with high liquidity
+# - 13-bin classification for detailed movements
+# - 80% coverage for comprehensive analysis
+# - 5000-tick lookforward for stable patterns
+
+# EURUSD: Most liquid pair
+# - 13-bin classification
+# - 90% coverage for maximum data utilization
+# - Standard 5000-tick lookforward
+
+# USDJPY: JPY pair with different pip structure
+# - 9-bin classification for different dynamics
+# - 0.01 pip size (vs 0.0001 for others)
+# - 60% coverage for efficiency
+
+# GBPUSD: High volatility pair
+# - 13-bin classification
+# - 3000-tick lookforward for faster response
+# - 70% coverage balancing accuracy and speed
+```
+
+### Saving Custom Configurations
+
+Save your optimized configurations for reuse:
+
+```python
+from represent.config import CurrencyConfig, save_currency_config
+
+# Create custom currency configuration
+config = CurrencyConfig(
+    currency_pair='CUSTOM',
+    classification=ClassificationConfig(nbins=7, lookforward_input=2000),
+    sampling=SamplingConfig(coverage_percentage=0.5, seed=999),
+    description='Custom configuration for specific trading strategy'
+)
+
+# Save for future use
+config_file = save_currency_config(config)
+print(f"Saved to: {config_file}")  # represent/configs/custom.json
+
+# Load later
+loaded_config = load_currency_config('CUSTOM')
+```
+
+### Configuration Validation
+
+All configurations include Pydantic validation:
+
+```python
+# ✅ Valid configurations
+ClassificationConfig(nbins=13)  # Supported nbins value
+SamplingConfig(coverage_percentage=0.8)  # Valid percentage
+
+# ❌ Invalid configurations raise ValidationError
+ClassificationConfig(nbins=4)  # Unsupported nbins value
+SamplingConfig(coverage_percentage=1.5)  # Invalid percentage > 1.0
+```
+
 ## 🚀 Running Examples
 
 The repository includes comprehensive examples demonstrating real market data processing:
