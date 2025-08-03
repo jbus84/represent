@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.8.0 (2025-08-03)
+
+### Features
+
+- Restore HighPerformanceDataLoader for production stability
+  ([`de35f5d`](https://github.com/jbus84/represent/commit/de35f5dcb3d9d6b317cb73b0ec6827ec6996e2b7))
+
+- **performance**: Move away from async to high perfomrance
+  ([`e591652`](https://github.com/jbus84/represent/commit/e591652a2cf00ea577b87a59bd05e080d43388e7))
+
+
 ## v1.7.2 (2025-08-03)
 
 ### Bug Fixes
