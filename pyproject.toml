@@ -49,7 +49,8 @@ version = "1.7.1"
 tag_format = "v$version"
 
 [tool.semantic_release]
-version_variables = ["pyproject.toml:version", "represent/__init__.py:__version__"]
+version_toml = ["pyproject.toml:project.version"]
+version_variables = ["represent/__init__.py:__version__"]
 branch = "main"
 changelog_file = "CHANGELOG.md"
 commit_parser = "conventional"
