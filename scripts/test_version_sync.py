@@ -8,6 +8,7 @@ and that the semantic-release configuration is correctly set up.
 
 import re
 from pathlib import Path
+from typing import Dict, List
 
 
 def extract_pyproject_version() -> str:
@@ -51,21 +52,32 @@ def extract_init_version() -> str:
     return match.group(1)
 
 
-def check_semantic_release_config() -> list[str]:
+def check_semantic_release_config() -> Dict[str, List[str]]:
     """Check that semantic release is configured to update both locations."""
     pyproject_path = Path("pyproject.toml")
     content = pyproject_path.read_text()
     
-    # Find version_variables directly in the full content
+    result: Dict[str, List[str]] = {}
+    
+    # Find version_toml configuration
+    toml_match = re.search(r'version_toml\s*=\s*\[(.*?)\]', content)
+    if toml_match:
+        toml_str = toml_match.group(1)
+        toml_vars = [var.strip().strip('"') for var in toml_str.split(',') if var.strip()]
+        result['version_toml'] = toml_vars
+    else:
+        result['version_toml'] = []
+    
+    # Find version_variables configuration
     var_match = re.search(r'version_variables\s*=\s*\[(.*?)\]', content)
-    if not var_match:
-        raise ValueError("Could not find version_variables in semantic_release config")
+    if var_match:
+        variables_str = var_match.group(1)
+        variables = [var.strip().strip('"') for var in variables_str.split(',') if var.strip()]
+        result['version_variables'] = variables
+    else:
+        result['version_variables'] = []
     
-    # Parse the list 
-    variables_str = var_match.group(1)
-    variables = [var.strip().strip('"') for var in variables_str.split(',') if var.strip()]
-    
-    return variables
+    return result
 
 
 def main():
@@ -92,17 +104,26 @@ def main():
         
         # Check semantic release configuration
         print("\n🔧 Checking semantic-release configuration...")
-        version_variables = check_semantic_release_config()
-        print(f"📝 Version variables: {version_variables}")
+        config = check_semantic_release_config()
+        print(f"📝 Version TOML: {config['version_toml']}")
+        print(f"📝 Version variables: {config['version_variables']}")
         
+        expected_toml = ["pyproject.toml:project.version"]
         expected_variables = ["represent/__init__.py:__version__"]
-        if set(version_variables) == set(expected_variables):
-            print("✅ Semantic-release is configured to update __init__.py!")
-            print("📝 Note: pyproject.toml is handled automatically by semantic-release")
+        
+        toml_ok = set(config['version_toml']) == set(expected_toml)
+        vars_ok = set(config['version_variables']) == set(expected_variables)
+        
+        if toml_ok and vars_ok:
+            print("✅ Semantic-release is configured to update both locations!")
+            print("   📄 pyproject.toml via version_toml")
+            print("   🐍 __init__.py via version_variables")
         else:
             print("❌ Semantic-release configuration issue!")
-            print(f"   Expected: {expected_variables}")
-            print(f"   Found: {version_variables}")
+            if not toml_ok:
+                print(f"   version_toml - Expected: {expected_toml}, Found: {config['version_toml']}")
+            if not vars_ok:
+                print(f"   version_variables - Expected: {expected_variables}, Found: {config['version_variables']}")
             return 1
         
         print("\n🎉 Version bumping system is properly configured!")

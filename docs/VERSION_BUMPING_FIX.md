@@ -25,10 +25,14 @@ version_variables = ["pyproject.toml:version", "represent/__init__.py:__version_
 **After:**
 ```toml
 [tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
 version_variables = ["represent/__init__.py:__version__"]
 ```
 
-**Rationale:** pyproject.toml versions are handled automatically by semantic-release. Including it in `version_variables` can cause conflicts.
+**Rationale:** 
+- `version_toml` is the correct way to handle TOML files like pyproject.toml
+- `version_variables` is for non-TOML files like Python files
+- This ensures both locations are properly updated during version bumping
 
 ### 2. Fixed __version__ Declaration Format
 
@@ -72,9 +76,11 @@ Expected output:
 ✅ All versions are synchronized!
 
 🔧 Checking semantic-release configuration...
+📝 Version TOML: ['pyproject.toml:project.version']
 📝 Version variables: ['represent/__init__.py:__version__']
-✅ Semantic-release is configured to update __init__.py!
-📝 Note: pyproject.toml is handled automatically by semantic-release
+✅ Semantic-release is configured to update both locations!
+   📄 pyproject.toml via version_toml
+   🐍 __init__.py via version_variables
 
 🎉 Version bumping system is properly configured!
 ```
@@ -99,7 +105,7 @@ Version: 1.7.1
 2. **Version Calculation**: Determines the next version based on the semantic versioning rules
 
 3. **File Updates**: 
-   - **pyproject.toml**: Updated automatically (built-in functionality)
+   - **pyproject.toml**: Updated via `version_toml` configuration
    - **represent/__init__.py**: Updated via `version_variables` configuration
    - **[tool.commitizen]**: Updated automatically as part of pyproject.toml
 
@@ -124,12 +130,12 @@ Version: 1.7.1
 
 ### ✅ Do:
 - Use simple assignment for `__version__` in Python files
-- Let semantic-release handle pyproject.toml automatically
-- Use only necessary files in `version_variables`
+- Use `version_toml` for TOML files like pyproject.toml
+- Use `version_variables` for non-TOML files like Python files
 - Follow conventional commit message format
 
 ### ❌ Don't:
-- Include pyproject.toml in `version_variables` (handled automatically)
+- Include TOML files in `version_variables` (use `version_toml` instead)
 - Use typed assignments for version variables (`__version__: str = ...`)
 - Manually edit version numbers (let semantic-release handle it)
 - Mix manual and automated version bumping
