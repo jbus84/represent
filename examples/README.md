@@ -1,141 +1,99 @@
-# Market Depth Visualization Examples
+# Represent Library Examples
 
-This directory contains examples demonstrating how to use the `represent` library to process market data and generate visualizations.
+This directory contains organized examples demonstrating various uses of the `represent` library for market depth processing, PyTorch integration, and performance analysis.
 
-## Examples
+## Directory Structure
 
-1. **Basic Market Depth Visualization** (`generate_visualization.py`) - Processes real market data and creates a basic heatmap
-2. **Extended Features Visualization** (`extended_features_visualization.py`) - Comprehensive demonstration of the new extended features functionality
+- **`basic_usage/`** - Simple introductory examples and quickstart guides
+- **`dataloader_performance/`** - Performance benchmarking and optimization examples
+- **`pytorch_integration/`** - PyTorch dataloader and ML training examples
+- **`real_data/`** - Examples using real market data files (.dbn format)
+- **`visualization/`** - Market depth visualization and plotting examples
+- **`extended_features/`** - Multi-feature processing demonstrations (volume, variance, trade counts)
 
-## Basic Market Depth Visualization
+## Quick Start
 
-This example demonstrates how to use the `represent` library to process real market data and generate a visualization of the resulting market depth representation.
+For beginners, start with:
+1. `basic_usage/pytorch_quickstart.py` - Basic library usage
+2. `visualization/generate_visualization.py` - Generate market depth visualizations
+3. `dataloader_performance/dataloader_performance_demo.py` - Performance analysis
 
-## Workflow
+## Example Categories
 
-The process is as follows:
+### 1. Basic Usage (`basic_usage/`)
 
-1.  **Load Data**: Real market data is loaded from a `.dbn.zst` file using the `databento` library.
-2.  **Process Data**: The data is processed using the `represent.process_market_data` function, which returns a `numpy` array of the normalized absolute combined market depth.
-3.  **Generate Visualization**: A heatmap of the resulting array is generated using `matplotlib`, providing a visual representation of market depth dynamics over time.
+Simple examples to get started with the library:
+- **`pytorch_quickstart.py`** - Basic PyTorch tensor generation
+- **`simple_background_usage.py`** - Background processing introduction  
+- **`simple_currency_config_demo.py`** - Currency configuration examples
 
-## Code
+### 2. Performance Analysis (`dataloader_performance/`)
 
-The following Python script is used to generate the visualization:
+Performance benchmarking and optimization examples:
+- **`dataloader_performance_demo.py`** - Comprehensive performance analysis
+- **`production_dataloader_example.py`** - Production-ready dataloader setup
 
-```python
-"""
-Generates a visualization of the market depth representation.
+### 3. PyTorch Integration (`pytorch_integration/`)
 
-This script loads real market data, processes it using the 'represent' library,
-and creates a heatmap of the resulting normalized market depth array.
-The output is saved as a PNG image that can be easily viewed.
-"""
-import databento as db
-import matplotlib.pyplot as plt
-import numpy as np
-import polars as pl
-from represent.pipeline import process_market_data
+ML and PyTorch-specific examples:
+- **`pytorch_training_example.py`** - Model training with market data
+- **`pytorch_inference_example.py`** - Model inference examples
+- **`pytorch_streaming_example.py`** - Real-time streaming integration
+- **`background_training_demo.py`** - Background training workflows
 
-def generate_visualization():
-    """
-    Loads data, processes it, and generates a heatmap visualization.
-    """
-    # Load the real market data from the .dbn.zst file
-    data = db.DBNStore.from_file("data/glbx-mdp3-20240405.mbp-10.dbn.zst")
-    df_pandas = data.to_df()
+### 4. Real Data Processing (`real_data/`)
 
-    # Filter by symbol using pandas, as in the notebook
-    df_pandas = df_pandas[df_pandas.symbol == "M6AM4"]
-    
-    # Define slicing parameters based on the notebook's logic
-    SAMPLES = 50000
-    OFFSET = 120000
-    start = OFFSET
-    stop = OFFSET + SAMPLES
-    
-    if len(df_pandas) < stop:
-        raise ValueError(f"Not enough data to generate a visualization. Need {stop} samples, but only have {len(df_pandas)}.")
+Examples using actual market data files:
+- **`dataloader_real_data_example.py`** - Real DBN file processing
+- **`currency_config_demo.py`** - Currency-specific configurations
 
-    # Take the slice with pandas, then convert to polars
-    df_slice_pandas = df_pandas[start:stop]
-    df_polars = pl.from_pandas(df_slice_pandas)
+### 5. Visualization (`visualization/`)
 
-    # Process the data to get the normalized market depth representation
-    normed_abs_combined = process_market_data(df_polars)
+Market depth visualization examples:
+- **`generate_visualization.py`** - Basic market depth heatmaps
 
-    # Create a heatmap of the processed data
-    plt.figure(figsize=(12, 8))
-    plt.imshow(normed_abs_combined, cmap='viridis', aspect='auto')
-    plt.colorbar(label='Normalized Volume Difference')
-    plt.title('Market Depth Representation')
-    plt.xlabel('Time Bins')
-    plt.ylabel('Price Levels')
-    
-    # Save the visualization to a file
-    plt.savefig('examples/market_depth_visualization.png')
-    print("Successfully generated 'examples/market_depth_visualization.png'")
+### 6. Extended Features (`extended_features/`)
 
-if __name__ == '__main__':
-    generate_visualization()
-```
+Multi-feature processing demonstrations:
+- **`extended_features_visualization.py`** - Volume, variance, and trade count features
 
-## Output
+## Running Examples
 
-Running the script will produce the following visualization of the market depth representation:
+### Prerequisites
 
-![Market Depth Visualization](market_depth_visualization.png)
-
-## Extended Features Visualization
-
-The `extended_features_visualization.py` script provides a comprehensive demonstration of the new extended features functionality introduced in the `df/extended-features` branch.
-
-### Features Demonstrated
-
-This script showcases:
-
-1. **Single Feature Extraction**: Process individual features (volume, variance, trade_counts)
-2. **Multi-Feature Processing**: Extract multiple features simultaneously with 3D output
-3. **RGB Visualization**: Create RGB composite images where each feature maps to a color channel
-4. **Performance Analysis**: Benchmark processing times for different feature combinations
-5. **API Usage Examples**: Demonstrate all extended API patterns
-
-### Key Visualizations Generated
-
-1. **Single Features Plot**: Individual heatmaps for each feature type
-2. **RGB Composite**: Three-channel visualization (Red=Volume, Green=Variance, Blue=Trade Counts)
-3. **Feature Analysis**: Statistical distributions and comparisons
-4. **Time Series Cross-Sections**: Feature behavior at different price levels
-5. **Performance Charts**: Processing time analysis across feature combinations
-
-### Usage
+Ensure you have the represent library installed and data files available:
 
 ```bash
-# Run the extended features example
-uv run python examples/extended_features_visualization.py
+# Install the library
+uv sync --all-extras
+
+# Ensure data files are available
+ls data/glbx-mdp3-*.dbn.zst
 ```
 
-### Output
+### Running Individual Examples
 
-The script generates:
-- 5 PNG visualization files showing different aspects of the feature data
-- A comprehensive analysis report with statistics and performance metrics
-- Demonstrates RGB color mapping for multi-feature visualization
+```bash
+# Basic usage
+uv run python examples/basic_usage/pytorch_quickstart.py
 
-### Key Results
+# Performance analysis  
+uv run python examples/dataloader_performance/dataloader_performance_demo.py
 
-- **Performance**: All feature combinations process within <20ms (well under the 50ms target)
-- **Dimensions**: Single features return (402, 500), multiple features return (N, 402, 500)
-- **Backward Compatibility**: Existing volume-only processing unchanged
-- **Feature Types**: 
-  - Volume: Traditional market depth based on order sizes
-  - Variance: Market volatility extracted from `market_depth_extraction_micro_pips_var`
-  - Trade Counts: Activity levels based on transaction counts
+# Visualization
+uv run python examples/visualization/generate_visualization.py
 
-### RGB Color Interpretation
+# Extended features
+uv run python examples/extended_features/extended_features_visualization.py
 
-In the RGB composite visualization:
-- **Red Channel (Volume)**: Intensity represents volume-based market depth
-- **Green Channel (Variance)**: Intensity shows market variance/volatility patterns  
-- **Blue Channel (Trade Counts)**: Intensity indicates trade activity levels
-- **Combined Colors**: Mixed colors show correlated patterns across features
+# Real data processing
+uv run python examples/real_data/dataloader_real_data_example.py
+```
+
+### Key Features Demonstrated
+
+- **High-Performance Processing**: <10ms market depth generation
+- **Multi-Feature Support**: Volume, variance, and trade count features
+- **PyTorch Integration**: Native tensor output for ML workflows
+- **Real-Time Streaming**: Continuous data processing capabilities
+- **Production Ready**: Optimized for trading applications

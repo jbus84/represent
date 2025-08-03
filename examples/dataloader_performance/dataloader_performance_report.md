@@ -1,61 +1,60 @@
 # PyTorch Dataloader Performance Report
-Generated: 2025-07-29 14:32:08
+Generated: 2025-08-03 17:03:47
 
 ## Executive Summary
 
 ⚠️ **PERFORMANCE TARGET MISSED**: Ultra-Fast mode exceeds 10ms target
-- Ultra-Fast Mode: 28.65ms average
-- Standard Mode: 16.62ms average
+- Ultra-Fast Mode: 27.93ms average
+- Standard Mode: 16.59ms average
 - Performance improvement: 0.6x faster
 
 ## Detailed Performance Metrics
 
 ### Ultra-Fast Mode
-- Average processing time: 28.65ms
-- Minimum processing time: 27.10ms
-- Maximum processing time: 37.54ms
-- Standard deviation: 2.17ms
-- Memory usage: 2.3MB
+- Average processing time: 27.93ms
+- Minimum processing time: 27.22ms
+- Maximum processing time: 28.73ms
+- Standard deviation: 0.46ms
+- Memory usage: 27.9MB
 - Output tensor shape: torch.Size([402, 500])
 
 ### Standard Mode
-- Average processing time: 16.62ms
-- Minimum processing time: 15.77ms
-- Maximum processing time: 19.62ms
-- Standard deviation: 0.80ms
-- Memory usage: 50.3MB
+- Average processing time: 16.59ms
+- Minimum processing time: 15.94ms
+- Maximum processing time: 17.23ms
+- Standard deviation: 0.38ms
+- Memory usage: 42.3MB
 - Output tensor shape: torch.Size([402, 500])
 
 ## Streaming Performance Analysis
 
-- Data ingestion time: 1.47ms
-- Processing time: 28.46ms
-- Total cycle time: 29.94ms
-- Theoretical throughput: 33.4 updates/second
+- Data ingestion time: 1.50ms
+- Processing time: 28.40ms
+- Total cycle time: 29.89ms
+- Theoretical throughput: 33.5 updates/second
 
 ## Multi-Core Scaling Analysis
 
 ### Scaling Summary
 - Optimal configuration: Single-threaded (0 workers)
-- Best batch processing time: 1.20ms
+- Best batch processing time: 0.22ms
 - Speedup over baseline: 1.0x
 
 ### Per-Worker Performance
-- single-threaded: 1.20ms (1.0x speedup, 835.3 batches/sec)
+- single-threaded: 0.22ms (1.0x speedup, 4490.7 batches/sec)
 
 ## Background Processing Performance
 
 ### Background Processing Summary
-- Average batch retrieval time: 5.649ms
-- Synchronous generation time: 41.29ms
-- Background processing speedup: 7.3x
+- Average batch retrieval time: 30.752ms
+- Synchronous generation time: 29.04ms
+- Background processing speedup: 0.9x
 - Performance assessment: ⚠️ NEEDS IMPROVEMENT - Over 5ms access
 
 ### Background Producer Statistics
-- Batches produced: 20
-- Background generation rate: 17.4 batches/second
-- Average background generation: 29.28ms
-- Queue utilization efficiency: 0.0%
+- Test batches processed: 20
+- Average processing time: 30.752ms
+- Performance assessment: Needs improvement
 
 ## Recommendations
 
