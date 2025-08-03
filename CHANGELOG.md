@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v1.7.2 (2025-08-03)
+
+### Bug Fixes
+
+- Add version_toml configuration to ensure pyproject.toml updates
+  ([`b8de258`](https://github.com/jbus84/represent/commit/b8de2589267ae121f72a644f081b4ce97c55b290))
+
+- Update semantic-release configuration for proper __init__.py version bumping
+  ([`aa11573`](https://github.com/jbus84/represent/commit/aa11573af30ac2e44df714c1c42031c80569f387))
+
+### Build System
+
+- **lock**: Update
+  ([`0247beb`](https://github.com/jbus84/represent/commit/0247beb18fd37a1332fe19bd2d60809f231c8434))
+
+
 ## v1.7.1 (2025-08-02)
 
 ### Bug Fixes
