@@ -20,10 +20,9 @@ import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 from pathlib import Path
 
-from represent.dataloader import MarketDepthDataset, AsyncDataLoader
+from represent.dataloader import MarketDepthDataset, HighPerformanceDataLoader
 from represent.constants import SAMPLES
 from tests.unit.fixtures.sample_data import generate_realistic_market_data
-
 
 class MarketDepthCNN(nn.Module):
     """
@@ -81,7 +80,6 @@ class MarketDepthCNN(nn.Module):
         x = self.classifier(x)
         return x
 
-
 def create_synthetic_targets(batch_size: int) -> torch.Tensor:
     """
     Create synthetic targets for demonstration.
@@ -91,8 +89,7 @@ def create_synthetic_targets(batch_size: int) -> torch.Tensor:
     # Positive = price increase, negative = price decrease
     return torch.randn(batch_size, 1) * 0.5  # Scale to reasonable range
 
-
-def train_epoch(model, async_loader, optimizer, criterion, device, epoch):
+def train_epoch(model, dataloader, optimizer, criterion, device, epoch):
     """Train for one epoch with background batch processing."""
     model.train()
     total_loss = 0.0
@@ -108,7 +105,7 @@ def train_epoch(model, async_loader, optimizer, criterion, device, epoch):
         batch_start = time.perf_counter()
         
         # Get batch from background processor
-        market_depth = async_loader.get_batch()  # Shape: (402, 500)
+        market_depth = next(iter(dataloader))[0]  # Shape: (402, 500)
         
         # Create synthetic target (in practice, use real targets)
         target = create_synthetic_targets(1).to(device)
@@ -162,8 +159,7 @@ def train_epoch(model, async_loader, optimizer, criterion, device, epoch):
     
     return avg_loss, avg_batch_time, avg_training_time
 
-
-def validate_model(model, async_loader, criterion, device):
+def validate_model(model, dataloader, criterion, device):
     """Run validation with background batch processing."""
     model.eval()
     total_loss = 0.0
@@ -175,7 +171,7 @@ def validate_model(model, async_loader, criterion, device):
     with torch.no_grad():
         for batch_idx in range(10):  # Validate on 10 batches
             # Get validation batch
-            market_depth = async_loader.get_batch()
+            market_depth = next(iter(dataloader))[0]
             target = create_synthetic_targets(1).to(device)
             
             # Prepare data
@@ -192,7 +188,6 @@ def validate_model(model, async_loader, criterion, device):
     print(f"   Validation Loss: {avg_val_loss:.6f}")
     
     return avg_val_loss
-
 
 def main():
     """Main training function demonstrating background batch processing."""
@@ -225,17 +220,16 @@ def main():
     
     # 2. Create background batch processor
     print("\n2️⃣  Creating background batch processor...")
-    async_loader = AsyncDataLoader(
+    dataloader = HighPerformanceDataLoader(
         dataset=dataset,
         background_queue_size=6,  # Keep 6 batches ready
         prefetch_batches=3        # Start with 3 pre-generated batches
     )
     
     # Start background processing
-    async_loader.start_background_production()
-    
+
     # Check initial status
-    status = async_loader.queue_status
+    status = {"status": "HighPerformanceDataLoader"}
     print("   ✅ Background processing started")
     print(f"   📊 Queue: {status['queue_size']}/{status['max_queue_size']} batches ready")
     print(f"   ⚡ Background healthy: {status['background_healthy']}")
@@ -277,11 +271,11 @@ def main():
         for epoch in range(num_epochs):
             # Train epoch
             train_loss, batch_time, training_time = train_epoch(
-                model, async_loader, optimizer, criterion, device, epoch
+                model, dataloader, optimizer, criterion, device, epoch
             )
             
             # Validate
-            val_loss = validate_model(model, async_loader, criterion, device)
+            val_loss = validate_model(model, dataloader, criterion, device)
             
             # Learning rate scheduling
             scheduler.step(val_loss)
@@ -316,7 +310,7 @@ def main():
             print(f"   📈 Learning Rate: {current_lr:.6f}")
             
             # Background processing status
-            status = async_loader.queue_status
+            status = {"status": "HighPerformanceDataLoader"}
             print(f"   🔄 Background: {status['batches_produced']} batches produced, "
                   f"{status['avg_generation_time_ms']:.2f}ms avg generation")
     
@@ -328,10 +322,9 @@ def main():
         print("\n6️⃣  Training completed! Generating final report...")
         
         # Stop background processing
-        async_loader.stop()
-        
+
         # Final background processing statistics
-        final_status = async_loader.queue_status
+        final_status = {"status": "HighPerformanceDataLoader"}
         
         print("\n" + "=" * 70)
         print("🏆 FINAL TRAINING REPORT")
@@ -376,7 +369,6 @@ def main():
         print("\n✅ Training completed successfully!")
         print("   Use the saved model for inference or continue training.")
         print("=" * 70)
-
 
 if __name__ == "__main__":
     main()

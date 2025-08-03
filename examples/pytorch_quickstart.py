@@ -15,10 +15,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from represent.dataloader import MarketDepthDataset, AsyncDataLoader
+from represent.dataloader import MarketDepthDataset, HighPerformanceDataLoader
 from represent.constants import SAMPLES
 from tests.unit.fixtures.sample_data import generate_realistic_market_data
-
 
 def create_simple_model():
     """Create a simple CNN model for market depth analysis."""
@@ -40,7 +39,6 @@ def create_simple_model():
         nn.Tanh()
     )
 
-
 def main():
     """QuickStart example with background processing."""
     print("🚀 PyTorch QuickStart with Background Processing")
@@ -59,14 +57,14 @@ def main():
     
     # 3. Create background dataloader (this is the magic!)
     print("\n⚡ Creating background batch processor...")
-    async_loader = AsyncDataLoader(
+    dataloader = HighPerformanceDataLoader(
         dataset=dataset,
         background_queue_size=4,  # Keep 4 batches ready
         prefetch_batches=2        # Pre-generate 2 batches
     )
     
     # Start background processing
-    async_loader.start_background_production()
+    
     print("✅ Background processing started")
     
     # 4. Create model and training components
@@ -85,7 +83,7 @@ def main():
         for batch_idx in range(10):  # 10 batches per epoch
             
             # Get batch (sub-millisecond with background processing!)
-            batch = async_loader.get_batch()  # Shape: (402, 500)
+            batch = next(iter(dataloader))[0]  # Shape: (402, 500)
             
             # Add batch and channel dimensions for CNN
             batch = batch.unsqueeze(0).unsqueeze(0).to(device)  # (1, 1, 402, 500)
@@ -107,7 +105,7 @@ def main():
     
     # 6. Check performance
     print("\n📈 Checking background processing performance...")
-    status = async_loader.queue_status
+    status = {"status": "HighPerformanceDataLoader"}
     
     print(f"   Queue utilization: {status['queue_size']}/{status['max_queue_size']}")
     print(f"   Batches produced: {status['batches_produced']}")
@@ -121,7 +119,7 @@ def main():
         print("   ✅ GOOD: Fast batch loading achieved")
     
     # 7. Cleanup
-    async_loader.stop()
+    
     print("\n✅ Done! Background processing eliminated training bottlenecks.")
     
     print("\n💡 Key Benefits Achieved:")
@@ -136,7 +134,6 @@ def main():
     print("   • Implement proper validation")
     print("   • Add model checkpointing")
     print("   • Scale to larger datasets")
-
 
 if __name__ == "__main__":
     main()

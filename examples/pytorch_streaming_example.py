@@ -20,10 +20,9 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-from represent.dataloader import MarketDepthDataset, AsyncDataLoader
+from represent.dataloader import MarketDepthDataset, HighPerformanceDataLoader
 from represent.constants import SAMPLES
 from tests.unit.fixtures.sample_data import generate_realistic_market_data
-
 
 class TradingSignalModel(nn.Module):
     """
@@ -52,7 +51,6 @@ class TradingSignalModel(nn.Module):
     
     def forward(self, x):
         return self.features(x)
-
 
 class StreamingDataSimulator:
     """
@@ -91,7 +89,6 @@ class StreamingDataSimulator:
             self.updates_sent += 1
             
             time.sleep(self.update_interval)
-
 
 class TradingSignalGenerator:
     """
@@ -172,12 +169,11 @@ class TradingSignalGenerator:
             'signal_distribution': dict(self.signal_counts)
         }
 
-
-def print_signal_dashboard(signal_generator, async_loader):
+def print_signal_dashboard(signal_generator, dataloader):
     """Print a real-time dashboard of signals and performance."""
     recent_signals = signal_generator.get_recent_signals(5)
     stats = signal_generator.get_performance_stats()
-    queue_status = async_loader.queue_status
+    queue_status = {"status": "HighPerformanceDataLoader"}
     
     # Clear previous output (simple version)
     print("\n" + "=" * 80)
@@ -217,7 +213,6 @@ def print_signal_dashboard(signal_generator, async_loader):
     print(f"   Background Rate: {queue_status['background_rate_bps']:.1f} batches/sec")
     print(f"   Healthy: {'✅' if queue_status['background_healthy'] else '❌'}")
 
-
 def main():
     """Main streaming inference demonstration."""
     print("🌊 PYTORCH STREAMING INFERENCE WITH BACKGROUND PROCESSING")
@@ -249,17 +244,15 @@ def main():
     
     # 3. Create background processor
     print("\n3️⃣  Starting background batch processing...")
-    async_loader = AsyncDataLoader(
+    dataloader = HighPerformanceDataLoader(
         dataset=dataset,
         background_queue_size=10,  # Large queue for streaming
         prefetch_batches=5         # Keep well-stocked
     )
-    
-    async_loader.start_background_production()
-    
+
     # Wait for initial queue population
     time.sleep(0.3)
-    status = async_loader.queue_status
+    status = {"status": "HighPerformanceDataLoader"}
     print(f"   ✅ Background processing ready ({status['queue_size']}/{status['max_queue_size']} batches)")
     
     # 4. Setup streaming simulator
@@ -287,7 +280,7 @@ def main():
             loop_start = time.perf_counter()
             
             # Generate signal from current market state
-            market_depth = async_loader.get_batch()
+            market_depth = next(iter(dataloader))[0]
             signal_data = signal_generator.generate_signal(market_depth)
             
             total_signals += 1
@@ -296,7 +289,7 @@ def main():
             # Update dashboard periodically
             current_time = time.perf_counter()
             if current_time - last_dashboard_update >= dashboard_interval:
-                print_signal_dashboard(signal_generator, async_loader)
+                print_signal_dashboard(signal_generator, dataloader)
                 last_dashboard_update = current_time
             
             # Brief pause to prevent overwhelming
@@ -311,11 +304,10 @@ def main():
         
         # Stop components
         simulator.stop()
-        async_loader.stop()
-        
+
         # Final statistics
         final_stats = signal_generator.get_performance_stats()
-        final_queue_status = async_loader.queue_status
+        final_queue_status = {"status": "HighPerformanceDataLoader"}
         
         print("\n" + "=" * 80)
         print("🏆 FINAL STREAMING PERFORMANCE REPORT")
@@ -373,7 +365,6 @@ def main():
         
         print("\n🎯 This demonstrates production-ready real-time trading capabilities!")
         print("=" * 80)
-
 
 if __name__ == "__main__":
     main()

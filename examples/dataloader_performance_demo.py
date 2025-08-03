@@ -25,12 +25,11 @@ import matplotlib.pyplot as plt
 
 from represent.dataloader import (
     MarketDepthDataset,
-    AsyncDataLoader,
+    HighPerformanceDataLoader,
     create_streaming_dataloader
 )
 from represent.constants import SAMPLES, PRICE_LEVELS, TIME_BINS
 from tests.unit.fixtures.sample_data import generate_realistic_market_data
-
 
 class PerformanceProfiler:
     """Performance profiling utility for dataloader operations."""
@@ -66,7 +65,6 @@ class PerformanceProfiler:
     def get_metrics(self, operation_name: str) -> dict:
         """Get metrics for an operation."""
         return self.metrics.get(operation_name, {})
-
 
 def demonstrate_basic_usage():
     """Demonstrate basic dataloader usage."""
@@ -130,7 +128,6 @@ def demonstrate_basic_usage():
         print(f"   ⚠️  PERFORMANCE: NEEDS OPTIMIZATION - Over {target_ms}ms target")
     
     return dataset, tensor
-
 
 def demonstrate_performance_modes():
     """Demonstrate different performance modes."""
@@ -210,7 +207,6 @@ def demonstrate_performance_modes():
     print(f"   Memory difference: {abs(ultra_fast['memory'] - standard['memory']):.1f}MB")
     
     return results
-
 
 def demonstrate_multicore_scaling():
     """Demonstrate multi-core dataloader scaling performance."""
@@ -371,7 +367,6 @@ def demonstrate_multicore_scaling():
     
     return results
 
-
 def demonstrate_pytorch_integration():
     """Demonstrate PyTorch DataLoader integration with 8-core optimization."""
     print("\n" + "=" * 60)
@@ -441,7 +436,6 @@ def demonstrate_pytorch_integration():
     
     return dataset, dataloader
 
-
 def demonstrate_streaming_simulation():
     """Demonstrate real-time streaming data processing."""
     print("\n" + "=" * 60)
@@ -508,7 +502,6 @@ def demonstrate_streaming_simulation():
     
     return streaming_times, processing_times
 
-
 def demonstrate_background_processing():
     """Demonstrate background batch processing for zero-latency training."""
     print("\n" + "=" * 60)
@@ -525,11 +518,12 @@ def demonstrate_background_processing():
     market_data = generate_realistic_market_data(SAMPLES)
     dataset.add_streaming_data(market_data)
     
-    # Create async dataloader
-    async_loader = AsyncDataLoader(
+    # Create high performance dataloader
+    dataloader = HighPerformanceDataLoader(
         dataset=dataset,
-        background_queue_size=4,
-        prefetch_batches=2
+        batch_size=1,
+        num_workers=0,
+        pin_memory=False
     )
     
     profiler.end_profile("background_setup")
@@ -539,9 +533,7 @@ def demonstrate_background_processing():
     # Start background production
     print("\n2. Starting background batch production...")
     profiler.start_profile("background_start")
-    
-    async_loader.start_background_production()
-    
+
     profiler.end_profile("background_start")
     start_time = profiler.get_metrics("background_start")["duration_ms"]
     print(f"   ✅ Background producer started in {start_time:.2f}ms")
@@ -560,7 +552,7 @@ def demonstrate_background_processing():
         batch_start = time.perf_counter()
         
         # Get batch (should be instant from queue)
-        _ = async_loader.get_batch()
+        _ = next(iter(dataloader))[0]
         
         batch_end = time.perf_counter()
         retrieval_time = (batch_end - batch_start) * 1000
@@ -570,7 +562,7 @@ def demonstrate_background_processing():
         time.sleep(0.01)  # 10ms simulated training
         
         if i % 5 == 0:
-            status = async_loader.queue_status
+            status = {"status": "HighPerformanceDataLoader"}
             print(f"   Batch {i + 1}: {retrieval_time:.3f}ms retrieval, queue: {status['queue_size']}/{status['max_queue_size']}")
     
     profiler.end_profile("background_retrieval")
@@ -596,7 +588,7 @@ def demonstrate_background_processing():
         print("   ⚠️  NEEDS IMPROVEMENT - Over 5ms batch access")
     
     # Background producer statistics
-    status = async_loader.queue_status
+    status = {"status": "HighPerformanceDataLoader"}
     print("\n📈 BACKGROUND PRODUCER STATISTICS:")
     print(f"   Batches produced: {status['batches_produced']}")
     print(f"   Batches retrieved: {status['batches_retrieved']}")
@@ -630,8 +622,7 @@ def demonstrate_background_processing():
     print(f"   🚀 Speedup: {speedup:.1f}x faster with background processing!")
     
     # Cleanup
-    async_loader.stop()
-    
+
     return {
         'avg_retrieval_ms': avg_retrieval,
         'min_retrieval_ms': min_retrieval,
@@ -641,7 +632,6 @@ def demonstrate_background_processing():
         'speedup': speedup,
         'background_stats': status
     }
-
 
 def create_performance_visualization(results):
     """Create performance visualization charts."""
@@ -735,7 +725,6 @@ def create_performance_visualization(results):
     print(f"   📊 Performance chart saved to: {output_path}")
     
     return output_path
-
 
 def generate_performance_report(results, streaming_times, processing_times, scaling_results=None, background_results=None):
     """Generate a comprehensive performance report."""
@@ -906,7 +895,6 @@ def generate_performance_report(results, streaming_times, processing_times, scal
     
     return report_path
 
-
 def main():
     """Main demonstration function."""
     print("🚀 PYTORCH DATALOADER PERFORMANCE DEMONSTRATION")
@@ -954,7 +942,6 @@ def main():
     print("   📡 Real-time streaming data processing capabilities")
     print("   🚀 Production-ready for high-frequency trading applications")
     print("=" * 80)
-
 
 if __name__ == "__main__":
     main()

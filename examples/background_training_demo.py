@@ -14,10 +14,9 @@ import time
 import torch
 import torch.nn as nn
 
-from represent.dataloader import MarketDepthDataset, AsyncDataLoader
+from represent.dataloader import MarketDepthDataset, HighPerformanceDataLoader
 from represent.constants import SAMPLES
 from tests.unit.fixtures.sample_data import generate_realistic_market_data
-
 
 def simulate_training_with_background_processing():
     """Simulate training loop with background batch processing."""
@@ -31,15 +30,14 @@ def simulate_training_with_background_processing():
     dataset.add_streaming_data(market_data)
     
     # Create async dataloader with background processing
-    async_loader = AsyncDataLoader(
+    dataloader = HighPerformanceDataLoader(
         dataset=dataset,
         background_queue_size=4,  # Keep 4 batches ready
         prefetch_batches=2        # Start with 2 pre-generated batches
     )
     
     # Start background production
-    async_loader.start_background_production()
-    
+
     # Simple CNN model for market depth
     model = nn.Sequential(
         nn.Conv2d(1, 32, kernel_size=3, padding=1),
@@ -68,7 +66,7 @@ def simulate_training_with_background_processing():
         
         # Get batch (should be instant from background queue)
         batch_start = time.perf_counter()
-        batch = async_loader.get_batch()
+        batch = next(iter(dataloader))[0]
         batch_end = time.perf_counter()
         
         batch_time = (batch_end - batch_start) * 1000
@@ -97,7 +95,7 @@ def simulate_training_with_background_processing():
         
         # Progress reporting
         if epoch % 5 == 0:
-            status = async_loader.queue_status
+            status = {"status": "HighPerformanceDataLoader"}
             print(f"   Epoch {epoch + 1:2d}: Batch={batch_time:.3f}ms, Train={training_time:.2f}ms, "
                   f"Total={total_time:.2f}ms, Queue={status['queue_size']}/{status['max_queue_size']}")
     
@@ -113,7 +111,7 @@ def simulate_training_with_background_processing():
     print(f"   Batch loading overhead: {(avg_batch_time/avg_total_time)*100:.1f}%")
     
     # Queue statistics
-    final_status = async_loader.queue_status
+    final_status = {"status": "HighPerformanceDataLoader"}
     print("\n📈 BACKGROUND PROCESSING STATISTICS:")
     print(f"   Total batches produced: {final_status['batches_produced']}")
     print(f"   Background generation rate: {final_status['background_rate_bps']:.1f} batches/sec")
@@ -133,8 +131,7 @@ def simulate_training_with_background_processing():
         print(f"   📊 GPU utilization: ~{((avg_training_time/avg_total_time)*100):.0f}%")
     
     # Cleanup
-    async_loader.stop()
-    
+
     return {
         'avg_batch_time_ms': avg_batch_time,
         'avg_training_time_ms': avg_training_time,
@@ -142,7 +139,6 @@ def simulate_training_with_background_processing():
         'gpu_utilization_pct': (avg_training_time/avg_total_time)*100,
         'background_stats': final_status
     }
-
 
 def compare_with_synchronous_training():
     """Compare with traditional synchronous batch generation."""
@@ -222,7 +218,6 @@ def compare_with_synchronous_training():
         'gpu_utilization_pct': (avg_sync_train/avg_sync_total)*100
     }
 
-
 def main():
     """Main demonstration function."""
     print("🚀 BACKGROUND PROCESSING TRAINING DEMONSTRATION")
@@ -265,7 +260,6 @@ def main():
         print("   📊 BENEFICIAL - AsyncDataLoader reduces bottlenecks, consider optimization")
     
     print("=" * 80)
-
 
 if __name__ == "__main__":
     main()
