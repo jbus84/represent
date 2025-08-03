@@ -16,7 +16,7 @@ from .constants import (
 )
 from .dataloader import (
     MarketDepthDataset, 
-    HighPerformanceDataLoader, BackgroundBatchProducer, AsyncDataLoader,
+    HighPerformanceDataLoader, BackgroundBatchProducer,
     create_streaming_dataloader, create_file_dataloader, create_high_performance_dataloader
 )
 from .config import (
@@ -37,7 +37,6 @@ __all__ = [
     "MarketDepthDataset",
     "HighPerformanceDataLoader",
     "BackgroundBatchProducer",
-    "AsyncDataLoader",
     "create_streaming_dataloader",
     "create_file_dataloader",
     "create_high_performance_dataloader",

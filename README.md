@@ -10,12 +10,13 @@ High-performance Python package for creating normalized market depth representat
 ## 🚀 Key Features
 
 - **<10ms Processing**: Ultra-fast market depth array generation
-- **PyTorch Integration**: Native DataLoader with tensor operations
+- **PyTorch Integration**: Production-ready DataLoader with tensor operations
 - **Multi-Feature Support**: Volume, variance, and trade count features
 - **Currency Configurations**: Pre-optimized settings for major currency pairs
 - **Validated Configurations**: Pydantic validation ensures reliable threshold access
 - **Smart Output Shapes**: Automatic 2D/3D tensor generation based on feature count
 - **Real Market Data**: Processes DBN files and streaming market data
+- **Production Stability**: HighPerformanceDataLoader for reliable production environments
 
 ## 📦 Installation
 
@@ -99,55 +100,46 @@ for currency in currencies:
     # AUDUSD: 13 bins, USDJPY: 9 bins (different pip sizes)
 ```
 
-### AsyncDataLoader Example
+### Production DataLoader Example
 
 ```python
-import time
-from represent.dataloader import MarketDepthDataset, AsyncDataLoader
+from represent import MarketDepthDataset, create_high_performance_dataloader
 
 # Create dataset with multiple features
 dataset = MarketDepthDataset(
     data_source="market_data.dbn",
     currency="EURUSD",
     features=['volume', 'variance', 'trade_counts'],  # 3 features
-    batch_size=500
-)
-
-# Create AsyncDataLoader for background batch generation
-async_loader = AsyncDataLoader(
-    dataset=dataset,
-    background_queue_size=8,  # Keep 8 batches ready
-    prefetch_batches=4        # Pre-generate 4 batches on startup
 )
 
 print(f"Dataset: {len(dataset)} batches available")
 print(f"Output shape per sample: {dataset.output_shape}")  # (3, 402, 500)
 
-# Start background batch production
-async_loader.start_background_production()
+# Create production-ready dataloader
+dataloader = create_high_performance_dataloader(
+    dataset=dataset,
+    batch_size=16,           # Batch size for training
+    num_workers=0,           # Single-threaded for production stability
+    pin_memory=False         # Safe for all devices
+)
 
-# Zero-latency training loop
+# Reliable training loop
 for epoch in range(5):
-    for batch_idx in range(min(3, len(dataset))):  # Show first 3 batches
-        start_time = time.perf_counter()
-        
-        # Get batch instantly (pre-generated in background)
-        batch = async_loader.get_batch()
-        
-        batch_time = (time.perf_counter() - start_time) * 1000
+    for batch_idx, (features, targets) in enumerate(dataloader):
+        # features: (16, 3, 402, 500) - batch of 16, 3 features, 402x500 depth
+        # targets: (16, 1) - classification targets
         
         print(f"Epoch {epoch}, Batch {batch_idx}")
-        print(f"  Batch retrieved in: {batch_time:.2f}ms")
-        print(f"  Batch shape: {batch.shape}")
-        print(f"  Queue status: {async_loader.queue_status['queue_size']}/{async_loader.queue_status['max_queue_size']} batches ready")
+        print(f"  Features shape: {features.shape}")
+        print(f"  Targets shape: {targets.shape}")
         
-        # Your model training here - batches generate in background
-        # model(batch) -> predictions
-        time.sleep(0.1)  # Simulate training time
+        # Your model training here - reliable and stable
+        # model(features) -> predictions
+        
+        if batch_idx >= 2:  # Just show first few batches
+            break
 
-# Cleanup
-async_loader.stop()
-print(f"Average retrieval time: {async_loader.average_retrieval_time_ms:.2f}ms")
+print("✅ Production-ready training completed successfully")
 ```
 
 ## 🎯 Feature Types
@@ -209,6 +201,9 @@ Automatic preprocessing handles missing columns and type conversions.
 ```bash
 # Currency configuration demo
 uv run python examples/simple_currency_config_demo.py
+
+# Production-ready dataloader demo
+uv run python examples/production_dataloader_example.py
 
 # Real market data processing
 uv run python examples/dataloader_real_data_example.py
