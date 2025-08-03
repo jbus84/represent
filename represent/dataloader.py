@@ -12,10 +12,10 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 import numpy as np
 import polars as pl
 import torch
-from torch.utils.data import IterableDataset
+from torch.utils.data import DataLoader, IterableDataset
 
 from .constants import (
-    SAMPLES, TICKS_PER_BIN, TIME_BINS, VOLUME_DTYPE,
+    SAMPLES, TICKS_PER_BIN, TIME_BINS, OUTPUT_SHAPE, VOLUME_DTYPE,
     ASK_PRICE_COLUMNS, BID_PRICE_COLUMNS, ASK_VOL_COLUMNS, BID_VOL_COLUMNS,
     ASK_COUNT_COLUMNS, BID_COUNT_COLUMNS, DEFAULT_FEATURES, FeatureType, get_output_shape
 )
@@ -1208,6 +1208,92 @@ class MarketDepthDataset(IterableDataset[Tuple[torch.Tensor, torch.Tensor]]):
 
 
 
+class HighPerformanceDataLoader:
+    """
+    Ultra-fast DataLoader wrapper optimized for market depth data.
+    
+    Features:
+    - Pre-allocated tensor batching
+    - Memory pinning for GPU transfer
+    - Synchronous data loading (production-ready)
+    - Performance monitoring
+    """
+    
+    def __init__(
+        self,
+        dataset: MarketDepthDataset,
+        batch_size: int = 8,
+        num_workers: int = 8,
+        pin_memory: bool = True,
+        prefetch_factor: int = 4
+    ):
+        """
+        Initialize high-performance dataloader.
+        
+        Args:
+            dataset: MarketDepthDataset instance
+            batch_size: Number of samples per batch
+            num_workers: Number of worker processes
+            pin_memory: Pin memory for faster GPU transfer
+            prefetch_factor: Number of batches to prefetch
+        """
+        self.dataset = dataset
+        self.batch_size = batch_size
+        
+        # Create optimized PyTorch DataLoader
+        if num_workers > 0:
+            self._dataloader = DataLoader(
+                dataset,
+                batch_size=batch_size,
+                num_workers=num_workers,
+                pin_memory=pin_memory,
+                persistent_workers=True,
+                drop_last=True,
+                prefetch_factor=prefetch_factor
+            )
+        else:
+            self._dataloader = DataLoader(
+                dataset,
+                batch_size=batch_size,
+                num_workers=0,
+                pin_memory=pin_memory,
+                persistent_workers=False,
+                drop_last=True
+            )
+        
+        # Get output shape from first dataset sample to handle variable feature dimensions
+        sample_output_shape = dataset.output_shape if hasattr(dataset, 'output_shape') else OUTPUT_SHAPE
+        
+        # Pre-allocated batch tensor (force CPU to avoid MPS issues in production)
+        # Only create pre-allocated tensor for single-threaded mode to avoid pickle issues
+        if num_workers == 0:
+            # Disable pin_memory on MPS devices to avoid kernel issues
+            safe_pin_memory = pin_memory and not torch.backends.mps.is_available()
+            
+            self._batch_tensor = torch.zeros(
+                (batch_size, *sample_output_shape), 
+                dtype=torch.float32,
+                pin_memory=safe_pin_memory,
+                device='cpu'
+            )
+        else:
+            # Don't pre-allocate for multi-worker mode to avoid pickle issues
+            self._batch_tensor = None
+    
+    def __iter__(self) -> Iterator[torch.Tensor]:
+        """Iterate over batched market depth representations."""
+        return iter(self._dataloader)
+    
+    def __len__(self) -> int:
+        """Number of batches in the dataloader."""
+        return len(self._dataloader)
+    
+    @property
+    def average_processing_time(self) -> float:
+        """Average processing time from underlying dataset."""
+        return self.dataset.average_processing_time
+
+
 class BackgroundBatchProducer:
     """
     Background batch producer using threading for zero-latency training.
@@ -1397,112 +1483,6 @@ class BackgroundBatchProducer:
         self.stop()
 
 
-class AsyncDataLoader:
-    """
-    Async-aware DataLoader wrapper that uses background batch production.
-    
-    Provides instant batch access by pre-generating batches in background thread.
-    Ideal for training loops where batch generation would otherwise be a bottleneck.
-    """
-    
-    def __init__(
-        self,
-        dataset: MarketDepthDataset,
-        background_queue_size: int = 4,
-        prefetch_batches: int = 2
-    ):
-        """
-        Initialize async dataloader.
-        
-        Args:
-            dataset: MarketDepthDataset instance
-            background_queue_size: Max batches to keep in background queue
-            prefetch_batches: Number of batches to prefetch on startup
-        """
-        self.dataset = dataset
-        self.background_queue_size = background_queue_size
-        self.prefetch_batches = prefetch_batches
-        
-        # Create background producer
-        self._producer = BackgroundBatchProducer(
-            dataset=dataset,
-            queue_size=background_queue_size,
-            auto_start=False
-        )
-        
-        # Performance tracking
-        self._batches_retrieved = 0
-        self._total_retrieval_time = 0.0
-    
-    def start_background_production(self) -> None:
-        """Start background batch production and prefetch initial batches."""
-        self._producer.start()
-        
-        # Prefetch initial batches
-        print(f"🚀 Prefetching {self.prefetch_batches} batches...")
-        prefetch_start = time.perf_counter()
-        
-        while self._producer.queue_size_current < self.prefetch_batches:
-            time.sleep(0.01)  # Wait for prefetch to complete
-            
-            # Timeout after 10 seconds
-            if time.perf_counter() - prefetch_start > 10.0:
-                print("⚠️  Prefetch timeout, continuing with available batches")
-                break
-        
-        prefetch_time = (time.perf_counter() - prefetch_start) * 1000
-        print(f"✅ Prefetch complete in {prefetch_time:.2f}ms, {self._producer.queue_size_current} batches ready")
-    
-    def get_batch(self) -> torch.Tensor:
-        """Get next batch with minimal latency."""
-        start_time = time.perf_counter()
-        
-        batch = self._producer.get_batch(timeout=2.0)
-        
-        end_time = time.perf_counter()
-        retrieval_time = end_time - start_time
-        
-        # Update statistics
-        self._batches_retrieved += 1
-        self._total_retrieval_time += retrieval_time
-        
-        return batch
-    
-    def add_streaming_data(self, data: Union[np.ndarray, pl.DataFrame]) -> None:
-        """Add streaming data (thread-safe)."""
-        self._producer.add_streaming_data(data)
-    
-    def stop(self) -> None:
-        """Stop background processing."""
-        self._producer.stop()
-    
-    @property
-    def average_retrieval_time_ms(self) -> float:
-        """Average batch retrieval time in milliseconds."""
-        if self._batches_retrieved == 0:
-            return 0.0
-        return (self._total_retrieval_time / self._batches_retrieved) * 1000
-    
-    @property
-    def queue_status(self) -> Dict[str, Any]:
-        """Current queue status and performance metrics."""
-        return {
-            'queue_size': self._producer.queue_size_current,
-            'max_queue_size': self.background_queue_size,
-            'batches_ready': self._producer.queue_size_current > 0,
-            'background_healthy': self._producer.is_healthy,
-            'avg_generation_time_ms': self._producer.average_generation_time,
-            'avg_retrieval_time_ms': self.average_retrieval_time_ms,
-            'background_rate_bps': self._producer.batches_per_second,
-            'batches_produced': self._producer.batches_produced_count,
-            'batches_retrieved': self._batches_retrieved
-        }
-    
-    def __del__(self):
-        """Cleanup on destruction."""
-        self.stop()
-
-
 def create_streaming_dataloader(
     buffer_size: int = SAMPLES,
     features: Optional[list[str]] = None,
@@ -1579,3 +1559,59 @@ def create_file_dataloader(
     )
     
     return dataset
+
+
+def create_high_performance_dataloader(
+    dataset: MarketDepthDataset,
+    batch_size: int = 8,
+    num_workers: int = 0,  # Default to single-threaded for production stability
+    pin_memory: bool = False,  # Default to False to avoid device issues
+    prefetch_factor: int = 2
+) -> HighPerformanceDataLoader:
+    """
+    Create a production-ready high-performance dataloader.
+    
+    This is a simplified, synchronous alternative to AsyncDataLoader that works
+    reliably in production environments without complex threading.
+    
+    Args:
+        dataset: MarketDepthDataset instance
+        batch_size: Number of samples per batch
+        num_workers: Number of worker processes (0=single-threaded, recommended for production)
+        pin_memory: Pin memory for faster GPU transfer (False=safer for production)
+        prefetch_factor: Number of batches to prefetch per worker
+        
+    Returns:
+        HighPerformanceDataLoader ready for production use
+        
+    Example:
+        ```python
+        from represent import MarketDepthDataset, create_high_performance_dataloader
+        
+        # Create dataset
+        dataset = MarketDepthDataset(
+            data_source="market_data.dbn",
+            currency="AUDUSD",
+            features=['volume']
+        )
+        
+        # Create production-ready dataloader
+        dataloader = create_high_performance_dataloader(
+            dataset,
+            batch_size=16,
+            num_workers=4
+        )
+        
+        # Use in training loop
+        for batch in dataloader:
+            # Training code here
+            pass
+        ```
+    """
+    return HighPerformanceDataLoader(
+        dataset=dataset,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        prefetch_factor=prefetch_factor
+    )

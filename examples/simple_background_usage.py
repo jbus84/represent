@@ -8,7 +8,7 @@ for eliminating training bottlenecks.
 import torch
 import torch.nn as nn
 
-from represent.dataloader import MarketDepthDataset, AsyncDataLoader
+from represent.dataloader import MarketDepthDataset, HighPerformanceDataLoader
 from represent.constants import SAMPLES
 from tests.unit.fixtures.sample_data import generate_realistic_market_data
 
@@ -23,15 +23,13 @@ def main():
     market_data = generate_realistic_market_data(SAMPLES)
     dataset.add_streaming_data(market_data)
     
-    # 2. Create async dataloader with background processing
-    async_loader = AsyncDataLoader(
+    # 2. Create high performance dataloader
+    dataloader = HighPerformanceDataLoader(
         dataset=dataset,
-        background_queue_size=4,  # Keep 4 batches ready
-        prefetch_batches=2        # Pre-generate 2 batches
+        batch_size=1,
+        num_workers=0,      # Single-threaded for stability
+        pin_memory=False    # Safe for all devices
     )
-    
-    # 3. Start background batch production
-    async_loader.start_background_production()
     
     # 4. Create your model (example CNN)
     model = nn.Sequential(
@@ -45,38 +43,26 @@ def main():
     optimizer = torch.optim.Adam(model.parameters())
     criterion = nn.MSELoss()
     
-    print("Training with background batch processing...")
+    print("Training with HighPerformanceDataLoader...")
     
-    # 5. Training loop - batches are instant!
+    # 5. Training loop - reliable and stable
     for epoch in range(10):
-        # Get batch (sub-millisecond when queue is full)
-        batch = async_loader.get_batch()
-        
-        # Prepare for training
-        batch = batch.unsqueeze(0).unsqueeze(0)  # Add batch & channel dims
-        target = torch.randn(1, 1)  # Random target for demo
-        
-        # Standard PyTorch training step
-        optimizer.zero_grad()
-        output = model(batch)
-        loss = criterion(output, target)
-        loss.backward()
-        optimizer.step()
-        
-        print(f"Epoch {epoch + 1}: Loss = {loss.item():.6f}")
+        for features, targets in dataloader:
+            # Features already have correct dimensions from dataloader
+            batch = features
+            target = targets
+            
+            # Standard PyTorch training step
+            optimizer.zero_grad()
+            output = model(batch)
+            loss = criterion(output, target)
+            loss.backward()
+            optimizer.step()
+            
+            print(f"Epoch {epoch + 1}: Loss = {loss.item():.6f}")
+            break  # Only process one batch per epoch for demo
     
-    # 6. Check background processing status
-    status = async_loader.queue_status
-    print("\\n📊 Background Processing Stats:")
-    print(f"   Batches produced: {status['batches_produced']}")
-    print(f"   Average generation: {status['avg_generation_time_ms']:.2f}ms")
-    print(f"   Average retrieval: {status['avg_retrieval_time_ms']:.3f}ms")
-    print(f"   Queue utilization: {status['queue_size']}/{status['max_queue_size']}")
-    
-    # 7. Cleanup
-    async_loader.stop()
-    
-    print("\\n✅ Done! Background processing eliminated the bottleneck.")
+    print("\\n✅ Done! HighPerformanceDataLoader provides reliable training.")
 
 
 if __name__ == "__main__":

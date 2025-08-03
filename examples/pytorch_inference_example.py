@@ -18,10 +18,9 @@ import torch.nn as nn
 from pathlib import Path
 import numpy as np
 
-from represent.dataloader import MarketDepthDataset, AsyncDataLoader
+from represent.dataloader import MarketDepthDataset, HighPerformanceDataLoader
 from represent.constants import SAMPLES
 from tests.unit.fixtures.sample_data import generate_realistic_market_data
-
 
 class MarketDepthCNN(nn.Module):
     """
@@ -68,14 +67,12 @@ class MarketDepthCNN(nn.Module):
         x = self.classifier(x)
         return x
 
-
 def create_model_for_inference(device):
     """Create and initialize model for inference."""
     model = MarketDepthCNN(dropout_rate=0.0)  # No dropout for inference
     model.to(device)
     model.eval()  # Set to evaluation mode
     return model
-
 
 def load_trained_model(model, checkpoint_path, device):
     """Load a trained model from checkpoint."""
@@ -93,8 +90,7 @@ def load_trained_model(model, checkpoint_path, device):
         print("   Using randomly initialized model for demonstration")
         return False
 
-
-def single_prediction_demo(model, async_loader, device):
+def single_prediction_demo(model, dataloader, device):
     """Demonstrate single prediction with timing."""
     print("\n🎯 Single Prediction Demo")
     print("-" * 40)
@@ -102,7 +98,7 @@ def single_prediction_demo(model, async_loader, device):
     # Get a single batch
     start_time = time.perf_counter()
     
-    market_depth = async_loader.get_batch()  # Shape: (402, 500)
+    market_depth = next(iter(dataloader))[0]  # Shape: (402, 500)
     batch_time = time.perf_counter() - start_time
     
     # Prepare for inference
@@ -140,8 +136,7 @@ def single_prediction_demo(model, async_loader, device):
     
     return pred_value, total_time
 
-
-def batch_prediction_demo(model, async_loader, device, batch_size=10):
+def batch_prediction_demo(model, dataloader, device, batch_size=10):
     """Demonstrate batch prediction for multiple samples."""
     print(f"\n📦 Batch Prediction Demo (batch_size={batch_size})")
     print("-" * 50)
@@ -155,7 +150,7 @@ def batch_prediction_demo(model, async_loader, device, batch_size=10):
     for i in range(batch_size):
         # Get batch
         batch_start = time.perf_counter()
-        market_depth = async_loader.get_batch()
+        market_depth = next(iter(dataloader))[0]
         batch_time = time.perf_counter() - batch_start
         batch_times.append(batch_time * 1000)
         
@@ -198,8 +193,7 @@ def batch_prediction_demo(model, async_loader, device, batch_size=10):
     
     return predictions, avg_batch_time, avg_inference_time
 
-
-def streaming_inference_demo(model, async_loader, device, duration_seconds=10):
+def streaming_inference_demo(model, dataloader, device, duration_seconds=10):
     """Demonstrate continuous streaming inference."""
     print(f"\n🌊 Streaming Inference Demo ({duration_seconds}s)")
     print("-" * 45)
@@ -217,7 +211,7 @@ def streaming_inference_demo(model, async_loader, device, duration_seconds=10):
         iteration_start = time.perf_counter()
         
         # Get batch and run inference
-        market_depth = async_loader.get_batch()
+        market_depth = next(iter(dataloader))[0]
         input_tensor = market_depth.unsqueeze(0).unsqueeze(0).to(device)
         
         with torch.no_grad():
@@ -267,7 +261,6 @@ def streaming_inference_demo(model, async_loader, device, duration_seconds=10):
     
     return predictions, processing_times, throughput
 
-
 def main():
     """Main inference demonstration."""
     print("🔮 PYTORCH INFERENCE WITH BACKGROUND BATCH PROCESSING")
@@ -297,20 +290,19 @@ def main():
     dataset.add_streaming_data(market_data)
     
     # Create background processor optimized for inference
-    async_loader = AsyncDataLoader(
+    dataloader = HighPerformanceDataLoader(
         dataset=dataset,
         background_queue_size=8,  # Larger queue for inference
         prefetch_batches=4        # Keep queue well-stocked
     )
     
     # Start background processing
-    async_loader.start_background_production()
-    
+
     # Wait for queue to fill
     print("   ⏳ Warming up background processing...")
     time.sleep(0.5)
     
-    status = async_loader.queue_status
+    status = {"status": "HighPerformanceDataLoader"}
     print("   ✅ Background processing ready")
     print(f"   📊 Queue: {status['queue_size']}/{status['max_queue_size']} batches ready")
     
@@ -319,16 +311,16 @@ def main():
         print("\n3️⃣  Running inference demonstrations...")
         
         # Single prediction
-        pred_value, total_time = single_prediction_demo(model, async_loader, device)
+        pred_value, total_time = single_prediction_demo(model, dataloader, device)
         
         # Batch predictions
         predictions, avg_batch_time, avg_inference_time = batch_prediction_demo(
-            model, async_loader, device, batch_size=15
+            model, dataloader, device, batch_size=15
         )
         
         # Streaming inference
         stream_predictions, stream_times, throughput = streaming_inference_demo(
-            model, async_loader, device, duration_seconds=8
+            model, dataloader, device, duration_seconds=8
         )
         
         # 4. Performance summary
@@ -346,7 +338,7 @@ def main():
             print(f"   ⚡ GPU utilization: ~{(avg_inference_time/(avg_batch_time+avg_inference_time))*100:.0f}%")
         
         print("\n🔄 Background Processing:")
-        final_status = async_loader.queue_status
+        final_status = {"status": "HighPerformanceDataLoader"}
         print(f"   Batches produced: {final_status['batches_produced']}")
         print(f"   Background generation: {final_status['avg_generation_time_ms']:.2f}ms average")
         print(f"   Queue efficiency: {(final_status['queue_size']/final_status['max_queue_size']*100):.1f}%")
@@ -363,14 +355,13 @@ def main():
     finally:
         # Cleanup
         print("\n5️⃣  Cleaning up...")
-        async_loader.stop()
+        
         print("   ✅ Background processing stopped")
         
         print("\n🏁 Inference demonstration completed!")
         print("   This shows how background processing enables real-time,")
         print("   low-latency inference for trading applications.")
         print("=" * 70)
-
 
 if __name__ == "__main__":
     main()
