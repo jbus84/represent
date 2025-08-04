@@ -1,99 +1,206 @@
-# Represent Library Examples
+# Represent Library Examples (v2.0.0)
 
-This directory contains organized examples demonstrating various uses of the `represent` library for market depth processing, PyTorch integration, and performance analysis.
+This directory contains examples demonstrating the new **parquet-based machine learning pipeline** for market depth processing and PyTorch integration.
+
+## New Architecture Overview
+
+The represent library now uses a **two-stage pipeline**:
+1. **Offline Preprocessing**: Convert DBN files to labeled parquet datasets
+2. **Online Training**: Lazy loading from parquet for memory-efficient ML training
 
 ## Directory Structure
 
-- **`basic_usage/`** - Simple introductory examples and quickstart guides
-- **`dataloader_performance/`** - Performance benchmarking and optimization examples
-- **`pytorch_integration/`** - PyTorch dataloader and ML training examples
-- **`real_data/`** - Examples using real market data files (.dbn format)
-- **`visualization/`** - Market depth visualization and plotting examples
-- **`extended_features/`** - Multi-feature processing demonstrations (volume, variance, trade counts)
+- **`new_architecture/`** - Complete workflow examples for the new DBN→Parquet→ML pipeline
+- **`real_data/`** - Examples using the new parquet-based dataloader
+- **`visualization/`** - Market depth visualization using core processing pipeline
+- **`random_access_evaluation/`** - Performance benchmarks for lazy dataloader random access
 
 ## Quick Start
 
-For beginners, start with:
-1. `basic_usage/pytorch_quickstart.py` - Basic library usage
-2. `visualization/generate_visualization.py` - Generate market depth visualizations
-3. `dataloader_performance/dataloader_performance_demo.py` - Performance analysis
+For the new architecture, follow this sequence:
+1. `new_architecture/dbn_to_parquet_example.py` - Complete workflow demonstration
+2. `real_data/parquet_dataloader_example.py` - Parquet-based training
+3. `visualization/generate_visualization.py` - Core processing visualization
 
 ## Example Categories
 
-### 1. Basic Usage (`basic_usage/`)
+### 1. New Architecture (`new_architecture/`)
 
-Simple examples to get started with the library:
-- **`pytorch_quickstart.py`** - Basic PyTorch tensor generation
-- **`simple_background_usage.py`** - Background processing introduction  
-- **`simple_currency_config_demo.py`** - Currency configuration examples
+Complete workflow examples for the v2.0.0 architecture:
+- **`dbn_to_parquet_example.py`** - End-to-end DBN→Parquet→ML pipeline demonstration
 
-### 2. Performance Analysis (`dataloader_performance/`)
+**Features demonstrated:**
+- DBN file to labeled parquet conversion
+- Automatic classification labeling during conversion
+- Currency-specific configurations (AUDUSD, GBPUSD, EURJPY)
+- Multi-feature extraction (volume, variance, trade counts)
+- Lazy loading parquet dataloader for training
+- Memory-efficient ML training on large datasets
 
-Performance benchmarking and optimization examples:
-- **`dataloader_performance_demo.py`** - Comprehensive performance analysis
-- **`production_dataloader_example.py`** - Production-ready dataloader setup
+### 2. Parquet-Based Training (`real_data/`)
 
-### 3. PyTorch Integration (`pytorch_integration/`)
+Examples using the new lazy loading dataloader:
+- **`parquet_dataloader_example.py`** - Memory-efficient training from parquet files
 
-ML and PyTorch-specific examples:
-- **`pytorch_training_example.py`** - Model training with market data
-- **`pytorch_inference_example.py`** - Model inference examples
-- **`pytorch_streaming_example.py`** - Real-time streaming integration
-- **`background_training_demo.py`** - Background training workflows
+**Features demonstrated:**
+- Lazy loading from parquet datasets
+- Memory usage independent of dataset size
+- High-performance tensor generation
+- PyTorch integration with pre-computed labels
+- Configurable sampling strategies
 
-### 4. Real Data Processing (`real_data/`)
+### 3. Core Processing (`visualization/`)
 
-Examples using actual market data files:
-- **`dataloader_real_data_example.py`** - Real DBN file processing
-- **`currency_config_demo.py`** - Currency-specific configurations
+Core market depth processing examples:
+- **`generate_visualization.py`** - Market depth heatmap generation
 
-### 5. Visualization (`visualization/`)
+**Features demonstrated:**
+- Raw market data processing
+- 402×500 market depth representation
+- Price level mapping and time bin aggregation
 
-Market depth visualization examples:
-- **`generate_visualization.py`** - Basic market depth heatmaps
+### 4. Performance Evaluation (`random_access_evaluation/`)
 
-### 6. Extended Features (`extended_features/`)
+Comprehensive benchmarks for lazy dataloader performance:
+- **`lazy_dataloader_random_access_benchmark.py`** - Full performance benchmark suite
+- **`minimal_test.py`** - Quick functionality verification
+- **`usage_examples.py`** - Configuration examples for different scenarios
 
-Multi-feature processing demonstrations:
-- **`extended_features_visualization.py`** - Volume, variance, and trade count features
+**Features demonstrated:**
+- Random access latency measurement (<1ms target)
+- Batch loading throughput (>10K samples/sec target)
+- 50K subset sampling for ML training
+- Cache effectiveness analysis with different sizes
+- Memory efficiency monitoring
+- Production-ready performance validation
+
+## New Workflow
+
+### Stage 1: Convert DBN to Labeled Parquet
+
+```bash
+# Use the conversion script or example
+uv run python examples/new_architecture/dbn_to_parquet_example.py
+
+# Or use the CLI tool
+uv run python scripts/convert_dbn_to_parquet.py \
+  --input data/market_data.dbn.zst \
+  --output data/labeled_dataset.parquet \
+  --currency AUDUSD
+```
+
+### Stage 2: Train with Parquet Dataloader
+
+```bash
+# Use the parquet dataloader example
+uv run python examples/real_data/parquet_dataloader_example.py
+```
+
+## Prerequisites
+
+### Data Setup
+
+For DBN conversion examples:
+```bash
+# Ensure DBN files are available
+ls data/*.dbn.zst
+
+# Or create sample DBN files for testing
+```
+
+For parquet training examples:
+```bash
+# Convert DBN to parquet first (Stage 1)
+# Then run parquet training examples (Stage 2)
+```
+
+### Environment Setup
+
+```bash
+# Install the library with all dependencies
+uv sync --all-extras
+
+# Verify installation
+uv run python -c "from represent import convert_dbn_file, create_market_depth_dataloader; print('✅ Installation OK')"
+```
 
 ## Running Examples
 
-### Prerequisites
-
-Ensure you have the represent library installed and data files available:
+### Complete Workflow (Recommended)
 
 ```bash
-# Install the library
-uv sync --all-extras
+# 1. Run complete workflow example
+uv run python examples/new_architecture/dbn_to_parquet_example.py
 
-# Ensure data files are available
-ls data/glbx-mdp3-*.dbn.zst
-```
+# 2. Run parquet training example  
+uv run python examples/real_data/parquet_dataloader_example.py
 
-### Running Individual Examples
-
-```bash
-# Basic usage
-uv run python examples/basic_usage/pytorch_quickstart.py
-
-# Performance analysis  
-uv run python examples/dataloader_performance/dataloader_performance_demo.py
-
-# Visualization
+# 3. Generate visualization
 uv run python examples/visualization/generate_visualization.py
 
-# Extended features
-uv run python examples/extended_features/extended_features_visualization.py
-
-# Real data processing
-uv run python examples/real_data/dataloader_real_data_example.py
+# 4. Evaluate random access performance (optional)
+uv run python examples/random_access_evaluation/minimal_test.py
 ```
 
-### Key Features Demonstrated
+### Individual Components
 
-- **High-Performance Processing**: <10ms market depth generation
-- **Multi-Feature Support**: Volume, variance, and trade count features
-- **PyTorch Integration**: Native tensor output for ML workflows
-- **Real-Time Streaming**: Continuous data processing capabilities
-- **Production Ready**: Optimized for trading applications
+```bash
+# DBN conversion workflow
+uv run python examples/new_architecture/dbn_to_parquet_example.py
+
+# Parquet-based training
+uv run python examples/real_data/parquet_dataloader_example.py
+
+# Core processing visualization
+uv run python examples/visualization/generate_visualization.py
+
+# Performance evaluation
+uv run python examples/random_access_evaluation/minimal_test.py
+uv run python examples/random_access_evaluation/usage_examples.py
+```
+
+## Key Features Demonstrated
+
+### Performance Optimizations
+- **Pre-computed Labels**: Classification during conversion, not training
+- **Lazy Loading**: Memory usage independent of dataset size
+- **Columnar Storage**: Efficient parquet compression and querying
+- **Batch Processing**: Optimized tensor generation
+
+### ML Integration
+- **PyTorch Native**: Direct tensor output for training
+- **Pre-computed Classification**: 3-class price movement prediction
+- **Multi-feature Support**: Volume, variance, and trade count features
+- **Memory Efficient**: Train on datasets larger than RAM
+
+### Production Ready
+- **Currency Configurations**: Optimized settings for AUDUSD, GBPUSD, EURJPY
+- **Batch Conversion**: Process multiple DBN files efficiently
+- **Performance Monitoring**: Built-in benchmarking and statistics
+- **Scalable Architecture**: Linear memory scaling with dataset size
+
+## Migration from v1.x
+
+The old streaming/ring buffer architecture has been completely replaced. 
+
+**Old workflow (v1.x):**
+```python
+# DEPRECATED - Ring buffer streaming
+dataset = MarketDepthDataset(buffer_size=50000)
+dataset.add_streaming_data(data)
+representation = dataset.get_current_representation()
+```
+
+**New workflow (v2.0.0):**
+```python
+# NEW - Parquet-based pipeline
+# Stage 1: Convert DBN to parquet (run once)
+convert_dbn_file(dbn_path, parquet_path, currency='AUDUSD')
+
+# Stage 2: Lazy loading for training
+dataloader = create_market_depth_dataloader(parquet_path, batch_size=32)
+for features, labels in dataloader:
+    # Train your model
+```
+
+This new architecture provides significant performance improvements and enables training on much larger datasets while using less memory.

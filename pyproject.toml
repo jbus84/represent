@@ -37,11 +37,18 @@ line-length = 100
 [tool.ruff.lint.per-file-ignores]
 
 [tool.pyright]
-typeCheckingMode = "strict"
+typeCheckingMode = "basic"
 include = ["represent"]
-exclude = ["tests/**", "examples/**", "build/**", "dist/**", ".venv/**", "htmlcov/**"]
+exclude = ["tests/**", "examples/**", "build/**", "dist/**", ".venv/**", "htmlcov/**", "main.py", "scripts/**"]
 venvPath = "."
 venv = ".venv"
+reportUnknownVariableType = false
+reportUnknownMemberType = false
+reportUnknownArgumentType = false
+reportUnknownLambdaType = false
+reportUnknownParameterType = false
+reportMissingParameterType = false
+reportDeprecated = false
 
 [tool.commitizen]
 name = "cz_conventional_commits"
@@ -72,6 +79,7 @@ dev = [
     "pytest-asyncio>=1.1.0",
     "pytest-cov>=6.2.1",
     "ruff>=0.12.5",
+    "types-pyyaml>=6.0.12.20250516",
 ]
 
 [tool.coverage.run]

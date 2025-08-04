@@ -4,59 +4,155 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a **high-performance** Python package called "represent" that creates normalized market depth representations from limit order book (LOB) data. The core objective is to produce market depth arrays that can include multiple features:
+This is a **high-performance** Python package called "represent" that creates normalized market depth representations from limit order book (LOB) data using a **parquet-based machine learning pipeline**. The core objective is to produce market depth arrays with pre-computed classification labels for efficient ML training.
 
-1. **Base Feature**: `normed_abs_combined` numpy array (shape 402x500) - normalized cumulative market volume differences between ask and bid sides
-2. **Extended Features**: Additional dimensions for variance and trade count data
-3. **Multi-dimensional Output**: Configurable ND arrays with features in PyTorch-compatible dimensions
+**CRITICAL: This system must be extremely performance-optimized for ML training applications. Every millisecond matters.**
 
-**CRITICAL: This system must be extremely performance-optimized for real-time trading applications. Every millisecond matters.**
+### New Architecture (v2.0.0) - DBN→Parquet→ML Pipeline
 
-### Core Functionality
+The package follows a **two-stage pipeline** for maximum performance:
 
-The package processes market depth data to create multi-dimensional representations of limit order book dynamics:
+1. **Offline Preprocessing**: Convert DBN files to labeled parquet datasets
+2. **Online Training**: Lazy loading from parquet for memory-efficient ML training
 
-1. **Price Binning**: Converts raw prices to integer micro-pip format and maps them to 402 price levels (200 bid + 200 ask + 2 for mid-price)
-2. **Time Aggregation**: Groups tick data into 500 time bins (100 ticks per bin by default)
-3. **Feature Extraction**: Extracts multiple features from market data:
-   - **Volume**: Order book volumes mapped to 2D grid (price levels × time bins)
-   - **Variance**: Price variance calculated from `market_depth_extraction_micro_pips_var` 
-   - **Trade Counts**: Count data available in DBN files
-4. **Cumulative Processing**: Calculates cumulative market depth for ask and bid sides across all features
-5. **Multi-dimensional Output**: Creates configurable output arrays:
-   - **Single Feature**: (402, 500) - traditional 2D representation
-   - **Multi-feature**: (N, 402, 500) - ND array with features in first dimension (PyTorch compatible)
-   - **Feature Selection**: Configurable combination of volume, variance, and trade counts
+## Core Workflow
 
-### Input Data Sources
+### Stage 1: DBN to Labeled Parquet Conversion
 
-- **DBN Files**: Databento compressed market data files (.dbn.zst format)
-  - Contains volume, variance (`market_depth_extraction_micro_pips_var`), and trade count data
-  - Must support extraction of multiple feature types from same source
-- **Streaming Data**: Real-time market data in Polars DataFrame format
-- **Market Data**: 10-level market by price (MBP-10) limit order book data with extended features
+```python
+from represent import convert_dbn_file
 
-### PyTorch Integration
+# Convert DBN file to labeled parquet dataset  
+stats = convert_dbn_file(
+    dbn_path="market_data.dbn.zst",
+    output_path="labeled_dataset.parquet", 
+    currency="AUDUSD",                    # Currency-specific classification config
+    features=['volume', 'variance'],      # Multi-feature extraction
+    symbol_filter="M6AM4"                 # Optional symbol filtering
+)
+```
 
-The package serves as a **ultra-fast** PyTorch-compatible data loading module that:
-- Dynamically generates multi-dimensional feature arrays for ML model inputs with **<10ms latency**
-- Supports configurable feature selection (volume, variance, trade counts) with **same performance targets**
-- Provides **zero-copy** batching and streaming capabilities for training
-- Maintains rolling windows of 50K historical samples with **O(1) insertion/removal**
-- Processes data in batches of 500 records with **vectorized operations only**
-- Uses **memory-mapped files** and **pre-allocated buffers** for maximum throughput
-- **Feature dimension management**: Automatically handles PyTorch-compatible tensor shapes (N_features, 402, 500)
+**Key Features:**
+- **Pre-computed Classification Labels**: Price movement classification during conversion
+- **Multi-feature Extraction**: Volume, variance, and trade count features
+- **Currency-specific Configs**: AUDUSD, GBPUSD, EURJPY market configurations
+- **Efficient Storage**: Compressed parquet with optimal row groups
+
+### Stage 2: Lazy ML Training
+
+```python  
+from represent import create_market_depth_dataloader
+
+# Create lazy dataloader for memory-efficient training
+dataloader = create_market_depth_dataloader(
+    parquet_path="labeled_dataset.parquet",
+    batch_size=32,
+    shuffle=True,
+    sample_fraction=0.1,                  # Use 10% of dataset for quick iteration
+    num_workers=4                         # Parallel loading
+)
+
+# Standard PyTorch training loop
+for features, labels in dataloader:
+    # features: torch.Tensor shape (batch_size, [N_features,] 402, 500)  
+    # labels: torch.Tensor shape (batch_size,) with classification targets
+    outputs = model(features)
+    loss = criterion(outputs, labels)
+    # ... training logic
+```
+
+**Key Benefits:**
+- **Memory Efficient**: Load only required batches, not entire dataset
+- **Pre-computed Labels**: No runtime classification overhead
+- **Lazy Loading**: Train on datasets larger than available RAM
+- **PyTorch Native**: Direct tensor output for ML workflows
+
+## Core Data Structures
+
+### Market Depth Features
+
+1. **Volume Features** (Default):
+   - Source: `ask_sz_XX`, `bid_sz_XX` columns from DBN
+   - Output: Normalized cumulative volume differences
+   - Shape: (402, 500) for single feature
+
+2. **Variance Features**:
+   - Source: Price variance data from DBN files  
+   - Output: Normalized cumulative variance differences
+   - Shape: (402, 500) for single feature
+
+3. **Trade Count Features**:
+   - Source: `ask_ct_XX`, `bid_ct_XX` columns from DBN
+   - Output: Normalized cumulative trade count differences
+   - Shape: (402, 500) for single feature
+
+### Multi-Feature Output Shapes
+
+**Shape Determination Logic:**
+- **1 feature**: Output shape `(402, 500)` - 2D tensor
+- **2+ features**: Output shape `(N, 402, 500)` - 3D tensor with feature dimension first
+
+```python
+# Examples:
+features=['volume'] → tensor shape (402, 500)
+features=['volume', 'variance'] → tensor shape (2, 402, 500)  
+features=['volume', 'variance', 'trade_counts'] → tensor shape (3, 402, 500)
+```
+
+### Price and Time Dimensions
+
+```python
+PRICE_LEVELS = 402       # Total price bins (200 bid + 200 ask + 2 mid)
+TIME_BINS = 500          # Time dimension  
+MICRO_PIP_SIZE = 0.00001 # Price precision
+TICKS_PER_BIN = 100      # Tick aggregation for time bins
+```
+
+## Classification System
+
+### Pre-computed Classification Labels
+
+Labels are computed during DBN→parquet conversion based on price movement:
+
+```python
+# Classification logic (applied during conversion)
+def classify_price_movement(start_price, end_price, thresholds):
+    movement = (end_price - start_price) / MICRO_PIP_SIZE
+    if movement > thresholds.up_threshold:
+        return 2  # UP
+    elif movement < thresholds.down_threshold:  
+        return 0  # DOWN
+    else:
+        return 1  # NEUTRAL
+```
+
+### Currency-Specific Configuration
+
+Each currency has optimized classification thresholds:
+
+```python
+# AUDUSD Configuration (represent/configs/audusd.json)
+{
+  "classification": {
+    "nbins": 13,
+    "up_threshold": 5.0,     # micro-pips
+    "down_threshold": -5.0,   # micro-pips
+    "lookforward_input": 5000,
+    "lookback_rows": 5000,
+    "lookforward_offset": 500
+  }
+}
+```
 
 ## Development Setup
 
-The project uses Python 3.12, uv for package management, and modern Python packaging standards. **All repository interactions should be run via the Makefile where sensible.**
+The project uses Python 3.12, uv for package management, and modern Python packaging standards.
 
 ```bash
-# Primary development commands (use these)
+# Primary development commands  
 make install      # Install dependencies and setup environment
 make test         # Run all tests with coverage (requires 80%)
-make test-fast    # Run tests excluding performance tests with coverage
-make test-coverage # Run tests with coverage report
+make test-fast    # Run tests excluding performance tests
 make coverage-html # Generate HTML coverage report
 make lint         # Run linting checks
 make typecheck    # Run type checking
@@ -64,157 +160,19 @@ make format       # Format code
 make build        # Build package
 make clean        # Clean build artifacts
 
-# Direct uv commands (fallback when Makefile targets don't exist)
+# Direct uv commands (fallback)
 uv sync --all-extras
-uv run pytest --cov=represent
+uv run pytest --cov=represent  
 uv run ruff check .
 uv run pyright
 uv build
 ```
-
-### Key Constants (from notebook analysis)
-
-```python
-MICRO_PIP_SIZE = 0.00001  # Price precision
-TICKS_PER_BIN = 100      # Tick aggregation
-SAMPLES = 50000          # Historical context window
-PRICE_LEVELS = 402       # Total price bins (200 bid + 200 ask + 2 mid)
-TIME_BINS = 500          # Time dimension
-
-# Extended Features
-FEATURE_TYPES = ['volume', 'variance', 'trade_counts']  # Available feature types
-DEFAULT_FEATURES = ['volume']  # Default feature selection for backward compatibility
-MAX_FEATURES = 3         # Maximum number of features that can be selected
-
-# Feature Index Mapping (consistent ordering in multi-feature tensors)
-FEATURE_INDEX_MAP = {
-    'volume': 0,
-    'variance': 1, 
-    'trade_counts': 2
-}
-```
-
-## Extended Features Architecture
-
-### Feature Types and Data Sources
-
-1. **Volume Features** (Default/Existing):
-   - Source: `ask_sz_XX`, `bid_sz_XX` columns
-   - Processing: Same as current `normed_abs_combined` logic
-   - Output: Normalized cumulative volume differences
-
-2. **Variance Features** (New):
-   - Source: `market_depth_extraction_micro_pips_var` from DBN files
-   - Processing: Extract variance data, map to price levels, apply cumulative processing
-   - Output: Normalized cumulative variance differences across price levels
-
-3. **Trade Count Features** (New):
-   - Source: Trade count data available in DBN files (ask_ct_XX, bid_ct_XX columns)
-   - Processing: Count aggregation, map to price levels, apply cumulative processing  
-   - Output: Normalized cumulative trade count differences across price levels
-
-### API Design for Feature Selection
-
-```python
-# Single feature (backward compatible) - always 2D output
-processor = create_processor(features=['volume'])
-result = processor.process(data)  # Shape: (402, 500)
-
-# Two features - always 3D output  
-processor = create_processor(features=['volume', 'variance'])
-result = processor.process(data)  # Shape: (2, 402, 500)
-
-# Three features - always 3D output
-processor = create_processor(features=['volume', 'variance', 'trade_counts'])
-result = processor.process(data)  # Shape: (3, 402, 500)
-
-# Individual feature selection
-processor = create_processor(features=['variance'])  # Just variance
-result = processor.process(data)  # Shape: (402, 500)
-
-processor = create_processor(features=['trade_counts'])  # Just trade counts  
-result = processor.process(data)  # Shape: (402, 500)
-
-# PyTorch integration - output shape determined by feature count
-dataset = MarketDepthDataset(features=['volume'])  # 2D tensors
-batch = dataset.get_current_representation()  # Shape: (402, 500)
-
-dataset = MarketDepthDataset(features=['volume', 'variance'])  # 3D tensors
-batch = dataset.get_current_representation()  # Shape: (2, 402, 500)
-```
-
-### Output Shape Rules
-
-**Simple Dimensional Logic:**
-- **1 feature**: Output shape `(402, 500)` - 2D tensor
-- **2 features**: Output shape `(2, 402, 500)` - 3D tensor with feature dimension first
-- **3 features**: Output shape `(3, 402, 500)` - 3D tensor with feature dimension first
-
-**Feature Index Mapping:**
-```python
-FEATURE_INDEX_MAP = {
-    'volume': 0,
-    'variance': 1, 
-    'trade_counts': 2
-}
-
-# For multi-feature tensors, features are ordered by index
-features=['variance', 'volume'] → shape (2, 402, 500) where:
-# result[0] = volume (index 0)
-# result[1] = variance (index 1)
-```
-
-### Configuration Options
-
-**Simple Configuration Example:**
-```python
-# Configuration is now simply based on feature selection
-processor = create_processor(
-    features=['volume', 'variance', 'trade_counts'],  # Shape: (3, 402, 500)
-    normalize_features=True,     # Normalize each feature independently  
-    cache_features=True,         # Cache processed features for reuse
-    validate_features=True,      # Validate feature availability at initialization
-)
-
-# DataLoader configuration
-dataset = MarketDepthDataset(
-    features=['volume', 'variance'],  # Shape: (2, 402, 500)
-    buffer_size=SAMPLES,
-    validate_features=True,
-)
-```
-
-**Shape Determination Logic:**
-```python
-def determine_output_shape(features):
-    """Simple logic: shape determined by feature count."""
-    if len(features) == 1:
-        return (PRICE_LEVELS, TIME_BINS)  # (402, 500)
-    else:
-        return (len(features), PRICE_LEVELS, TIME_BINS)  # (N, 402, 500)
-    
-# Examples:
-features=['volume'] → shape (402, 500)
-features=['volume', 'variance'] → shape (2, 402, 500) 
-features=['volume', 'variance', 'trade_counts'] → shape (3, 402, 500)
-features=['variance'] → shape (402, 500)
-```
-
-### Performance Requirements for Extended Features
-
-**CRITICAL: Extended features must maintain same performance targets:**
-- **Feature Processing**: <10ms for any combination of features (1-3 features)
-- **Memory Usage**: Linear scaling - max 3x base memory for all 3 features
-- **Batch Processing**: Same <50ms target regardless of feature count
-- **Cache Efficiency**: Pre-allocate buffers for all enabled features
-- **Shape Handling**: Zero overhead for output shape determination based on feature count
 
 ## Development Standards
 
 ### Code Organization
 - Use Single Responsibility Principle consistently
 - Prefer Pydantic models over standard Python classes
-- Never create modules with suffixes like `_extended`, `_coverage`, `_enhanced`
 - Keep all related functionality in single modules, not split across files
 
 ### Error Handling
@@ -222,25 +180,20 @@ features=['variance'] → shape (402, 500)
 - Log errors with appropriate context for debugging
 
 ### Data Processing (Performance Critical)
-- Maintain exactly 50K historical samples for ML context **using ring buffers**
-- Process in batches of exactly 500 records (TICKS_PER_BIN = 100) **with SIMD operations**
-- Use Polars for high-performance data operations on streaming data **with lazy evaluation**
-- Use Databento for DBN file processing and decompression **with streaming decompression**
-- **Pre-validate data schemas at startup** - avoid runtime validation in hot paths
-- Handle zstandard compression for DBN files **with parallel decompression**
-- Map prices to 402-level grid centered on mid-price **using lookup tables, not calculations**
-- **Pre-allocate all arrays** - no dynamic memory allocation in processing loops
-- **Use numba/cython** for critical path functions if pure NumPy isn't fast enough
 
-#### Extended Features Processing Requirements:
-- **Feature-agnostic processing**: Same pipeline handles volume, variance, and trade counts
-- **Memory pre-allocation**: Allocate buffers for maximum enabled features at initialization
-- **Vectorized multi-feature operations**: Process all enabled features in single pass
-- **Feature dimension management**: Handle (N_features, 402, 500) shapes efficiently
-- **Backward compatibility**: Single feature mode must perform identically to original
-- **Schema validation**: Validate feature availability in data source at startup
-- **Feature extraction**: Extract variance from `market_depth_extraction_micro_pips_var` efficiently
-- **Count aggregation**: Handle trade count data with same performance as volume data
+#### Parquet-Based Processing Requirements:
+- **Lazy Loading**: Load only required data chunks from parquet
+- **Vectorized Operations**: Use polars for high-performance data operations
+- **Pre-allocated Buffers**: No dynamic memory allocation in hot paths
+- **Feature-agnostic Pipeline**: Same processing handles volume, variance, trade counts
+- **Memory Pre-allocation**: Allocate buffers for maximum enabled features at initialization
+- **Schema Validation**: Validate feature availability at startup, not runtime
+
+#### DBN Processing Requirements:
+- **Streaming Decompression**: Handle zstandard compression efficiently
+- **Batch Processing**: Process large DBN files in configurable chunks
+- **Price Mapping**: Map prices to 402-level grid using lookup tables
+- **Multi-feature Extraction**: Extract all enabled features in single pass
 
 ### Testing (Performance Focused)
 - Organize tests by domain matching source structure
@@ -248,231 +201,205 @@ features=['variance'] → shape (402, 500)
 - Test error conditions and recovery scenarios
 - **MANDATORY: 80% code coverage minimum** - all PRs must maintain this threshold
 - **MANDATORY: Performance test critical paths with benchmarks**
-- **Every PR must include performance regression tests**
-- **Benchmark against target latencies: <10ms for array generation, <1ms for single record processing**
+- **Benchmark against target latencies: <10ms for array generation, <50ms for batch processing**
 - **Memory usage tests** - ensure no memory leaks in long-running processes
-- **Load tests** - verify performance under sustained 10K+ records/second
 - **Coverage reporting** - use `make test-coverage` and `make coverage-html` for detailed reports
-
-
-## Recent Updates
-
-### Classification Logic Integration
-- Added classification class generation logic from `notebooks/market_depth_extraction_micro_pips.py` 
-- Integrated price movement-based classification with configurable bin thresholds
-- Enhanced PyTorch dataloader with classification target generation capabilities
-- Updated tests to cover new classification functionality
-
-## Development Workflow
-
-### Environment Setup
-- **Always use Makefile targets for common operations** (make install, make test, etc.)
-- Use `uv` for all package management and virtual environment handling
-- Use `direnv` for environment variable management  
-- Bootstrap with `make install` command
-- Run tests with `make test` before commits
-- Use pre-commit hooks for code quality
-
-### Package Deployment Options
-
-**Local Development Reference (Recommended for now):**
-```bash
-# In consuming projects, reference locally:
-uv add --editable /path/to/represent
-
-# Or in pyproject.toml:
-[tool.uv.sources]
-represent = { path = "../represent", editable = true }
-```
-
-**Private Package Hosting (Future option):**
-- **GitHub Packages**: Host privately on GitHub with token-based access
-- **GitLab Package Registry**: If using GitLab for source control
-- **Private PyPI Server**: For enterprise environments (e.g., devpi, Artifactory)
-- **Git Dependencies**: Direct git+ssh references in uv/pip
-
-For current development, local editable installs are most practical until the API stabilizes.
-
-### Adding New Features
-- Start with data models and validation
-- Implement core business logic with error handling
-- Add comprehensive tests (unit, integration, e2e)
-- Update monitoring and health checks
-- Document API changes and operational impact
-
-### Debugging and Monitoring
-- Use structured logging with appropriate levels
-- Monitor end-to-end latency and throughput
-- Track data quality metrics continuously
-- Set up alerts for critical system metrics
-- Maintain operational runbooks for common issues
-
-
-
-## Key Architecture Patterns
-
-### Market Depth Processing Pipeline
-
-The core processing follows this pattern from the notebook analysis:
-
-```python
-# 1. Load and decompress DBN data
-with zstd.ZstdDecompressor() as decompressor:
-    data = db.DBNStore.from_file("trades.dbn")
-    df = data.to_df()
-
-# 2. Convert to micro-pip integers
-df[price_columns] = (df[price_columns] / MICRO_PIP_SIZE).round().astype(int)
-
-# 3. Create time bins and aggregate
-sub_df = sub_df.with_columns((pl.int_range(0, SAMPLES) // TICKS_PER_BIN).alias("tick_bin"))
-
-# 4. Group by time bins and map to price grid
-grouped_data = sub_df.group_by(["tick_bin"]).agg([...])
-
-# 5. Create cumulative volume arrays
-ask_market_volume = np.cumsum(mapped_volumes, axis=0)
-bid_market_volume = np.cumsum(mapped_volumes, axis=0)
-
-# 6. Generate final normalized output
-normed_abs_combined = normalize_market_difference(ask_market_volume, bid_market_volume)
-```
-
-### Data Structure Patterns
-
-```python
-# Price column definitions (from notebook)
-ASK_PRICE_COLUMNS = [f"ask_px_{str(i).zfill(2)}" for i in range(10)]
-BID_PRICE_COLUMNS = [f"bid_px_{str(i).zfill(2)}" for i in range(10)]
-ASK_VOL_COLUMNS = [f"ask_sz_{str(i).zfill(2)}" for i in range(10)]
-BID_VOL_COLUMNS = [f"bid_sz_{str(i).zfill(2)}" for i in range(10)]
-```
-
 
 ## Performance Requirements (NON-NEGOTIABLE)
 
 **CRITICAL LATENCY TARGETS:**
-- **Single Record Processing**: <1ms per record (any feature combination)
-- **Array Generation**: <10ms for complete arrays (single feature: 402x500, multi-feature: Nx402x500)
+- **DBN Conversion**: <1000 samples/second sustained processing
+- **Parquet Loading**: <10ms for single sample loading (with caching)
+- **Batch Processing**: <50ms for 32-sample batch generation
 - **Feature Processing**: <2ms additional latency per additional feature (linear scaling)
-- **Batch Processing**: <50ms for 500-record batch end-to-end (any feature combination)
-- **Rolling Window Updates**: <5ms for 50K sample window maintenance (any feature combination)
+- **Memory Usage**: <4GB RAM for training on multi-GB parquet datasets
 
 **THROUGHPUT REQUIREMENTS:**
-- **Sustained**: 10K+ records/second without performance degradation
-- **Peak**: 50K+ records/second burst capacity
+- **Training**: 1000+ samples/second during ML training
+- **Conversion**: 500+ samples/second during DBN→parquet conversion
 - **Parallel Processing**: Must scale linearly with CPU cores
 
 **MEMORY CONSTRAINTS:**
-- **Core Processing**: <1GB RAM for single feature, <3GB for all features
-- **Total System**: <4GB for single feature, <12GB for complete application with all features
-- **Memory Allocation**: Zero dynamic allocation in hot paths
-- **Cache Efficiency**: >95% L1 cache hit rate for price lookups
-- **Feature Scaling**: Linear memory usage per additional feature (no exponential growth)
+- **Training Memory**: <4GB RAM regardless of parquet dataset size
+- **Conversion Memory**: <8GB RAM during DBN processing
+- **Cache Efficiency**: >90% cache hit rate for frequently accessed samples
+- **Feature Scaling**: Linear memory usage per additional feature
 
-**ARCHITECTURAL PERFORMANCE REQUIREMENTS:**
-- **Context Size**: Maintain exactly 50K samples in O(1) ring buffer
-- **Batch Size**: Process exactly 500 records per batch with vectorized operations
-- **Random Sampling**: Support efficient random sampling of end ticks from large datasets
-- **Configurable Processing**: Process configurable percentage of total dataset (not all data)
-- **Data Structures**: All critical path data structures must be cache-aligned
-- **Thread Safety**: Lock-free data structures for concurrent access
+## Key Components
+
+### DBN to Parquet Converter (`represent/converter.py`)
+
+High-performance converter from DBN files to labeled parquet datasets.
+
+```python
+class DBNToParquetConverter:
+    """
+    Convert DBN files to labeled parquet datasets with:
+    - Automatic classification labeling
+    - Multi-feature extraction (volume, variance, trade_counts)
+    - Currency-specific configurations
+    - Efficient batch processing
+    """
+```
+
+### Lazy Parquet DataLoader (`represent/lazy_dataloader.py`)
+
+Memory-efficient PyTorch dataloader for parquet datasets.
+
+```python
+class LazyParquetDataLoader:
+    """
+    Lazy loading dataloader with:
+    - Memory usage independent of dataset size
+    - LRU caching for performance
+    - Configurable sampling strategies
+    - Direct tensor deserialization
+    """
+```
+
+### Market Depth Processor (`represent/pipeline.py`)
+
+Core market depth processing logic for feature extraction.
+
+```python
+class MarketDepthProcessor:
+    """
+    Process market data to generate:
+    - Price level mapping (402 levels)
+    - Time bin aggregation (500 bins)  
+    - Multi-feature extraction
+    - Normalized output tensors
+    """
+```
+
+## API Reference
+
+### Main Entry Points
+
+```python
+# DBN Conversion
+from represent import convert_dbn_file, batch_convert_dbn_files
+
+# Lazy DataLoader
+from represent import create_market_depth_dataloader
+
+# Core Processing  
+from represent import MarketDepthProcessor, process_market_data
+
+# Configuration
+from represent import load_currency_config, ClassificationConfig
+```
+
+### Currency Configurations
+
+Available currency configurations:
+- **AUDUSD**: `represent/configs/audusd.json`
+- **GBPUSD**: `represent/configs/gbpusd.json` 
+- **EURJPY**: `represent/configs/eurjpy.json`
+
+Each config includes optimized classification thresholds and processing parameters.
 
 ## Instructions for Claude
 
 When working on this codebase:
 
-1. **PERFORMANCE FIRST** - Every code change must be evaluated for performance impact. Profile before and after.
-2. **80% COVERAGE MANDATORY** - All code must maintain 80% test coverage minimum (use `make test-coverage`)
-3. **Use Makefile first** - Always check for and use Makefile targets before running direct commands
-4. **Zero tolerance for performance regressions** - Any change that increases latency must be rejected
-5. **Zero tolerance for coverage drops** - Any change that drops coverage below 80% must be rejected
-6. **Benchmark everything** - Include performance tests with every significant change
-7. **Memory efficiency** - Use pre-allocated buffers, avoid dynamic allocation in hot paths
-8. **Follow the domain organization** - Don't suggest technical layer organization
-9. **Always add error handling** - But ensure error paths are also optimized
-10. **Validate data efficiently** - Pre-validate schemas, use lookup tables over calculations
-11. **Think about operations** - Include monitoring for performance metrics specifically
-12. **Test thoroughly** - Include performance regression tests (use `make test`)
-13. **Document performance decisions** - Explain why specific optimizations were chosen
-14. **Optimize first, then simplify** - Performance takes precedence over elegance in this system
+1. **PARQUET-FIRST ARCHITECTURE** - All data processing should assume parquet-based lazy loading
+2. **PERFORMANCE FIRST** - Every code change must be evaluated for performance impact
+3. **80% COVERAGE MANDATORY** - All code must maintain 80% test coverage minimum
+4. **NO RING BUFFERS** - The old ring buffer architecture has been completely replaced
+5. **TYPE SAFETY** - Fix all type annotations for better IDE support and runtime safety
+6. **LAZY LOADING ONLY** - Remove any references to streaming/real-time data ingestion
+7. **PRE-COMPUTED LABELS** - Classification happens during conversion, not training
+8. **MEMORY EFFICIENCY** - Optimize for training on datasets larger than RAM
+9. **VECTORIZED OPERATIONS** - Use polars/numpy for all data operations
+10. **VALIDATE AT STARTUP** - Pre-validate schemas, use lookup tables over calculations
+11. **TEST THOROUGHLY** - Include performance regression tests with every change
+12. **DOCUMENT PERFORMANCE** - Explain performance implications of design decisions
 
-## Random Sampling & Dataset Processing Requirements
+## Migration from v1.x
 
-### Random End Tick Sampling Architecture
+**CURRENT ARCHITECTURE COMPONENTS:**
 
-The DataLoader must support efficient random sampling of "end ticks" instead of consecutive processing:
+✅ **ACTIVE COMPONENTS:**
+- `converter.py` - DBN to labeled parquet conversion with classification
+- `dataloader.py` - Lazy parquet loading for ML training  
+- `config.py` - Currency-specific configurations with YAML support
+- `api.py` - High-level convenience API for common workflows
+- `constants.py` - Feature definitions and output shape calculations
 
-**Key Concepts:**
-- **End Tick**: The final tick in a time series window used for feature generation
-- **Target Sampling**: Classification target sampled at a configurable offset after the end tick
-- **Random Sampling**: Randomly select end ticks from the dataset rather than consecutive processing
-- **Configurable Coverage**: Process only a specified percentage of the total dataset
+**WORKFLOW INTEGRATION:**
+- Use `convert_dbn_file()` for offline preprocessing
+- Use `LazyParquetDataLoader` for memory-efficient training
+- Leverage currency configs for market-specific optimizations
+- Pre-computed labels eliminate runtime classification overhead
 
-**Implementation Requirements:**
+## Example Workflows
+
+### Complete ML Pipeline
+
 ```python
-# Example configuration for random sampling
-dataset_config = {
-    'sampling_mode': 'random',  # 'consecutive' | 'random'
-    'coverage_percentage': 0.20,  # Process 20% of total dataset
-    'end_tick_strategy': 'uniform_random',  # How to select end ticks
-    'target_offset_ticks': 500,  # Ticks after end tick to sample target
-    'lookback_window': 2000,  # Historical ticks before end tick for features
-    'min_tick_spacing': 100,  # Minimum spacing between sampled end ticks
-    'seed': 42  # For reproducible random sampling
-}
+from represent import convert_dbn_file, create_market_depth_dataloader
+import torch
+import torch.nn as nn
+
+# 1. Convert DBN to labeled parquet (run once)
+stats = convert_dbn_file(
+    dbn_path="data/AUDUSD-20240101.dbn.zst",
+    output_path="data/AUDUSD_labeled.parquet",
+    currency="AUDUSD",
+    features=['volume', 'variance'],
+    chunk_size=50000
+)
+
+# 2. Create lazy dataloader for training
+dataloader = create_market_depth_dataloader(
+    parquet_path="data/AUDUSD_labeled.parquet", 
+    batch_size=32,
+    shuffle=True,
+    sample_fraction=0.2,  # Use 20% of data
+    num_workers=4
+)
+
+# 3. Train PyTorch model
+model = nn.Sequential(
+    nn.Conv2d(2, 32, 3),  # 2 features: volume + variance
+    nn.ReLU(),
+    nn.AdaptiveAvgPool2d(1),
+    nn.Flatten(),
+    nn.Linear(32, 3)      # 3-class classification
+)
+
+optimizer = torch.optim.Adam(model.parameters())
+criterion = nn.CrossEntropyLoss()
+
+for epoch in range(10):
+    for features, labels in dataloader:
+        # features: (32, 2, 402, 500) for volume+variance
+        # labels: (32,) with classification targets 0,1,2
+        outputs = model(features)
+        loss = criterion(outputs, labels)
+        
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
 ```
 
-**Performance Requirements for Random Sampling:**
-- **Random Selection**: <1ms to select random end tick positions
-- **Feature Generation**: Same <10ms target for any sampled end tick
-- **Memory Efficiency**: Pre-compute valid end tick ranges to avoid runtime validation
-- **Cache Efficiency**: Optimize for non-sequential data access patterns
-- **Coverage Validation**: Validate coverage percentage achieves target without overlap
+### Batch Processing Multiple Files
 
-**Random Sampling Algorithm:**
-1. **Dataset Analysis**: Scan dataset to identify valid end tick positions
-2. **Random Selection**: Use configurable seed to randomly select end ticks from valid positions
-3. **Coverage Calculation**: Ensure selected ticks cover the requested percentage of data
-4. **Feature Extraction**: Extract features for each randomly selected end tick
-5. **Target Generation**: Sample classification targets at configured offsets
-
-### Dataset Processing Optimization
-
-**Configurable Processing Volume:**
 ```python
-# Support processing subsets of large datasets
-processing_config = {
-    'total_dataset_size': 1_000_000,  # Total ticks in dataset
-    'coverage_percentage': 0.15,  # Process 15% = 150K ticks
-    'sampling_strategy': 'stratified_random',  # Ensure temporal distribution
-    'max_processing_time': 300_000,  # 5 minutes max processing time
-    'early_stopping': True,  # Stop if coverage achieved early
-}
+from represent import batch_convert_dbn_files
+
+# Convert all DBN files in directory
+results = batch_convert_dbn_files(
+    input_directory="data/dbn_files/",
+    output_directory="data/parquet_datasets/", 
+    currency="AUDUSD",
+    pattern="*.dbn*",
+    features=['volume'],
+    chunk_size=25000
+)
+
+print(f"Converted {len(results)} files successfully")
 ```
 
-**Memory Management for Large Datasets:**
-- **Lazy Loading**: Load only selected tick ranges into memory
-- **Streaming Processing**: Process selected ticks in configurable batch sizes
-- **Memory Budgets**: Respect memory constraints while processing subsets
-- **Garbage Collection**: Aggressive cleanup of processed tick data
-
-### Extended Features Implementation Guidelines
-
-When implementing extended features (variance, trade counts):
-
-1. **Backward Compatibility**: Existing API must work unchanged with `features=['volume']` default
-2. **Feature Selection**: Support `features` parameter in all processor creation functions  
-3. **Simple Dimension Logic**: Output shape determined solely by feature count (1→2D, 2+→3D)
-4. **Feature Ordering**: Use consistent FEATURE_INDEX_MAP ordering in multi-feature tensors
-5. **Data Source Validation**: Check feature availability in data at initialization
-6. **Memory Pre-allocation**: Allocate for maximum requested features upfront
-7. **Vectorized Processing**: Process all features in single data pass when possible
-8. **PyTorch Integration**: Ensure DataLoader handles both 2D and 3D tensors correctly
-9. **Performance Testing**: Benchmark each feature combination against targets
-10. **Schema Evolution**: Handle data sources that may not have all features available
-11. **Feature Extraction**: Implement efficient extraction from `market_depth_extraction_micro_pips_var`
-12. **Configuration Validation**: Validate feature selection and availability at creation time
-13. **Output Shape Consistency**: Ensure predictable tensor shapes based on feature count
-14. **Individual Features**: Support any single feature as 2D output (volume, variance, or trade_counts)
-15. **Caching Strategy**: Implement optional feature caching for repeated processing
+This architecture provides maximum performance for ML training while maintaining flexibility for different market configurations and feature combinations.

@@ -9,3 +9,9 @@ wheels/
 # Virtual environments
 .venv
 .coverage
+
+*.parquet*
+.coverage
+
+# Test conversion outputs
+test_conversion/
