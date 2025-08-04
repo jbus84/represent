@@ -9,14 +9,14 @@ High-performance Python package for creating normalized market depth representat
 
 ## 🚀 Key Features
 
-- **<10ms Processing**: Ultra-fast market depth array generation
-- **PyTorch Integration**: Production-ready DataLoader with tensor operations
+- **Two-Stage ML Pipeline**: Offline DBN→Parquet conversion + Online lazy loading
+- **Pre-computed Classifications**: Labels generated during conversion for faster training
+- **Memory-Efficient Training**: Lazy loading with configurable caching for large datasets
 - **Multi-Feature Support**: Volume, variance, and trade count features
-- **Currency Configurations**: Pre-optimized settings for major currency pairs
-- **Validated Configurations**: Pydantic validation ensures reliable threshold access
+- **Currency Configurations**: Pre-optimized settings for major currency pairs with YAML support
+- **PyTorch Integration**: Production-ready DataLoader with tensor operations
 - **Smart Output Shapes**: Automatic 2D/3D tensor generation based on feature count
-- **Real Market Data**: Processes DBN files and streaming market data
-- **Production Stability**: HighPerformanceDataLoader for reliable production environments
+- **Performance Optimized**: <10ms processing targets for ML training applications
 
 ## 📦 Installation
 
@@ -34,96 +34,129 @@ uv sync --all-extras
 
 ## 📊 What It Does
 
-Transforms limit order book data into normalized ML-ready representations:
+**Stage 1: DBN to Labeled Parquet Conversion**
+- **Input**: Raw DBN market data files (.dbn, .dbn.zst)
+- **Processing**: Extracts market depth + computes classification labels
+- **Output**: Labeled parquet datasets ready for ML training
 
-- **Input**: Raw market data (DBN files or DataFrames)
-- **Processing**: Maps to 402 price levels × 500 time bins
+**Stage 2: Memory-Efficient ML Training**
+- **Input**: Labeled parquet datasets
+- **Processing**: Lazy loading with configurable caching
 - **Features**: Volume, variance, trade counts (individually or combined)
-- **Output**: Normalized tensors ready for PyTorch models
+- **Output**: PyTorch tensors with pre-computed labels
 
-**Output Shapes:**
-- Single feature: `(402, 500)` 
-- Multiple features: `(N, 402, 500)`
+**Tensor Shapes:**
+- Single feature: `(time_bins, price_levels)` → `(402, 500)`
+- Multiple features: `(features, time_bins, price_levels)` → `(N, 402, 500)`
 
 ## 🚀 Quick Start
 
-### Basic Processing
+### Step 1: Convert DBN to Labeled Parquet Dataset
 
 ```python
-from represent import process_market_data
-import polars as pl
+from represent import convert_dbn_file
 
-# Single feature extraction
-volume_features = process_market_data(df)  # (402, 500)
+# Convert DBN file to labeled parquet dataset
+stats = convert_dbn_file(
+    dbn_path="market_data.dbn.zst",
+    output_path="labeled_dataset.parquet", 
+    currency="AUDUSD",                    # Currency-specific classification config
+    features=['volume', 'variance'],      # Multi-feature extraction
+    symbol_filter="M6AM4"                 # Optional symbol filtering
+)
 
-# Multiple features  
-multi_features = process_market_data(df, features=['volume', 'variance'])  # (2, 402, 500)
+print(f"Converted {stats['total_samples']} samples with {stats['classification_distribution']} labels")
 ```
 
-### PyTorch DataLoader Integration
+### Step 2: Create ML Training DataLoader
 
 ```python
-import torch
-from torch.utils.data import DataLoader
-from represent.dataloader import MarketDepthDataset
+from represent import create_market_depth_dataloader
 
-# Create dataset with currency optimization
-dataset = MarketDepthDataset(
-    data_source="market_data.dbn",
-    currency="AUDUSD",  # Auto-loads AUDUSD optimized settings
-    features=['volume', 'variance']
+# Create production-ready dataloader
+dataloader = create_market_depth_dataloader(
+    parquet_path="labeled_dataset.parquet",
+    batch_size=32,
+    shuffle=True,
+    cache_size=1000  # Optimize for your memory constraints
 )
-# Note: If no currency specified, automatically defaults to AUDUSD configuration
 
-# Standard PyTorch DataLoader
-dataloader = DataLoader(dataset, batch_size=8, shuffle=False)
-
-for features, targets in dataloader:
-    # features: (8, 2, 402, 500) - batch of 8, 2 features, 402x500 depth
-    # targets: (8, 1) - classification targets
-    pass
+# Use in PyTorch training loop
+for batch_features, batch_labels in dataloader:
+    # batch_features: torch.Tensor of shape [batch_size, time_bins, price_levels, features]
+    # batch_labels: torch.Tensor of shape [batch_size] with classification targets
+    model_output = model(batch_features)
+    loss = criterion(model_output, batch_labels)
+    # ... training logic
 ```
 
 ### Currency-Specific Configurations
 
 ```python
-# Different currencies have optimized settings
-currencies = ['AUDUSD', 'EURUSD', 'GBPUSD', 'USDJPY']
+from represent import load_currency_config, list_available_currencies
 
-for currency in currencies:
-    dataset = MarketDepthDataset(
-        data_source="data.dbn",
-        currency=currency,  # Loads currency-specific optimization
-        features=['volume']
-    )
-    print(f"{currency}: {dataset.classification_config.nbins} bins")
-    # AUDUSD: 13 bins, USDJPY: 9 bins (different pip sizes)
+# View available currency configurations
+currencies = list_available_currencies()
+print(f"Available currencies: {currencies}")  # ['AUDUSD', 'EURUSD', 'GBPUSD', 'USDJPY', ...]
+
+# Load specific currency config
+config = load_currency_config('AUDUSD')
+print(f"AUDUSD classification bins: {config.classification.nbins}")
+print(f"AUDUSD pip size: {config.classification.pip_size}")
+
+# Different currencies have optimized settings for their market characteristics
+for currency in ['AUDUSD', 'USDJPY']:
+    config = load_currency_config(currency)
+    print(f"{currency}: {config.classification.nbins} bins, pip size: {config.classification.pip_size}")
 ```
 
-### Production DataLoader Example
+### Complete ML Training Example
 
 ```python
-from represent import MarketDepthDataset, create_high_performance_dataloader
+from represent import convert_dbn_file, create_market_depth_dataloader
+import torch
+import torch.nn as nn
 
-# Create dataset with multiple features
-dataset = MarketDepthDataset(
-    data_source="market_data.dbn",
-    currency="EURUSD",
-    features=['volume', 'variance', 'trade_counts'],  # 3 features
+# 1. Convert DBN to labeled parquet (run once)
+stats = convert_dbn_file(
+    dbn_path="data/AUDUSD-20240101.dbn.zst",
+    output_path="data/AUDUSD_labeled.parquet",
+    currency="AUDUSD",
+    features=['volume', 'variance'],
+    chunk_size=50000
 )
 
-print(f"Dataset: {len(dataset)} batches available")
-print(f"Output shape per sample: {dataset.output_shape}")  # (3, 402, 500)
-
-# Create production-ready dataloader
-dataloader = create_high_performance_dataloader(
-    dataset=dataset,
-    batch_size=16,           # Batch size for training
-    num_workers=0,           # Single-threaded for production stability
-    pin_memory=False         # Safe for all devices
+# 2. Create lazy dataloader for training
+dataloader = create_market_depth_dataloader(
+    parquet_path="data/AUDUSD_labeled.parquet", 
+    batch_size=32,
+    shuffle=True,
+    sample_fraction=0.2,  # Use 20% of data
+    cache_size=1000
 )
 
-# Reliable training loop
+# 3. Train PyTorch model
+model = nn.Sequential(
+    nn.Conv2d(2, 32, 3),  # 2 features: volume + variance
+    nn.ReLU(),
+    nn.AdaptiveAvgPool2d(1),
+    nn.Flatten(),
+    nn.Linear(32, 3)      # 3-class classification
+)
+
+optimizer = torch.optim.Adam(model.parameters())
+criterion = nn.CrossEntropyLoss()
+
+for epoch in range(10):
+    for features, labels in dataloader:
+        # features: (32, 2, 402, 500) for volume+variance
+        # labels: (32,) with classification targets 0,1,2
+        outputs = model(features)
+        loss = criterion(outputs, labels)
+        
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
 for epoch in range(5):
     for batch_idx, (features, targets) in enumerate(dataloader):
         # features: (16, 3, 402, 500) - batch of 16, 3 features, 402x500 depth

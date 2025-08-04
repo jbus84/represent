@@ -1,141 +1,206 @@
-# Market Depth Visualization Examples
+# Represent Library Examples (v2.0.0)
 
-This directory contains examples demonstrating how to use the `represent` library to process market data and generate visualizations.
+This directory contains examples demonstrating the new **parquet-based machine learning pipeline** for market depth processing and PyTorch integration.
 
-## Examples
+## New Architecture Overview
 
-1. **Basic Market Depth Visualization** (`generate_visualization.py`) - Processes real market data and creates a basic heatmap
-2. **Extended Features Visualization** (`extended_features_visualization.py`) - Comprehensive demonstration of the new extended features functionality
+The represent library now uses a **two-stage pipeline**:
+1. **Offline Preprocessing**: Convert DBN files to labeled parquet datasets
+2. **Online Training**: Lazy loading from parquet for memory-efficient ML training
 
-## Basic Market Depth Visualization
+## Directory Structure
 
-This example demonstrates how to use the `represent` library to process real market data and generate a visualization of the resulting market depth representation.
+- **`new_architecture/`** - Complete workflow examples for the new DBN→Parquet→ML pipeline
+- **`real_data/`** - Examples using the new parquet-based dataloader
+- **`visualization/`** - Market depth visualization using core processing pipeline
+- **`random_access_evaluation/`** - Performance benchmarks for lazy dataloader random access
 
-## Workflow
+## Quick Start
 
-The process is as follows:
+For the new architecture, follow this sequence:
+1. `new_architecture/dbn_to_parquet_example.py` - Complete workflow demonstration
+2. `real_data/parquet_dataloader_example.py` - Parquet-based training
+3. `visualization/generate_visualization.py` - Core processing visualization
 
-1.  **Load Data**: Real market data is loaded from a `.dbn.zst` file using the `databento` library.
-2.  **Process Data**: The data is processed using the `represent.process_market_data` function, which returns a `numpy` array of the normalized absolute combined market depth.
-3.  **Generate Visualization**: A heatmap of the resulting array is generated using `matplotlib`, providing a visual representation of market depth dynamics over time.
+## Example Categories
 
-## Code
+### 1. New Architecture (`new_architecture/`)
 
-The following Python script is used to generate the visualization:
+Complete workflow examples for the v2.0.0 architecture:
+- **`dbn_to_parquet_example.py`** - End-to-end DBN→Parquet→ML pipeline demonstration
 
-```python
-"""
-Generates a visualization of the market depth representation.
+**Features demonstrated:**
+- DBN file to labeled parquet conversion
+- Automatic classification labeling during conversion
+- Currency-specific configurations (AUDUSD, GBPUSD, EURJPY)
+- Multi-feature extraction (volume, variance, trade counts)
+- Lazy loading parquet dataloader for training
+- Memory-efficient ML training on large datasets
 
-This script loads real market data, processes it using the 'represent' library,
-and creates a heatmap of the resulting normalized market depth array.
-The output is saved as a PNG image that can be easily viewed.
-"""
-import databento as db
-import matplotlib.pyplot as plt
-import numpy as np
-import polars as pl
-from represent.pipeline import process_market_data
+### 2. Parquet-Based Training (`real_data/`)
 
-def generate_visualization():
-    """
-    Loads data, processes it, and generates a heatmap visualization.
-    """
-    # Load the real market data from the .dbn.zst file
-    data = db.DBNStore.from_file("data/glbx-mdp3-20240405.mbp-10.dbn.zst")
-    df_pandas = data.to_df()
+Examples using the new lazy loading dataloader:
+- **`parquet_dataloader_example.py`** - Memory-efficient training from parquet files
 
-    # Filter by symbol using pandas, as in the notebook
-    df_pandas = df_pandas[df_pandas.symbol == "M6AM4"]
-    
-    # Define slicing parameters based on the notebook's logic
-    SAMPLES = 50000
-    OFFSET = 120000
-    start = OFFSET
-    stop = OFFSET + SAMPLES
-    
-    if len(df_pandas) < stop:
-        raise ValueError(f"Not enough data to generate a visualization. Need {stop} samples, but only have {len(df_pandas)}.")
+**Features demonstrated:**
+- Lazy loading from parquet datasets
+- Memory usage independent of dataset size
+- High-performance tensor generation
+- PyTorch integration with pre-computed labels
+- Configurable sampling strategies
 
-    # Take the slice with pandas, then convert to polars
-    df_slice_pandas = df_pandas[start:stop]
-    df_polars = pl.from_pandas(df_slice_pandas)
+### 3. Core Processing (`visualization/`)
 
-    # Process the data to get the normalized market depth representation
-    normed_abs_combined = process_market_data(df_polars)
+Core market depth processing examples:
+- **`generate_visualization.py`** - Market depth heatmap generation
 
-    # Create a heatmap of the processed data
-    plt.figure(figsize=(12, 8))
-    plt.imshow(normed_abs_combined, cmap='viridis', aspect='auto')
-    plt.colorbar(label='Normalized Volume Difference')
-    plt.title('Market Depth Representation')
-    plt.xlabel('Time Bins')
-    plt.ylabel('Price Levels')
-    
-    # Save the visualization to a file
-    plt.savefig('examples/market_depth_visualization.png')
-    print("Successfully generated 'examples/market_depth_visualization.png'")
+**Features demonstrated:**
+- Raw market data processing
+- 402×500 market depth representation
+- Price level mapping and time bin aggregation
 
-if __name__ == '__main__':
-    generate_visualization()
-```
+### 4. Performance Evaluation (`random_access_evaluation/`)
 
-## Output
+Comprehensive benchmarks for lazy dataloader performance:
+- **`lazy_dataloader_random_access_benchmark.py`** - Full performance benchmark suite
+- **`minimal_test.py`** - Quick functionality verification
+- **`usage_examples.py`** - Configuration examples for different scenarios
 
-Running the script will produce the following visualization of the market depth representation:
+**Features demonstrated:**
+- Random access latency measurement (<1ms target)
+- Batch loading throughput (>10K samples/sec target)
+- 50K subset sampling for ML training
+- Cache effectiveness analysis with different sizes
+- Memory efficiency monitoring
+- Production-ready performance validation
 
-![Market Depth Visualization](market_depth_visualization.png)
+## New Workflow
 
-## Extended Features Visualization
-
-The `extended_features_visualization.py` script provides a comprehensive demonstration of the new extended features functionality introduced in the `df/extended-features` branch.
-
-### Features Demonstrated
-
-This script showcases:
-
-1. **Single Feature Extraction**: Process individual features (volume, variance, trade_counts)
-2. **Multi-Feature Processing**: Extract multiple features simultaneously with 3D output
-3. **RGB Visualization**: Create RGB composite images where each feature maps to a color channel
-4. **Performance Analysis**: Benchmark processing times for different feature combinations
-5. **API Usage Examples**: Demonstrate all extended API patterns
-
-### Key Visualizations Generated
-
-1. **Single Features Plot**: Individual heatmaps for each feature type
-2. **RGB Composite**: Three-channel visualization (Red=Volume, Green=Variance, Blue=Trade Counts)
-3. **Feature Analysis**: Statistical distributions and comparisons
-4. **Time Series Cross-Sections**: Feature behavior at different price levels
-5. **Performance Charts**: Processing time analysis across feature combinations
-
-### Usage
+### Stage 1: Convert DBN to Labeled Parquet
 
 ```bash
-# Run the extended features example
-uv run python examples/extended_features_visualization.py
+# Use the conversion script or example
+uv run python examples/new_architecture/dbn_to_parquet_example.py
+
+# Or use the CLI tool
+uv run python scripts/convert_dbn_to_parquet.py \
+  --input data/market_data.dbn.zst \
+  --output data/labeled_dataset.parquet \
+  --currency AUDUSD
 ```
 
-### Output
+### Stage 2: Train with Parquet Dataloader
 
-The script generates:
-- 5 PNG visualization files showing different aspects of the feature data
-- A comprehensive analysis report with statistics and performance metrics
-- Demonstrates RGB color mapping for multi-feature visualization
+```bash
+# Use the parquet dataloader example
+uv run python examples/real_data/parquet_dataloader_example.py
+```
 
-### Key Results
+## Prerequisites
 
-- **Performance**: All feature combinations process within <20ms (well under the 50ms target)
-- **Dimensions**: Single features return (402, 500), multiple features return (N, 402, 500)
-- **Backward Compatibility**: Existing volume-only processing unchanged
-- **Feature Types**: 
-  - Volume: Traditional market depth based on order sizes
-  - Variance: Market volatility extracted from `market_depth_extraction_micro_pips_var`
-  - Trade Counts: Activity levels based on transaction counts
+### Data Setup
 
-### RGB Color Interpretation
+For DBN conversion examples:
+```bash
+# Ensure DBN files are available
+ls data/*.dbn.zst
 
-In the RGB composite visualization:
-- **Red Channel (Volume)**: Intensity represents volume-based market depth
-- **Green Channel (Variance)**: Intensity shows market variance/volatility patterns  
-- **Blue Channel (Trade Counts)**: Intensity indicates trade activity levels
-- **Combined Colors**: Mixed colors show correlated patterns across features
+# Or create sample DBN files for testing
+```
+
+For parquet training examples:
+```bash
+# Convert DBN to parquet first (Stage 1)
+# Then run parquet training examples (Stage 2)
+```
+
+### Environment Setup
+
+```bash
+# Install the library with all dependencies
+uv sync --all-extras
+
+# Verify installation
+uv run python -c "from represent import convert_dbn_file, create_market_depth_dataloader; print('✅ Installation OK')"
+```
+
+## Running Examples
+
+### Complete Workflow (Recommended)
+
+```bash
+# 1. Run complete workflow example
+uv run python examples/new_architecture/dbn_to_parquet_example.py
+
+# 2. Run parquet training example  
+uv run python examples/real_data/parquet_dataloader_example.py
+
+# 3. Generate visualization
+uv run python examples/visualization/generate_visualization.py
+
+# 4. Evaluate random access performance (optional)
+uv run python examples/random_access_evaluation/minimal_test.py
+```
+
+### Individual Components
+
+```bash
+# DBN conversion workflow
+uv run python examples/new_architecture/dbn_to_parquet_example.py
+
+# Parquet-based training
+uv run python examples/real_data/parquet_dataloader_example.py
+
+# Core processing visualization
+uv run python examples/visualization/generate_visualization.py
+
+# Performance evaluation
+uv run python examples/random_access_evaluation/minimal_test.py
+uv run python examples/random_access_evaluation/usage_examples.py
+```
+
+## Key Features Demonstrated
+
+### Performance Optimizations
+- **Pre-computed Labels**: Classification during conversion, not training
+- **Lazy Loading**: Memory usage independent of dataset size
+- **Columnar Storage**: Efficient parquet compression and querying
+- **Batch Processing**: Optimized tensor generation
+
+### ML Integration
+- **PyTorch Native**: Direct tensor output for training
+- **Pre-computed Classification**: 3-class price movement prediction
+- **Multi-feature Support**: Volume, variance, and trade count features
+- **Memory Efficient**: Train on datasets larger than RAM
+
+### Production Ready
+- **Currency Configurations**: Optimized settings for AUDUSD, GBPUSD, EURJPY
+- **Batch Conversion**: Process multiple DBN files efficiently
+- **Performance Monitoring**: Built-in benchmarking and statistics
+- **Scalable Architecture**: Linear memory scaling with dataset size
+
+## Migration from v1.x
+
+The old streaming/ring buffer architecture has been completely replaced. 
+
+**Old workflow (v1.x):**
+```python
+# DEPRECATED - Ring buffer streaming
+dataset = MarketDepthDataset(buffer_size=50000)
+dataset.add_streaming_data(data)
+representation = dataset.get_current_representation()
+```
+
+**New workflow (v2.0.0):**
+```python
+# NEW - Parquet-based pipeline
+# Stage 1: Convert DBN to parquet (run once)
+convert_dbn_file(dbn_path, parquet_path, currency='AUDUSD')
+
+# Stage 2: Lazy loading for training
+dataloader = create_market_depth_dataloader(parquet_path, batch_size=32)
+for features, labels in dataloader:
+    # Train your model
+```
+
+This new architecture provides significant performance improvements and enables training on much larger datasets while using less memory.

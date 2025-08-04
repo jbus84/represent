@@ -1,0 +1,110 @@
+{
+  "currency_pair": "GBPUSD",
+  "classification": {
+    "micro_pip_size": 0.00001,
+    "true_pip_size": 0.0001,
+    "ticks_per_bin": 100,
+    "lookforward_offset": 500,
+    "lookforward_input": 5000,
+    "lookback_rows": 5000,
+    "nbins": 13,
+    "up_threshold": 12.0,
+    "down_threshold": -12.0,
+    "bin_thresholds": {
+      "13": {
+        "100": {
+          "5000": {
+            "bin_1": 0.52,
+            "bin_2": 1.65,
+            "bin_3": 2.85,
+            "bin_4": 4.15,
+            "bin_5": 5.75,
+            "bin_6": 8.25
+          },
+          "3000": {
+            "bin_1": 0.55,
+            "bin_2": 1.85,
+            "bin_3": 3.25,
+            "bin_4": 4.65,
+            "bin_5": 6.35,
+            "bin_6": 9.15
+          }
+        },
+        "10": {
+          "5000": {
+            "bin_1": 0.42,
+            "bin_2": 1.45,
+            "bin_3": 2.65,
+            "bin_4": 3.75,
+            "bin_5": 5.25,
+            "bin_6": 7.85
+          }
+        }
+      },
+      "9": {
+        "10": {
+          "5000": {
+            "bin_1": 0.35,
+            "bin_2": 1.05,
+            "bin_3": 1.85,
+            "bin_4": 2.95
+          }
+        },
+        "100": {
+          "5000": {
+            "bin_1": 0.58,
+            "bin_2": 2.45,
+            "bin_3": 4.35,
+            "bin_4": 6.95
+          }
+        }
+      },
+      "7": {
+        "10": {
+          "5000": {
+            "bin_1": 0.35,
+            "bin_2": 1.05,
+            "bin_3": 1.95
+          }
+        },
+        "100": {
+          "5000": {
+            "bin_1": 0.78,
+            "bin_2": 2.95,
+            "bin_3": 6.15
+          }
+        }
+      },
+      "5": {
+        "10": {
+          "5000": {
+            "bin_1": 0.58,
+            "bin_2": 1.75
+          }
+        },
+        "100": {
+          "5000": {
+            "bin_1": 1.15,
+            "bin_2": 3.45
+          }
+        }
+      }
+    }
+  },
+  "sampling": {
+    "sampling_mode": "random",
+    "coverage_percentage": 0.8,
+    "end_tick_strategy": "uniform_random",
+    "min_tick_spacing": 100,
+    "seed": 42,
+    "max_samples": null
+  },
+  "metadata": {
+    "volatility_profile": "high",
+    "typical_spread": 1.2,
+    "trading_sessions": ["London", "New York"],
+    "major_news_events": ["BOE", "Fed", "Brexit", "UK_GDP"],
+    "optimized_for": "news_driven_movements"
+  },
+  "description": "Optimized configuration for GBP/USD with higher volatility thresholds for Brexit-era trading"
+}

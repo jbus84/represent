@@ -21,6 +21,8 @@ def uncovered_function() -> str:
 
 
 # Alias for backward compatibility with tests
-def reference_pipeline(df: pl.DataFrame, features: Optional[Union[list[str], list[FeatureType]]] = None) -> np.ndarray:
+def reference_pipeline(
+    df: pl.DataFrame, features: Optional[Union[list[str], list[FeatureType]]] = None
+) -> np.ndarray:
     """Backward compatibility wrapper for process_market_data."""
     return process_market_data(df, features=features)

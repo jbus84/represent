@@ -2,6 +2,7 @@
 Performance-critical constants for market depth processing.
 These values are tuned for optimal cache performance and vectorization.
 """
+
 import numpy as np
 from typing import Final, Union
 from enum import Enum
@@ -39,25 +40,28 @@ VOLUME_DTYPE: Final[np.dtype] = np.dtype(np.float64)  # For volume calculations
 INDEX_DTYPE: Final[np.dtype] = np.dtype(np.int32)  # For indexing operations
 OUTPUT_DTYPE: Final[np.dtype] = np.dtype(np.float32)  # For final output array
 
+
 # Extended Features Enum
 class FeatureType(Enum):
     """Available feature types for market depth processing."""
+
     VOLUME = "volume"
     VARIANCE = "variance"
     TRADE_COUNTS = "trade_counts"
-    
+
     @classmethod
     def get_all_values(cls) -> list[str]:
         """Get all enum values as strings."""
         return [item.value for item in cls]
-    
+
     @classmethod
-    def from_string(cls, value: str) -> 'FeatureType':
+    def from_string(cls, value: str) -> "FeatureType":
         """Create FeatureType from string value."""
         for item in cls:
             if item.value == value:
                 return item
         raise ValueError(f"Invalid feature type: {value}. Valid options: {cls.get_all_values()}")
+
 
 # Extended Features Constants
 FEATURE_TYPES: Final[list[str]] = FeatureType.get_all_values()
@@ -67,12 +71,13 @@ MAX_FEATURES: Final[int] = len(FeatureType)
 # Feature Index Mapping (consistent ordering in multi-feature tensors)
 FEATURE_INDEX_MAP: Final[dict[str, int]] = {
     FeatureType.VOLUME.value: 0,
-    FeatureType.VARIANCE.value: 1, 
-    FeatureType.TRADE_COUNTS.value: 2
+    FeatureType.VARIANCE.value: 1,
+    FeatureType.TRADE_COUNTS.value: 2,
 }
 
 # Variance column name from DBN files
-VARIANCE_COLUMN: Final[str] = 'market_depth_extraction_micro_pips_var'
+VARIANCE_COLUMN: Final[str] = "market_depth_extraction_micro_pips_var"
+
 
 # Extended output shapes
 def get_output_shape(features: Union[list[str], list[FeatureType]]) -> tuple[int, ...]:

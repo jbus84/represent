@@ -1,0 +1,53 @@
+# Custom Configuration Example
+# This file demonstrates how to create a custom YAML configuration
+# for DBN to parquet conversion with specific trading requirements
+
+currency_pair: "CUSTOM"  # Must be 6 chars for validation
+description: "Custom configuration for high-frequency scalping strategy"
+
+classification:
+  # Ultra-precise pricing for scalping
+  micro_pip_size: 0.000001  # Sub-micro-pip precision
+  true_pip_size: 0.0001
+  
+  # Fast reaction time windows
+  ticks_per_bin: 50          # Smaller bins for faster reactions
+  lookforward_offset: 100    # Minimal offset
+  lookforward_input: 1000    # Short lookforward for scalping
+  lookback_rows: 1000        # Short historical context
+  
+  # High-resolution classification
+  nbins: 13                  # Standard classification bins
+  
+  # Custom bin thresholds for micro-movements
+  bin_thresholds:
+    13:
+      50:
+        1000:
+          bin_1: 0.1
+          bin_2: 0.3
+          bin_3: 0.6
+          bin_4: 1.0
+          bin_5: 1.5
+          bin_6: 2.2
+
+sampling:
+  # Comprehensive sampling for training
+  sampling_mode: "consecutive"
+  coverage_percentage: 1.0    # Use all available data
+  end_tick_strategy: "uniform_random"
+  min_tick_spacing: 25        # Dense sampling
+  seed: 123                   # Different seed
+  max_samples: 1000000        # Large training set
+
+# Multi-feature extraction
+features:
+  - "volume"
+  - "variance"
+  - "trade_counts"
+
+# High-performance processing
+batch_processing:
+  chunk_size: 50000           # Smaller chunks for memory efficiency
+  parallel_workers: 8         # More workers
+  memory_limit_gb: 16         # Higher memory limit
