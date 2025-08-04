@@ -8,7 +8,7 @@ This package provides:
 4. High-performance PyTorch integration
 """
 
-__version__ = "2.0.0"
+__version__ = "1.9.0"
 
 # New primary API - DBN to Parquet conversion and lazy loading
 from .converter import DBNToParquetConverter, convert_dbn_file, batch_convert_dbn_files

@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.9.0 (2025-08-04)
+
+### Features
+
+- **parquet**: Add parquet tooling fices
+  ([`f486d03`](https://github.com/jbus84/represent/commit/f486d03cc6a52ac5ee94b2fc3a15c247c46d4ab6))
+
+
 ## v1.8.0 (2025-08-03)
 
 ### Features
