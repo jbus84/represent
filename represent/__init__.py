@@ -1,23 +1,34 @@
 """
-Represent: High-performance LOB feature extraction package.
+Represent: High-performance market depth ML pipeline.
 
-This package provides ultra-fast market depth processing capabilities
-optimized for real-time trading applications.
+This package provides:
+1. DBN to labeled parquet conversion with classification
+2. Lazy loading parquet dataloader for ML training
+3. Currency-specific market configurations
+4. High-performance PyTorch integration
 """
 
-__version__ = "1.8.0"
+__version__ = "2.0.0"
 
-# Import main API functions
+# New primary API - DBN to Parquet conversion and lazy loading
+from .converter import (
+    DBNToParquetConverter,
+    convert_dbn_file,
+    batch_convert_dbn_files
+)
+from .dataloader import (
+    LazyParquetDataset,
+    LazyParquetDataLoader,
+    create_market_depth_dataloader,
+    MarketDepthDataLoader
+)
+
+# Core processing and configuration
 from .pipeline import process_market_data, create_processor, MarketDepthProcessor
 from .constants import (
     MICRO_PIP_SIZE, TICKS_PER_BIN, SAMPLES, PRICE_LEVELS, TIME_BINS,
     ASK_PRICE_COLUMNS, BID_PRICE_COLUMNS, ASK_VOL_COLUMNS, BID_VOL_COLUMNS,
     FeatureType, FEATURE_TYPES, DEFAULT_FEATURES, FEATURE_INDEX_MAP, MAX_FEATURES, get_output_shape
-)
-from .dataloader import (
-    MarketDepthDataset, 
-    HighPerformanceDataLoader, BackgroundBatchProducer,
-    create_streaming_dataloader, create_file_dataloader, create_high_performance_dataloader
 )
 from .config import (
     ClassificationConfig,
@@ -31,15 +42,21 @@ from .config import (
 
 # Public API
 __all__ = [
+    # Primary new API
+    "DBNToParquetConverter",
+    "convert_dbn_file",
+    "batch_convert_dbn_files",
+    "LazyParquetDataset",
+    "LazyParquetDataLoader",
+    "create_market_depth_dataloader",
+    "MarketDepthDataLoader",
+    
+    # Core processing
     "process_market_data",
     "create_processor", 
     "MarketDepthProcessor",
-    "MarketDepthDataset",
-    "HighPerformanceDataLoader",
-    "BackgroundBatchProducer",
-    "create_streaming_dataloader",
-    "create_file_dataloader",
-    "create_high_performance_dataloader",
+    
+    # Configuration
     "ClassificationConfig",
     "SamplingConfig",
     "CurrencyConfig",
@@ -47,6 +64,8 @@ __all__ = [
     "get_default_currency_config",
     "save_currency_config",
     "list_available_currencies",
+    
+    # Constants
     "MICRO_PIP_SIZE",
     "TICKS_PER_BIN", 
     "SAMPLES",

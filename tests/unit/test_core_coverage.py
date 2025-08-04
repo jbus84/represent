@@ -3,8 +3,9 @@ Tests to improve code coverage for core modules.
 """
 import numpy as np
 import polars as pl
+import pytest
 from represent.core import placeholder_function, reference_pipeline
-from represent.data_structures import RingBuffer, PriceLookupTable, VolumeGrid, OutputBuffer
+from represent.data_structures import PriceLookupTable, VolumeGrid, OutputBuffer
 
 
 class TestCoreCoverage:
@@ -54,46 +55,11 @@ class TestCoreCoverage:
 class TestDataStructuresCoverage:
     """Test data structures to improve coverage."""
     
+    @pytest.mark.skip("RingBuffer removed in new parquet-based architecture")
     def test_ring_buffer_operations(self):
         """Test ring buffer operations comprehensively."""
-        buffer = RingBuffer(capacity=100)
-        
-        # Test empty buffer
-        assert buffer.size == 0
-        assert not buffer.is_full
-        
-        # Test partial filling
-        for i in range(50):
-            data = np.random.random(75)
-            buffer.push(data)
-        
-        assert buffer.size == 50
-        assert not buffer.is_full
-        
-        # Test getting recent data when not full
-        recent = buffer.get_recent_data(25)
-        assert recent.shape == (25, 75)
-        
-        # Test getting more data than available
-        recent = buffer.get_recent_data(200)
-        assert recent.shape == (50, 75)
-        
-        # Fill buffer to capacity
-        for i in range(50):
-            data = np.random.random(75)
-            buffer.push(data)
-        
-        assert buffer.size == 100
-        assert buffer.is_full
-        
-        # Test wrapped data retrieval
-        recent = buffer.get_recent_data(80)
-        assert recent.shape[0] <= 100  # Should not exceed capacity
-        assert recent.shape[1] == 75
-        
-        # Test empty retrieval
-        empty = buffer.get_recent_data(0)
-        assert empty.shape == (0, 75)
+        # This test is disabled as RingBuffer is no longer used in the new architecture
+        pass
     
     def test_price_lookup_table_operations(self):
         """Test price lookup table operations."""
