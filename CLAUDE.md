@@ -334,14 +334,28 @@ from represent import MarketDepthProcessor, process_market_data
 from represent import load_currency_config, ClassificationConfig
 ```
 
-### Currency Configurations
+### Dynamic Configuration Generation
 
-Available currency configurations:
-- **AUDUSD**: `represent/configs/audusd.json`
-- **GBPUSD**: `represent/configs/gbpusd.json` 
-- **EURJPY**: `represent/configs/eurjpy.json`
+The represent package now uses **dynamic configuration generation** instead of static files:
 
-Each config includes optimized classification thresholds and processing parameters.
+```python
+from represent import generate_classification_config_from_parquet
+
+# Generate optimized config from actual parquet data
+config, metrics = generate_classification_config_from_parquet(
+    parquet_files="/path/to/data.parquet",
+    currency="AUDUSD"
+)
+
+print(f"Quality: {metrics['validation_metrics']['quality']}")
+print(f"Average deviation: {metrics['validation_metrics']['avg_deviation']:.1f}%")
+```
+
+**Benefits of Dynamic Configuration:**
+- ✅ **No Static Files**: Eliminates need for `represent/configs/` directory
+- ✅ **Data-Driven**: Optimized thresholds based on actual price movements
+- ✅ **Uniform Distribution**: Quantile-based approach ensures balanced classes
+- ✅ **Quality Assessment**: Real-time validation and quality metrics
 
 ## Instructions for Claude
 

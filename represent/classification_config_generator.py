@@ -8,7 +8,7 @@ configuration files.
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Tuple, Union
 import numpy as np
 import polars as pl
 from datetime import datetime

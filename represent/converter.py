@@ -13,7 +13,6 @@ import databento as db
 import polars as pl
 
 from .config import ClassificationConfig, load_currency_config, load_config_from_file
-from .constants import MICRO_PIP_SIZE
 from .pipeline import MarketDepthProcessor
 
 

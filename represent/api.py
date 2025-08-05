@@ -15,9 +15,7 @@ from .lazy_dataloader import LazyParquetDataset, LazyParquetDataLoader
 from .dataloader import create_market_depth_dataloader
 from .config import load_currency_config, load_config_from_file
 from .classification_config_generator import (
-    ClassificationConfigGenerator, 
-    generate_classification_config_from_parquet,
-    classify_with_generated_config
+    generate_classification_config_from_parquet
 )
 
 
@@ -489,7 +487,7 @@ class RepresentAPI:
         classified_dir = output_base / "classified"
         
         if verbose:
-            print(f"🚀 Running Complete 3-Stage Pipeline")
+            print("🚀 Running Complete 3-Stage Pipeline")
             print(f"   📁 Output base: {output_base}")
             print(f"   💱 Currency: {currency}")
             print(f"   📊 Features: {features or ['volume']}")
@@ -533,12 +531,12 @@ class RepresentAPI:
         }
 
         if verbose:
-            print(f"\n✅ Complete Pipeline Finished!")
+            print("\n✅ Complete Pipeline Finished!")
             print(f"   📊 Symbols processed: {pipeline_results['total_symbols']}")
             print(f"   📊 Total samples: {pipeline_results['total_samples']:,}")
             print(f"   📊 Classified files: {pipeline_results['classified_files']}")
             print(f"   📁 Classified data: {classified_dir}")
-            print(f"   🚀 Ready for ML training!")
+            print("   🚀 Ready for ML training!")
 
         return pipeline_results
 

@@ -8,12 +8,10 @@ with symbol-specific uniform distribution guarantees for balanced ML training.
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Union, Any
-import json
 
 import polars as pl
-import numpy as np
 
-from .config import load_currency_config, ClassificationConfig
+from .config import load_currency_config
 
 
 class ParquetClassifier:
@@ -67,7 +65,7 @@ class ParquetClassifier:
             print(f"🎯 ParquetClassifier initialized for {self.currency}")
             print(f"   📊 Target uniform percentage: {self.target_uniform_percentage:.2f}%")
             print(f"   📊 Force uniform distribution: {self.force_uniform}")
-            print(f"   📊 Using optimal thresholds from data analysis")
+            print("   📊 Using optimal thresholds from data analysis")
 
     def classify_symbol_parquet(
         self,
@@ -163,7 +161,7 @@ class ParquetClassifier:
         }
 
         if self.verbose:
-            print(f"   ✅ Classification complete!")
+            print("   ✅ Classification complete!")
             print(f"   📊 Processed {len(classified_df):,} samples")
             print(f"   📊 Rate: {stats['samples_per_second']:.1f} samples/second")
             print(f"   📊 Output: {output_path}")

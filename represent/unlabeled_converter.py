@@ -8,11 +8,9 @@ grouped by symbol for later post-processing classification.
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Union, Any
-from collections import defaultdict
 
 import databento as db
 import polars as pl
-import numpy as np
 
 from .pipeline import MarketDepthProcessor
 
@@ -50,7 +48,7 @@ class UnlabeledDBNConverter:
         # Initialize market depth processor
         self.processor = MarketDepthProcessor(features=self.features)
 
-        print(f"🔧 UnlabeledDBNConverter initialized")
+        print("🔧 UnlabeledDBNConverter initialized")
         print(f"   📊 Features: {self.features}")
         print(f"   📊 Min samples per symbol: {self.min_symbol_samples:,}")
 
@@ -283,7 +281,7 @@ class UnlabeledDBNConverter:
 
                 samples.append(sample_record)
 
-            except Exception as e:
+            except Exception:
                 # Skip samples that fail processing
                 continue
 
