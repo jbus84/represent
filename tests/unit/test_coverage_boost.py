@@ -158,8 +158,9 @@ def test_converter_components():
         assert converter.features == ["volume"]
 
         # Test classification method
-        movement = 2.5
-        label = converter._classify_price_movement(movement)
+        true_pip_size = converter.classification_config.true_pip_size
+        percentage_change = 2.5 * true_pip_size
+        label = converter._classify_price_movement_percentage(percentage_change)
         assert isinstance(label, int)
         assert 0 <= label < converter.classification_config.nbins
 

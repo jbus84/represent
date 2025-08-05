@@ -315,6 +315,11 @@ class DBNToParquetConverter:
     ) -> int:
         """
         Generate classification label based on price movement in lookforward window.
+        
+        This implementation matches the reference notebook logic exactly:
+        - Uses lookback baseline for relative percentage change calculation
+        - Applies thresholds to mean_change (percentage change)
+        - Handles both positive and negative movements
 
         Args:
             data: Full data chunk
@@ -322,72 +327,189 @@ class DBNToParquetConverter:
             lookforward_window: Number of ticks to look forward
 
         Returns:
-            Classification label (0=down, 1=neutral, 2=up)
+            Classification label (0 to nbins-1)
         """
         if target_pos + lookforward_window >= len(data):
-            return 1  # Neutral if insufficient data
+            return self.classification_config.nbins // 2  # Return middle bin if insufficient data
 
-        # Get mid prices for the lookforward window
+        # Calculate lookback baseline (matches reference notebook line 238)
+        lookback_start = max(0, target_pos - self.classification_config.lookback_rows)
+        lookback_data = data[lookback_start:target_pos]
+        
+        if len(lookback_data) == 0:
+            return self.classification_config.nbins // 2  # Return neutral if no lookback data
+            
+        # Calculate lookback mean mid price
+        lookback_mid_prices = (lookback_data["bid_px_00"] + lookback_data["ask_px_00"]) / 2
+        lookback_mean = lookback_mid_prices.mean()
+
+        # Calculate lookforward mean mid price (matches reference notebook line 239)
         lookforward_data = data[target_pos : target_pos + lookforward_window]
+        lookforward_mid_prices = (lookforward_data["bid_px_00"] + lookforward_data["ask_px_00"]) / 2
+        lookforward_mean = lookforward_mid_prices.mean()
 
-        # Calculate mid price as average of best bid/ask
-        start_mid = (lookforward_data["bid_px_00"][0] + lookforward_data["ask_px_00"][0]) / 2
-        end_mid = (lookforward_data["bid_px_00"][-1] + lookforward_data["ask_px_00"][-1]) / 2
+        # Calculate relative percentage change (matches reference notebook line 246)
+        mean_change = float((lookforward_mean - lookback_mean) / lookback_mean)
 
-        # Calculate price movement in micro pips
-        price_movement = (end_mid - start_mid) / MICRO_PIP_SIZE
+        # Apply classification based on percentage change thresholds
+        return self._classify_price_movement_percentage(mean_change)
 
-        # Apply classification based on bin thresholds
-        return self._classify_price_movement(abs(price_movement))
-
-    def _classify_price_movement(self, abs_movement: float) -> int:
+    def _classify_price_movement_percentage(self, mean_change: float) -> int:
         """
-        Classify price movement using bin thresholds.
+        Classify price movement using percentage change thresholds.
+        
+        This implementation exactly matches the reference notebook classification logic
+        from lines 250-293, handling both positive and negative movements.
 
         Args:
-            abs_movement: Absolute price movement in micro pips
+            mean_change: Relative percentage change from lookback to lookforward
 
         Returns:
             Classification label (0 to nbins-1)
         """
-        # Get thresholds for current configuration
         nbins = self.classification_config.nbins
         ticks_per_bin = self.classification_config.ticks_per_bin
         lookforward_input = self.classification_config.lookforward_input
-
-        # Get the appropriate threshold set
-        bin_thresholds = (
-            self.classification_config.bin_thresholds.get(nbins, {})
-            .get(ticks_per_bin, {})
-            .get(lookforward_input, {})
-        )
-
-        if not bin_thresholds:
-            # Fallback: simple 3-class classification
-            if abs_movement > 3.0:
-                return 2  # Large movement
-            elif abs_movement > 1.0:
-                return 1  # Medium movement
+        
+        # Get TRUE_PIP_SIZE from config
+        true_pip_size = self.classification_config.true_pip_size
+        
+        # Apply the exact same classification logic as the reference notebook
+        if nbins == 13:
+            if ticks_per_bin == 100:
+                if lookforward_input == 5000:
+                    # Exact thresholds from reference notebook lines 253-258
+                    bin_1 = float(0.47 * true_pip_size)
+                    bin_2 = float(1.55 * true_pip_size)
+                    bin_3 = float(2.69 * true_pip_size)
+                    bin_4 = float(3.92 * true_pip_size)
+                    bin_5 = float(5.45 * true_pip_size)
+                    bin_6 = float(7.73 * true_pip_size)
+                elif lookforward_input == 3000:
+                    # Exact thresholds from reference notebook lines 261-266
+                    bin_1 = float(0.5 * true_pip_size)
+                    bin_2 = float(1.7 * true_pip_size)
+                    bin_3 = float(3.0 * true_pip_size)
+                    bin_4 = float(4.3 * true_pip_size)
+                    bin_5 = float(6.0 * true_pip_size)
+                    bin_6 = float(8.45 * true_pip_size)
+                else:
+                    # Fallback to first set
+                    bin_1 = float(0.47 * true_pip_size)
+                    bin_2 = float(1.55 * true_pip_size)
+                    bin_3 = float(2.69 * true_pip_size)
+                    bin_4 = float(3.92 * true_pip_size)
+                    bin_5 = float(5.45 * true_pip_size)
+                    bin_6 = float(7.73 * true_pip_size)
+                    
+            # Apply exact classification logic from reference notebook lines 268-293
+            if mean_change >= bin_6:
+                return 12
+            elif mean_change > bin_5:
+                return 11
+            elif mean_change > bin_4:
+                return 10
+            elif mean_change > bin_3:
+                return 9
+            elif mean_change > bin_2:
+                return 8
+            elif mean_change > bin_1:
+                return 7
+            elif mean_change > -bin_1:
+                return 6
+            elif mean_change > -bin_2:
+                return 5
+            elif mean_change > -bin_3:
+                return 4
+            elif mean_change > -bin_4:
+                return 3
+            elif mean_change > -bin_5:
+                return 2
+            elif mean_change > -bin_6:
+                return 1
             else:
-                return 0  # Small movement
-
-        # Find the appropriate bin based on thresholds
-        thresholds = []
-        for i in range(1, (nbins // 2) + 1):
-            threshold_key = f"bin_{i}"
-            if threshold_key in bin_thresholds:
-                thresholds.append(bin_thresholds[threshold_key])
-
-        if not thresholds:
-            return nbins // 2  # Return middle bin if no thresholds
-
-        # Classify based on thresholds
-        for i, threshold in enumerate(thresholds):
-            if abs_movement <= threshold:
-                return i
-
-        # If movement exceeds all thresholds, return highest bin
-        return nbins - 1
+                return 0
+                
+        elif nbins == 9:
+            if ticks_per_bin == 10:
+                bin_1 = 0.31 * true_pip_size
+                bin_2 = 0.91 * true_pip_size
+                bin_3 = 1.6 * true_pip_size
+                bin_4 = 2.55 * true_pip_size
+            elif ticks_per_bin == 100:
+                bin_1 = 0.51 * true_pip_size
+                bin_2 = 2.25 * true_pip_size
+                bin_3 = 4.0 * true_pip_size
+                bin_4 = 6.35 * true_pip_size
+                
+            # Apply exact classification logic from reference notebook lines 308-325
+            if mean_change >= bin_4:
+                return 8
+            elif mean_change > bin_3:
+                return 7
+            elif mean_change > bin_2:
+                return 6
+            elif mean_change > bin_1:
+                return 5
+            elif mean_change > -bin_1:
+                return 4
+            elif mean_change > -bin_2:
+                return 3
+            elif mean_change > -bin_3:
+                return 2
+            elif mean_change > -bin_4:
+                return 1
+            else:
+                return 0
+                
+        elif nbins == 7:
+            if ticks_per_bin == 10:
+                bin_1 = 0.3 * true_pip_size
+                bin_2 = 0.9 * true_pip_size
+                bin_3 = 1.7 * true_pip_size
+            elif ticks_per_bin == 100:
+                bin_1 = 0.7 * true_pip_size
+                bin_2 = 2.7 * true_pip_size
+                bin_3 = 5.5 * true_pip_size
+                
+            # Apply exact classification logic from reference notebook lines 337-350
+            if mean_change > bin_3:
+                return 6
+            elif mean_change > bin_2:
+                return 5
+            elif mean_change > bin_1:
+                return 4
+            elif mean_change > -bin_1:
+                return 3
+            elif mean_change > -bin_2:
+                return 2
+            elif mean_change > -bin_3:
+                return 1
+            else:
+                return 0
+                
+        elif nbins == 5:
+            if ticks_per_bin == 10:
+                bin_1 = true_pip_size / 2
+                bin_2 = true_pip_size * 1.5
+            elif ticks_per_bin == 100:
+                bin_1 = 1 * true_pip_size
+                bin_2 = 3 * true_pip_size
+                
+            # Apply exact classification logic from reference notebook lines 360-369
+            if mean_change > bin_2:
+                return 4
+            elif mean_change > bin_1:
+                return 3
+            elif mean_change > -bin_1:
+                return 2
+            elif mean_change > -bin_2:
+                return 1
+            else:
+                return 0
+        else:
+            # Fallback for unsupported nbins
+            return nbins // 2
 
 
 def convert_dbn_file(

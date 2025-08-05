@@ -12,12 +12,12 @@
       "13": {
         "100": {
           "5000": {
-            "bin_1": 0.47,
-            "bin_2": 1.55,
-            "bin_3": 2.69,
-            "bin_4": 3.92,
-            "bin_5": 5.45,
-            "bin_6": 7.73
+            "bin_1": 1.41,
+            "bin_2": 2.61,
+            "bin_3": 3.75,
+            "bin_4": 4.75,
+            "bin_5": 6.53,
+            "bin_6": 10.13
           },
           "3000": {
             "bin_1": 0.5,
@@ -97,5 +97,5 @@
     "seed": 42,
     "max_samples": null
   },
-  "description": "Optimized configuration for AUD/USD major currency pair with empirically-derived thresholds"
+  "description": "Data-driven configuration for AUD/USD with thresholds optimized for uniform classification distribution based on real market data analysis"
 }

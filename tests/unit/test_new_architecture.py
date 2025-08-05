@@ -69,9 +69,11 @@ class TestDBNToParquetConverter:
         """Test classification logic."""
         converter = DBNToParquetConverter(currency="AUDUSD")
 
-        # Test various movement sizes
-        movements = [0.5, 1.5, 3.0, 5.0, 10.0]
-        labels = [converter._classify_price_movement(mov) for mov in movements]
+        # Test various percentage changes
+        true_pip_size = converter.classification_config.true_pip_size
+        percentage_changes = [0.5 * true_pip_size, 1.5 * true_pip_size, 3.0 * true_pip_size, 
+                            5.0 * true_pip_size, 10.0 * true_pip_size]
+        labels = [converter._classify_price_movement_percentage(change) for change in percentage_changes]
 
         # Should return valid labels
         for label in labels:
