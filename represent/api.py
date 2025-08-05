@@ -8,12 +8,11 @@ in market depth machine learning pipelines.
 from typing import Dict, List, Optional, Union, Any
 from pathlib import Path
 
-from .converter import convert_dbn_file, batch_convert_dbn_files, DBNToParquetConverter
 from .unlabeled_converter import convert_dbn_to_parquet, batch_convert_dbn_files as batch_convert_unlabeled
 from .parquet_classifier import classify_parquet_file, batch_classify_parquet_files
 from .lazy_dataloader import LazyParquetDataset, LazyParquetDataLoader
-from .dataloader import create_market_depth_dataloader
-from .config import load_currency_config, load_config_from_file
+from .lazy_dataloader import create_parquet_dataloader
+from .config import load_currency_config
 from .classification_config_generator import (
     generate_classification_config_from_parquet
 )
@@ -33,101 +32,7 @@ class RepresentAPI:
         """Initialize the API."""
         self._available_currencies = ["AUDUSD", "GBPUSD", "EURJPY", "EURUSD", "USDJPY"]
 
-    def convert_dbn_to_training_data(
-        self,
-        dbn_path: Union[str, Path],
-        output_path: Union[str, Path],
-        currency: Optional[str] = None,
-        config_file: Optional[Union[str, Path]] = None,
-        features: Optional[List[str]] = None,
-        symbol_filter: Optional[str] = None,
-        chunk_size: int = 100000,
-        verbose: bool = True,
-    ) -> Dict[str, Any]:
-        """
-        Convert DBN file to labeled parquet training dataset.
 
-        Args:
-            dbn_path: Path to input DBN file
-            output_path: Path for output parquet file
-            currency: Currency pair for predefined configuration
-            config_file: Path to custom YAML/JSON configuration
-            features: Features to extract ['volume', 'variance', 'trade_counts']
-            symbol_filter: Filter by symbol (e.g., 'M6AM4')
-            chunk_size: Processing chunk size
-            verbose: Print progress information
-
-        Returns:
-            Dictionary with conversion statistics
-
-        Examples:
-            api = RepresentAPI()
-
-            # Convert with predefined currency config
-            stats = api.convert_dbn_to_training_data('data.dbn', 'output.parquet', currency='AUDUSD')
-
-            # Convert with custom config and multi-features
-            stats = api.convert_dbn_to_training_data(
-                'data.dbn',
-                'output.parquet',
-                config_file='my_config.yaml',
-                features=['volume', 'variance']
-            )
-        """
-        if not verbose:
-            # Temporarily suppress print statements in converter
-            import builtins
-
-            original_print = builtins.print
-            builtins.print = lambda *args, **kwargs: None
-
-        try:
-            stats = convert_dbn_file(
-                dbn_path=dbn_path,
-                output_path=output_path,
-                currency=currency,
-                config_file=config_file,
-                features=features or ["volume"],
-                symbol_filter=symbol_filter,
-                chunk_size=chunk_size,
-                include_metadata=True,
-            )
-            return stats
-        finally:
-            if not verbose:
-                builtins.print = original_print
-
-    def batch_convert_dbn_directory(
-        self,
-        input_directory: Union[str, Path],
-        output_directory: Union[str, Path],
-        currency: Optional[str] = None,
-        config_file: Optional[Union[str, Path]] = None,
-        pattern: str = "*.dbn*",
-        **kwargs,
-    ) -> List[Dict[str, Any]]:
-        """
-        Batch convert all DBN files in a directory.
-
-        Args:
-            input_directory: Directory containing DBN files
-            output_directory: Directory for output parquet files
-            currency: Currency pair for predefined configuration
-            config_file: Path to custom configuration file
-            pattern: File pattern to match
-            **kwargs: Additional conversion parameters
-
-        Returns:
-            List of conversion statistics for each file
-        """
-        return batch_convert_dbn_files(
-            input_directory=input_directory,
-            output_directory=output_directory,
-            currency=currency,
-            config_file=config_file,
-            pattern=pattern,
-            **kwargs,
-        )
 
     def create_dataloader(
         self,
@@ -161,7 +66,7 @@ class RepresentAPI:
                 # labels: (64,) classification targets
                 pass
         """
-        return create_market_depth_dataloader(
+        return create_parquet_dataloader(
             parquet_path=parquet_path,
             batch_size=batch_size,
             shuffle=shuffle,
@@ -211,43 +116,7 @@ class RepresentAPI:
         """
         return load_currency_config(currency)
 
-    def load_custom_config(self, config_path: Union[str, Path]):
-        """
-        Load configuration from custom YAML/JSON file.
 
-        Args:
-            config_path: Path to configuration file
-
-        Returns:
-            CurrencyConfig object
-        """
-        return load_config_from_file(config_path)
-
-    def create_converter(
-        self,
-        currency: Optional[str] = None,
-        config_file: Optional[Union[str, Path]] = None,
-        features: Optional[List[str]] = None,
-        batch_size: int = 2000,
-    ) -> DBNToParquetConverter:
-        """
-        Create a DBN to Parquet converter with specified configuration.
-
-        Args:
-            currency: Currency pair for predefined config
-            config_file: Path to custom configuration file
-            features: Features to extract
-            batch_size: Processing batch size
-
-        Returns:
-            DBNToParquetConverter instance
-        """
-        return DBNToParquetConverter(
-            currency=currency,
-            config_file=config_file,
-            features=features or ["volume"],
-            batch_size=batch_size,
-        )
 
     def convert_dbn_to_unlabeled_parquet(
         self,
@@ -437,7 +306,7 @@ class RepresentAPI:
                 # labels: (64,) classification targets 0-12
                 pass
         """
-        return create_market_depth_dataloader(
+        return create_parquet_dataloader(
             parquet_path=parquet_path,
             batch_size=batch_size,
             shuffle=shuffle,
@@ -600,66 +469,6 @@ class RepresentAPI:
             'generation_method': 'quantile_based_dynamic'
         }
 
-    def convert_with_dynamic_classification(
-        self,
-        dbn_path: Union[str, Path],
-        output_path: Union[str, Path],
-        parquet_files_for_config: Union[str, Path, List[Union[str, Path]]],
-        currency: str,
-        features: Optional[List[str]] = None,
-        **kwargs
-    ) -> Dict[str, Any]:
-        """
-        Convert DBN file using dynamically generated classification config.
-        
-        This method first generates an optimized classification configuration
-        from existing parquet data, then uses it to convert the DBN file.
-
-        Args:
-            dbn_path: Path to input DBN file
-            output_path: Path for output classified parquet file
-            parquet_files_for_config: Existing parquet files to analyze for config
-            currency: Currency pair name
-            features: List of features to extract
-            **kwargs: Additional conversion parameters
-
-        Returns:
-            Dictionary with conversion results and config generation metrics
-
-        Example:
-            >>> api = RepresentAPI()
-            >>> result = api.convert_with_dynamic_classification(
-            ...     dbn_path="/path/to/new_data.dbn",
-            ...     output_path="/path/to/classified_output.parquet", 
-            ...     parquet_files_for_config="/path/to/training_data.parquet",
-            ...     currency="AUDUSD"
-            ... )
-            >>> print(f"Config quality: {result['config_metrics']['validation_metrics']['quality']}")
-        """
-        # Generate dynamic classification config
-        config_result = self.generate_classification_config(
-            parquet_files=parquet_files_for_config,
-            currency=currency,
-            **kwargs
-        )
-        
-        # Convert DBN file using generated config
-        conversion_result = convert_dbn_file(
-            dbn_path=dbn_path,
-            output_path=output_path,
-            currency=currency,
-            config=config_result['config'],
-            features=features or ['volume'],
-            **kwargs
-        )
-        
-        return {
-            'conversion_result': conversion_result,
-            'config_metrics': config_result['metrics'],
-            'generated_config': config_result['config'],
-            'currency': currency,
-            'method': 'dynamic_classification'
-        }
 
     def get_package_info(self) -> Dict[str, Any]:
         """
@@ -686,11 +495,6 @@ api = RepresentAPI()
 
 
 # Convenience functions that use the default API instance
-def convert_to_training_data(*args, **kwargs):
-    """Convenience function for converting DBN to training data."""
-    return api.convert_dbn_to_training_data(*args, **kwargs)
-
-
 def create_training_dataloader(*args, **kwargs):
     """Convenience function for creating training dataloader."""
     return api.create_dataloader(*args, **kwargs)

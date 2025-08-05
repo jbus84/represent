@@ -17,7 +17,7 @@ from typing import Dict
 from scipy import stats
 
 try:
-    from represent.converter import DBNToParquetConverter
+    from represent.unlabeled_converter import UnlabeledDBNConverter
     from represent.config import load_currency_config
 except ImportError as e:
     print(f"Error importing represent package: {e}")
@@ -78,9 +78,8 @@ def test_classification_directly(data: pl.DataFrame, n_tests: int = 1000) -> np.
     
     # Initialize converter with AUDUSD config
     currency_config = load_currency_config("AUDUSD")
-    converter = DBNToParquetConverter(
-        classification_config=currency_config.classification,
-        currency="AUDUSD"
+    converter = UnlabeledDBNConverter(
+        features=["volume", "variance"]
     )
     
     labels = []

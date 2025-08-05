@@ -8,7 +8,7 @@ This is a **high-performance** Python package called "represent" that creates no
 
 **CRITICAL: This system must be extremely performance-optimized for ML training applications. Every millisecond matters.**
 
-### New Architecture (v3.0.0) - DBN→Parquet→Classification→ML Pipeline
+### Clean 3-Stage Architecture (v3.0.0) - DBN→Parquet→Classification→ML Pipeline
 
 The package follows a **three-stage pipeline** for maximum flexibility and performance:
 
@@ -43,15 +43,14 @@ stats = convert_dbn_to_parquet(
 ### Stage 2: Post-Processing Classification
 
 ```python
-from represent import apply_classification_to_parquet
+from represent import classify_parquet_file
 
-# Apply uniform classification to common symbols only
-classification_stats = apply_classification_to_parquet(
-    parquet_dir="/data/parquet/",
-    output_dir="/data/classified/",
-    currency="AUDUSD",                     # Currency-specific thresholds
-    min_samples=10000,                     # Only classify symbols with sufficient data
-    target_distribution="uniform"          # Ensure uniform class distribution
+# Apply dynamic classification with uniform distribution guarantee
+classification_stats = classify_parquet_file(
+    parquet_path="/data/parquet/AUDUSD_M6AM4.parquet",
+    output_path="/data/classified/AUDUSD_M6AM4_classified.parquet",
+    currency="AUDUSD",                     # Currency for default config
+    force_uniform=True                     # Guarantee uniform class distribution
 )
 
 # Output: /data/classified/AUDUSD_M6AM4_labeled.parquet with classification_label column
@@ -66,10 +65,10 @@ classification_stats = apply_classification_to_parquet(
 ### Stage 3: Lazy ML Training
 
 ```python  
-from represent import create_market_depth_dataloader
+from represent import create_parquet_dataloader
 
 # Create lazy dataloader for memory-efficient training
-dataloader = create_market_depth_dataloader(
+dataloader = create_parquet_dataloader(
     parquet_dir="/data/classified/",       # Directory with classified parquet files
     batch_size=32,
     shuffle=True,
@@ -325,7 +324,7 @@ from represent import convert_dbn_to_parquet, batch_convert_dbn_files
 from represent import apply_classification_to_parquet, ParquetClassifier
 
 # Stage 3: ML Training DataLoader
-from represent import create_market_depth_dataloader
+from represent import create_parquet_dataloader
 
 # Core Processing  
 from represent import MarketDepthProcessor, process_market_data
@@ -396,7 +395,7 @@ When working on this codebase:
 ### Complete ML Pipeline (3-Stage)
 
 ```python
-from represent import convert_dbn_to_parquet, apply_classification_to_parquet, create_market_depth_dataloader
+from represent import convert_dbn_to_parquet, classify_parquet_file, create_parquet_dataloader
 import torch
 import torch.nn as nn
 
@@ -421,7 +420,7 @@ classification_stats = apply_classification_to_parquet(
 
 # Stage 3: Create lazy dataloader for training
 print("Stage 3: Creating training dataloader...")
-dataloader = create_market_depth_dataloader(
+dataloader = create_parquet_dataloader(
     parquet_dir="/data/classified/",
     batch_size=32,
     shuffle=True,

@@ -31,7 +31,6 @@ import torch
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from represent.lazy_dataloader import LazyParquetDataset
-from represent.dataloader import create_market_depth_dataloader
 
 # Performance targets from CLAUDE.md
 TARGET_SINGLE_SAMPLE_MS = 1.0  # <1ms per sample

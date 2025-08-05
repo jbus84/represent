@@ -9,7 +9,6 @@ import polars as pl
 import torch
 import pytest
 
-from represent.converter import DBNToParquetConverter
 from represent.dataloader import create_market_depth_dataloader
 from represent.lazy_dataloader import LazyParquetDataset, LazyParquetDataLoader
 from represent.config import load_currency_config
@@ -47,40 +46,6 @@ def create_synthetic_dbn_data(num_rows: int = 10000) -> pl.DataFrame:
     return pl.DataFrame(data)
 
 
-class TestDBNToParquetConverter:
-    """Test DBN to Parquet conversion functionality."""
-
-    def test_converter_initialization(self):
-        """Test converter initializes correctly."""
-        converter = DBNToParquetConverter(currency="AUDUSD")
-
-        assert converter.currency == "AUDUSD"
-        assert converter.features == ["volume"]  # Default
-        assert converter.classification_config is not None
-        assert converter.processor is not None
-
-    def test_converter_with_features(self):
-        """Test converter with multiple features."""
-        converter = DBNToParquetConverter(currency="AUDUSD", features=["volume", "variance"])
-
-        assert converter.features == ["volume", "variance"]
-
-    def test_classification_method(self):
-        """Test classification logic."""
-        converter = DBNToParquetConverter(currency="AUDUSD")
-
-        # Test various percentage changes
-        true_pip_size = converter.classification_config.true_pip_size
-        percentage_changes = [0.5 * true_pip_size, 1.5 * true_pip_size, 3.0 * true_pip_size, 
-                            5.0 * true_pip_size, 10.0 * true_pip_size]
-        labels = [converter._classify_price_movement_percentage(change) for change in percentage_changes]
-
-        # Should return valid labels
-        for label in labels:
-            assert 0 <= label < converter.classification_config.nbins
-
-        # Larger movements should generally get higher labels
-        assert labels[0] <= labels[-1]  # Smallest to largest
 
 
 class TestLazyParquetDataset:

@@ -16,7 +16,7 @@ from typing import Dict
 from scipy import stats
 
 try:
-    from represent.converter import DBNToParquetConverter
+    from represent.unlabeled_converter import UnlabeledDBNConverter
     from represent.config import load_currency_config
 except ImportError as e:
     print(f"Error: {e}")

@@ -18,7 +18,7 @@ from pathlib import Path
 import torch
 import numpy as np
 
-from represent.dataloader import MarketDepthDataset
+from represent.lazy_dataloader import LazyParquetDataLoader
 from represent.constants import SAMPLES
 
 

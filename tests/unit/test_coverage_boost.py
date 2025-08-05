@@ -148,25 +148,9 @@ def test_api_components():
 
 
 def test_converter_components():
-    """Test converter components that don't require full conversion."""
-    try:
-        from represent.converter import DBNToParquetConverter
-
-        # Test basic initialization
-        converter = DBNToParquetConverter(currency="AUDUSD")
-        assert converter.currency == "AUDUSD"
-        assert converter.features == ["volume"]
-
-        # Test classification method
-        true_pip_size = converter.classification_config.true_pip_size
-        percentage_change = 2.5 * true_pip_size
-        label = converter._classify_price_movement_percentage(percentage_change)
-        assert isinstance(label, int)
-        assert 0 <= label < converter.classification_config.nbins
-
-    except ImportError:
-        # Skip if converter can't import due to dependencies
-        pytest.skip("Converter not importable due to dependencies")
+    """Test converter components - DEPRECATED: converter removed in v3.0.0."""
+    # Converter has been removed in v3.0.0 - use new 3-stage architecture
+    pytest.skip("Converter removed in v3.0.0 - use UnlabeledDBNConverter + ParquetClassifier instead")
 
 
 def test_feature_types():

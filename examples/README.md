@@ -1,206 +1,249 @@
-# Represent Library Examples (v2.0.0)
+# Represent Library Examples (v3.0.0)
 
-This directory contains examples demonstrating the new **parquet-based machine learning pipeline** for market depth processing and PyTorch integration.
+This directory contains examples demonstrating the **clean 3-stage pipeline** for market depth processing with **guaranteed uniform distribution** and **dynamic classification**.
 
-## New Architecture Overview
+## Clean 3-Stage Architecture (v3.0.0)
 
-The represent library now uses a **two-stage pipeline**:
-1. **Offline Preprocessing**: Convert DBN files to labeled parquet datasets
-2. **Online Training**: Lazy loading from parquet for memory-efficient ML training
+The represent library uses a **clean separation of concerns**:
+
+1. **Stage 1: DBN → Unlabeled Parquet (Symbol-Grouped)** - Raw data conversion with symbol separation
+2. **Stage 2: Dynamic Classification (Uniform Distribution)** - Quantile-based classification with guaranteed class balance
+3. **Stage 3: ML Training (Memory-Efficient)** - Lazy loading with optimal class distribution
+
+## Key v3.0.0 Benefits
+
+- ✅ **Guaranteed Uniform Distribution**: 7.69% per class (13-bin) for optimal ML training
+- ✅ **Dynamic Configuration**: No static config files - thresholds computed from data
+- ✅ **Symbol-Grouped Processing**: Separate files per symbol for targeted analysis
+- ✅ **Memory-Efficient**: <4GB RAM regardless of dataset size
+- ✅ **Clean API**: Direct imports, no backward compatibility wrappers
+
+## Quick Start Examples
+
+### 🚀 Complete 3-Stage Pipeline
+```bash
+python examples/api_usage_examples.py
+```
+Comprehensive demonstration of all v3.0.0 features and workflows.
+
+### 🔄 Stage-by-Stage Processing
+```bash
+python examples/new_architecture/dbn_to_parquet_example.py
+```
+Detailed walkthrough of each stage with performance metrics.
+
+### ⚡ Dynamic Classification Demo
+```bash
+python examples/classification_analysis/dynamic_config_demo.py
+```
+Shows quantile-based config generation achieving uniform distribution.
 
 ## Directory Structure
 
-- **`new_architecture/`** - Complete workflow examples for the new DBN→Parquet→ML pipeline
-- **`real_data/`** - Examples using the new parquet-based dataloader
-- **`visualization/`** - Market depth visualization using core processing pipeline
-- **`random_access_evaluation/`** - Performance benchmarks for lazy dataloader random access
+### **`api_usage_examples.py`** - 🌟 Main Examples File
+Complete v3.0.0 API demonstration with 7 examples:
+1. Complete 3-stage pipeline
+2. Stage-by-stage processing
+3. Dynamic classification
+4. Batch processing
+5. Currency configurations
+6. Feature combinations
+7. Memory optimization strategies
 
-## Quick Start
+### **`new_architecture/`** - Core Pipeline Examples
+- **`dbn_to_parquet_example.py`** - Complete 3-stage workflow with performance metrics
 
-For the new architecture, follow this sequence:
-1. `new_architecture/dbn_to_parquet_example.py` - Complete workflow demonstration
-2. `real_data/parquet_dataloader_example.py` - Parquet-based training
-3. `visualization/generate_visualization.py` - Core processing visualization
+### **`classification_analysis/`** - Dynamic Classification Examples
+- **`dynamic_config_demo.py`** - Quantile-based config generation
+- **`final_quantile_validation.py`** - Validation achieving <2% deviation
+- **`realistic_market_demo.py`** - Real market data classification
+
+### **`real_data/`** - Production Examples
+- **`parquet_dataloader_example.py`** - Memory-efficient training from classified parquet
+
+### **`visualization/`** - Market Depth Visualization
+- **`generate_visualization.py`** - Market depth tensor visualization
+
+### **`random_access_evaluation/`** - Performance Benchmarks
+- **`lazy_dataloader_random_access_benchmark.py`** - Memory and performance testing
 
 ## Example Categories
 
-### 1. New Architecture (`new_architecture/`)
+### 1. Complete Pipeline Examples
 
-Complete workflow examples for the v2.0.0 architecture:
-- **`dbn_to_parquet_example.py`** - End-to-end DBN→Parquet→ML pipeline demonstration
+**Stage 1: DBN → Unlabeled Parquet**
+```python
+from represent import convert_dbn_to_parquet
 
-**Features demonstrated:**
-- DBN file to labeled parquet conversion
-- Automatic classification labeling during conversion
-- Currency-specific configurations (AUDUSD, GBPUSD, EURJPY)
-- Multi-feature extraction (volume, variance, trade counts)
-- Lazy loading parquet dataloader for training
-- Memory-efficient ML training on large datasets
-
-### 2. Parquet-Based Training (`real_data/`)
-
-Examples using the new lazy loading dataloader:
-- **`parquet_dataloader_example.py`** - Memory-efficient training from parquet files
-
-**Features demonstrated:**
-- Lazy loading from parquet datasets
-- Memory usage independent of dataset size
-- High-performance tensor generation
-- PyTorch integration with pre-computed labels
-- Configurable sampling strategies
-
-### 3. Core Processing (`visualization/`)
-
-Core market depth processing examples:
-- **`generate_visualization.py`** - Market depth heatmap generation
-
-**Features demonstrated:**
-- Raw market data processing
-- 402×500 market depth representation
-- Price level mapping and time bin aggregation
-
-### 4. Performance Evaluation (`random_access_evaluation/`)
-
-Comprehensive benchmarks for lazy dataloader performance:
-- **`lazy_dataloader_random_access_benchmark.py`** - Full performance benchmark suite
-- **`minimal_test.py`** - Quick functionality verification
-- **`usage_examples.py`** - Configuration examples for different scenarios
-
-**Features demonstrated:**
-- Random access latency measurement (<1ms target)
-- Batch loading throughput (>10K samples/sec target)
-- 50K subset sampling for ML training
-- Cache effectiveness analysis with different sizes
-- Memory efficiency monitoring
-- Production-ready performance validation
-
-## New Workflow
-
-### Stage 1: Convert DBN to Labeled Parquet
-
-```bash
-# Use the conversion script or example
-uv run python examples/new_architecture/dbn_to_parquet_example.py
-
-# Or use the CLI tool
-uv run python scripts/convert_dbn_to_parquet.py \
-  --input data/market_data.dbn.zst \
-  --output data/labeled_dataset.parquet \
-  --currency AUDUSD
+stats = convert_dbn_to_parquet(
+    dbn_path="data.dbn.zst",
+    output_dir="/data/unlabeled/",
+    features=['volume', 'variance'],
+    min_symbol_samples=1000
+)
 ```
 
-### Stage 2: Train with Parquet Dataloader
+**Stage 2: Dynamic Classification**
+```python
+from represent import classify_parquet_file
 
-```bash
-# Use the parquet dataloader example
-uv run python examples/real_data/parquet_dataloader_example.py
+stats = classify_parquet_file(
+    parquet_path="/data/unlabeled/AUDUSD_M6AM4.parquet",
+    output_path="/data/classified/AUDUSD_M6AM4_classified.parquet",
+    currency="AUDUSD",
+    force_uniform=True  # Guaranteed uniform distribution
+)
 ```
 
-## Prerequisites
+**Stage 3: ML Training**
+```python
+from represent import create_parquet_dataloader
 
-### Data Setup
+dataloader = create_parquet_dataloader(
+    parquet_path="/data/classified/AUDUSD_M6AM4_classified.parquet",
+    batch_size=32,
+    shuffle=True,
+    sample_fraction=0.2
+)
 
-For DBN conversion examples:
-```bash
-# Ensure DBN files are available
-ls data/*.dbn.zst
-
-# Or create sample DBN files for testing
+for features, labels in dataloader:
+    # features: (32, [N_features,] 402, 500)
+    # labels: (32,) with uniform distribution (7.69% each class)
+    pass
 ```
 
-For parquet training examples:
-```bash
-# Convert DBN to parquet first (Stage 1)
-# Then run parquet training examples (Stage 2)
+### 2. High-Level API Examples
+
+**Complete Pipeline in One Call**
+```python
+from represent import RepresentAPI
+
+api = RepresentAPI()
+
+results = api.run_complete_pipeline(
+    dbn_path="data.dbn",
+    output_base_dir="/data/pipeline/",
+    currency="AUDUSD",
+    features=['volume', 'variance'],
+    force_uniform=True
+)
 ```
 
-### Environment Setup
+### 3. Dynamic Classification Examples
 
-```bash
-# Install the library with all dependencies
-uv sync --all-extras
+**Generate Optimal Configuration**
+```python
+from represent import RepresentAPI
 
-# Verify installation
-uv run python -c "from represent import convert_dbn_file, create_market_depth_dataloader; print('✅ Installation OK')"
+api = RepresentAPI()
+
+config_result = api.generate_classification_config(
+    parquet_files="/data/unlabeled/AUDUSD_M6AM4.parquet",
+    currency="AUDUSD",
+    nbins=13
+)
+
+print(f"Quality: {config_result['metrics']['validation_metrics']['quality']:.1%}")
+```
+
+### 4. Memory Optimization Examples
+
+**Different Memory Strategies**
+```python
+# Quick iteration (10% data, 500 cache)
+dataloader = create_parquet_dataloader(
+    parquet_path="data.parquet",
+    sample_fraction=0.1,
+    cache_size=500
+)
+
+# Full training (100% data, 2000 cache)
+dataloader = create_parquet_dataloader(
+    parquet_path="data.parquet",
+    sample_fraction=1.0,
+    cache_size=2000
+)
 ```
 
 ## Running Examples
 
-### Complete Workflow (Recommended)
-
+### Prerequisites
 ```bash
-# 1. Run complete workflow example
-uv run python examples/new_architecture/dbn_to_parquet_example.py
+# Install represent with development dependencies
+uv sync --all-extras
 
-# 2. Run parquet training example  
-uv run python examples/real_data/parquet_dataloader_example.py
-
-# 3. Generate visualization
-uv run python examples/visualization/generate_visualization.py
-
-# 4. Evaluate random access performance (optional)
-uv run python examples/random_access_evaluation/minimal_test.py
+# Ensure you have DBN data files in data/ directory
 ```
 
-### Individual Components
-
+### Run Individual Examples
 ```bash
-# DBN conversion workflow
-uv run python examples/new_architecture/dbn_to_parquet_example.py
+# Complete API demonstration
+python examples/api_usage_examples.py
 
-# Parquet-based training
-uv run python examples/real_data/parquet_dataloader_example.py
+# 3-stage pipeline walkthrough
+python examples/new_architecture/dbn_to_parquet_example.py
 
-# Core processing visualization
-uv run python examples/visualization/generate_visualization.py
+# Dynamic classification demo
+python examples/classification_analysis/dynamic_config_demo.py
 
-# Performance evaluation
-uv run python examples/random_access_evaluation/minimal_test.py
-uv run python examples/random_access_evaluation/usage_examples.py
+# Production memory-efficient training
+python examples/real_data/parquet_dataloader_example.py
 ```
 
-## Key Features Demonstrated
+### Batch Processing Examples
+```bash
+# Process multiple DBN files
+python -c "
+from represent import batch_convert_unlabeled, batch_classify_parquet_files
 
-### Performance Optimizations
-- **Pre-computed Labels**: Classification during conversion, not training
-- **Lazy Loading**: Memory usage independent of dataset size
-- **Columnar Storage**: Efficient parquet compression and querying
-- **Batch Processing**: Optimized tensor generation
+# Stage 1: Batch convert
+unlabeled_results = batch_convert_unlabeled('data/dbn/', 'data/unlabeled/')
 
-### ML Integration
-- **PyTorch Native**: Direct tensor output for training
-- **Pre-computed Classification**: 3-class price movement prediction
-- **Multi-feature Support**: Volume, variance, and trade count features
-- **Memory Efficient**: Train on datasets larger than RAM
+# Stage 2: Batch classify
+classified_results = batch_classify_parquet_files('data/unlabeled/', 'data/classified/')
 
-### Production Ready
-- **Currency Configurations**: Optimized settings for AUDUSD, GBPUSD, EURJPY
-- **Batch Conversion**: Process multiple DBN files efficiently
-- **Performance Monitoring**: Built-in benchmarking and statistics
-- **Scalable Architecture**: Linear memory scaling with dataset size
-
-## Migration from v1.x
-
-The old streaming/ring buffer architecture has been completely replaced. 
-
-**Old workflow (v1.x):**
-```python
-# DEPRECATED - Ring buffer streaming
-dataset = MarketDepthDataset(buffer_size=50000)
-dataset.add_streaming_data(data)
-representation = dataset.get_current_representation()
+print(f'Processed {len(classified_results)} files with uniform distribution')
+"
 ```
 
-**New workflow (v2.0.0):**
-```python
-# NEW - Parquet-based pipeline
-# Stage 1: Convert DBN to parquet (run once)
-convert_dbn_file(dbn_path, parquet_path, currency='AUDUSD')
+## Performance Expectations
 
-# Stage 2: Lazy loading for training
-dataloader = create_market_depth_dataloader(parquet_path, batch_size=32)
-for features, labels in dataloader:
-    # Train your model
-```
+### Stage 1: DBN Conversion
+- **Throughput**: 500+ samples/second sustained
+- **Memory**: <8GB during conversion
+- **Output**: Symbol-grouped parquet files
 
-This new architecture provides significant performance improvements and enables training on much larger datasets while using less memory.
+### Stage 2: Classification
+- **Speed**: <5ms per file with caching
+- **Quality**: <2% deviation from uniform distribution
+- **Guarantee**: Exactly 7.69% per class (13-bin)
+
+### Stage 3: ML Training
+- **Throughput**: 1000+ samples/second during training
+- **Memory**: <4GB RAM regardless of dataset size
+- **Distribution**: Guaranteed uniform class balance
+
+## Migration from v2.0.0
+
+### Removed (No Longer Needed)
+- ❌ Static config files (replaced with dynamic generation)
+- ❌ `create_market_depth_dataloader()` (use `create_parquet_dataloader()`)
+- ❌ `convert_dbn_file()` (use 3-stage pipeline instead)
+
+### New in v3.0.0
+- ✅ `convert_dbn_to_parquet()` - Stage 1: Symbol-grouped unlabeled conversion
+- ✅ `classify_parquet_file()` - Stage 2: Dynamic uniform classification
+- ✅ `create_parquet_dataloader()` - Stage 3: Memory-efficient ML training
+- ✅ Guaranteed uniform distribution for optimal ML training
+
+## Tips for Production Use
+
+1. **Memory Optimization**: Use `sample_fraction` and `cache_size` to control memory usage
+2. **Symbol Analysis**: Process symbols individually for targeted strategies
+3. **Dynamic Classification**: Let the system compute optimal thresholds from your data
+4. **Batch Processing**: Use batch functions for multiple files
+5. **High-Level API**: Use `RepresentAPI.run_complete_pipeline()` for simple workflows
+
+---
+
+**🎯 All examples demonstrate production-ready workflows with guaranteed uniform class distribution for optimal ML training performance.**

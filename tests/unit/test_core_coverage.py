@@ -5,17 +5,13 @@ Tests to improve code coverage for core modules.
 import numpy as np
 import polars as pl
 import pytest
-from represent.core import placeholder_function, reference_pipeline
+from represent.core import reference_pipeline
 from represent.data_structures import PriceLookupTable, VolumeGrid, OutputBuffer
 
 
 class TestCoreCoverage:
     """Test core module functions to improve coverage."""
 
-    def test_placeholder_function(self):
-        """Test placeholder function."""
-        result = placeholder_function()
-        assert result == "placeholder"
 
     def test_reference_pipeline_with_features(self):
         """Test reference pipeline with different feature combinations."""

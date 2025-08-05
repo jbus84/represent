@@ -1,7 +1,7 @@
 """
 Represent: High-performance market depth ML pipeline.
 
-This package provides a 3-stage architecture (v2.0.0):
+This package provides a clean 3-stage architecture (v3.0.0):
 1. DBN to unlabeled symbol-grouped parquet conversion
 2. Post-processing classification with uniform distribution
 3. Lazy loading parquet dataloader for ML training
@@ -9,17 +9,15 @@ This package provides a 3-stage architecture (v2.0.0):
 5. High-performance PyTorch integration
 """
 
-__version__ = "2.0.0"
+__version__ = "3.0.0"
 
 # V2.0.0 - 3-Stage Architecture API
 from .unlabeled_converter import convert_dbn_to_parquet, batch_convert_dbn_files as batch_convert_unlabeled
 from .parquet_classifier import classify_parquet_file, batch_classify_parquet_files
-from .converter import DBNToParquetConverter, convert_dbn_file, batch_convert_dbn_files
-from .dataloader import (
+from .lazy_dataloader import (
     LazyParquetDataset,
     LazyParquetDataLoader,
-    create_market_depth_dataloader,
-    MarketDepthDataLoader,
+    create_parquet_dataloader,
 )
 
 # Dynamic classification configuration
@@ -66,14 +64,9 @@ __all__ = [
     "batch_convert_unlabeled", 
     "classify_parquet_file",   # Stage 2: Post-processing classification
     "batch_classify_parquet_files",
-    "create_market_depth_dataloader",  # Stage 3: ML training
-    # Legacy V1.x API (maintained for compatibility)
-    "DBNToParquetConverter",
-    "convert_dbn_file",
-    "batch_convert_dbn_files",
+    "create_parquet_dataloader",  # Stage 3: ML training
     "LazyParquetDataset",
     "LazyParquetDataLoader",
-    "MarketDepthDataLoader",
     # Core processing
     "process_market_data",
     "create_processor",
@@ -110,9 +103,8 @@ __all__ = [
     # High-level convenience API
     "RepresentAPI",
     "api",
-    "convert_to_training_data",
     "load_training_dataset",
-    "create_training_dataloader",
+    "create_parquet_dataloader",
 ]
 
 
@@ -120,7 +112,6 @@ __all__ = [
 from .api import (
     RepresentAPI,
     api,
-    convert_to_training_data,
     create_training_dataloader,
     load_training_dataset,
 )
