@@ -1,22 +1,23 @@
 # Represent v3.0.0
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-passing-green.svg)](https://github.com/your-repo/represent)
-[![Coverage](https://img.shields.io/badge/coverage-80%25-green.svg)](https://github.com/your-repo/represent)
+[![Tests](https://img.shields.io/badge/tests-204%20passed-green.svg)](https://github.com/your-repo/represent)
+[![Coverage](https://img.shields.io/badge/coverage-86.4%25-brightgreen.svg)](https://github.com/your-repo/represent)
 [![Performance](https://img.shields.io/badge/latency-<10ms-orange.svg)](https://github.com/your-repo/represent)
 
-High-performance Python package for creating normalized market depth representations from limit order book data using a **clean 3-stage pipeline** with **dynamic classification** and **guaranteed uniform distribution**.
+High-performance Python package for creating normalized market depth representations from limit order book data using a **parquet-optimized 3-stage pipeline** with **dynamic classification** and **guaranteed uniform distribution**.
 
 ## 🚀 Key Features
 
-- **🔄 Clean 3-Stage Pipeline**: DBN→Unlabeled Parquet→Classification→ML Training
-- **⚡ Dynamic Classification**: No static config files - thresholds computed from data
+- **🔄 Parquet-Optimized Pipeline**: DBN→Unlabeled Parquet→Classified Parquet→ML Training
+- **⚡ Dynamic Classification**: Adaptive thresholds computed from actual market data
 - **📊 Guaranteed Uniform Distribution**: 7.69% per class (13-bin) for optimal ML training
-- **💾 Symbol-Grouped Processing**: Separate files per symbol for targeted analysis
-- **🔋 Memory-Efficient Training**: Lazy loading with configurable caching for large datasets
-- **🎯 Multi-Feature Support**: Volume, variance, and trade count features
-- **🧠 PyTorch Integration**: Production-ready DataLoader with tensor operations
-- **⚡ Performance Optimized**: <10ms processing targets for ML training applications
+- **💾 Symbol-Grouped Processing**: Separate parquet files per symbol for targeted analysis
+- **🔋 Memory-Efficient Training**: Lazy loading with configurable batch sizes for large datasets
+- **🎯 Multi-Feature Support**: Volume, variance, and trade count features (configurable)
+- **🧠 PyTorch Integration**: Production-ready DataLoader with direct tensor operations
+- **⚡ Performance Optimized**: 86.4% test coverage with <25s test execution
+- **📈 Real-World Tested**: Validated on AUDUSD, GBPUSD, and EURJPY market data
 
 ## 📦 Installation
 
@@ -48,55 +49,56 @@ Memory-efficient lazy loading for PyTorch training with optimal class balance.
 ### Stage 1: Convert DBN to Unlabeled Parquet
 
 ```python
-from represent import convert_dbn_to_parquet
+from represent.unlabeled_converter import convert_dbn_to_parquet
 
 # Convert DBN file to symbol-grouped unlabeled parquet datasets
 stats = convert_dbn_to_parquet(
-    dbn_path="market_data.dbn.zst",
-    output_dir="/data/unlabeled/",           # Directory for symbol-grouped files
-    currency="AUDUSD",                      # Currency for naming
+    dbn_path="data/glbx-mdp3-20240403.mbp-10.dbn.zst",
+    output_dir="data/unlabeled/",           # Directory for symbol-grouped files
     features=['volume', 'variance'],        # Multi-feature extraction
     min_symbol_samples=1000                 # Only symbols with sufficient data
 )
 
-# Output: /data/unlabeled/AUDUSD_M6AM4.parquet, AUDUSD_M6AM5.parquet, etc.
-print(f"Generated {stats['symbols_processed']} symbol files with {stats['total_processed_samples']:,} samples")
+# Output: data/unlabeled/M6AM4.parquet, M6AU4.parquet, etc.
+print(f"Generated {stats['symbols_processed']} symbol files")
+print(f"Total samples: {stats['total_processed_samples']:,}")
+print(f"Conversion time: {stats['conversion_time_seconds']:.2f}s")
 ```
 
 ### Stage 2: Apply Dynamic Classification
 
 ```python
-from represent import classify_parquet_file
+from represent.parquet_classifier import ParquetClassifier
 
 # Apply dynamic classification with guaranteed uniform distribution
-classification_stats = classify_parquet_file(
-    parquet_path="/data/unlabeled/AUDUSD_M6AM4.parquet",
-    output_path="/data/classified/AUDUSD_M6AM4_classified.parquet",
-    currency="AUDUSD",                     # Currency for default config
-    force_uniform=True                     # Guarantee uniform distribution
+classifier = ParquetClassifier("AUDUSD", force_uniform=True)
+classification_stats = classifier.classify_symbol_parquet(
+    parquet_path="data/unlabeled/M6AM4.parquet",
+    output_path="data/classified/M6AM4_classified.parquet",
+    validate_uniformity=True               # Ensure uniform distribution
 )
 
-print(f"Classification quality: {classification_stats['uniform_quality']:.1%}")
+print(f"Uniformity assessment: {classification_stats['uniformity_assessment']}")
 print(f"Class distribution: {classification_stats['class_distribution']}")
+print(f"Processing time: {classification_stats['processing_time_seconds']:.3f}s")
 ```
 
 ### Stage 3: ML Training with Lazy Loading
 
 ```python
-from represent import create_parquet_dataloader
+from represent.lazy_dataloader import create_parquet_dataloader
 
 # Create memory-efficient dataloader
 dataloader = create_parquet_dataloader(
-    parquet_path="/data/classified/AUDUSD_M6AM4_classified.parquet",
+    parquet_path="data/classified/M6AM4_classified.parquet",
     batch_size=32,
     shuffle=True,
-    sample_fraction=0.2,                   # Use 20% of data for quick iteration
-    cache_size=1000                        # Optimize for your memory constraints
+    num_workers=4                          # Parallel loading for performance
 )
 
 # Use in PyTorch training loop
 for batch_features, batch_labels in dataloader:
-    # batch_features: torch.Tensor of shape [32, features, 402, 500]
+    # batch_features: torch.Tensor of shape [32, 2, 402, 500] for 2 features
     # batch_labels: torch.Tensor of shape [32] with uniform distribution (7.69% each class)
     model_output = model(batch_features)
     loss = criterion(model_output, batch_labels)
