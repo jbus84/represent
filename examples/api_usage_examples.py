@@ -36,7 +36,7 @@ def example_1_complete_pipeline():
             force_uniform=True
         )
         
-        print(f"✅ Pipeline complete!")
+        print("✅ Pipeline complete!")
         print(f"   📊 Symbols processed: {results['total_symbols']}")
         print(f"   📊 Total samples: {results['total_samples']:,}")
         print(f"   📁 Classified data: {results['classified_directory']}")
@@ -62,7 +62,7 @@ def example_2_stage_by_stage():
             min_symbol_samples=1000
         )
         
-        print(f"✅ Stage 1 complete:")
+        print("✅ Stage 1 complete:")
         print(f"   📊 Symbols: {conversion_stats['symbols_processed']}")
         print(f"   📊 Samples: {conversion_stats['total_processed_samples']:,}")
         
@@ -75,9 +75,9 @@ def example_2_stage_by_stage():
             force_uniform=True  # Guaranteed uniform distribution
         )
         
-        print(f"✅ Stage 2 complete:")
+        print("✅ Stage 2 complete:")
         print(f"   📊 Quality: {classification_stats.get('uniform_quality', 'N/A')}")
-        print(f"   📊 Distribution: Uniform (7.69% per class)")
+        print("   📊 Distribution: Uniform (7.69% per class)")
         
         # Stage 3: ML training dataloader
         print("\n🔄 Stage 3: Creating ML training dataloader...")
@@ -88,7 +88,7 @@ def example_2_stage_by_stage():
             sample_fraction=0.2  # Use 20% for quick iteration
         )
         
-        print(f"✅ Stage 3 complete: Dataloader ready for training")
+        print("✅ Stage 3 complete: Dataloader ready for training")
         
         # Demonstrate training loop
         print("\n🔄 Demo training loop...")
@@ -117,7 +117,7 @@ def example_3_dynamic_classification():
             target_samples=5000
         )
         
-        print(f"✅ Dynamic config generated:")
+        print("✅ Dynamic config generated:")
         print(f"   🎯 Quality: {config_result['metrics']['validation_metrics']['quality']:.1%}")
         print(f"   📊 Method: {config_result['generation_method']}")
         print(f"   💱 Currency: {config_result['currency']}")
@@ -127,9 +127,9 @@ def example_3_dynamic_classification():
         print(f"   🔧 Bins: {config.classification.nbins}")
         print(f"   🔧 Lookforward: {config.classification.lookforward_input}")
         
-    except (FileNotFoundError, ValueError) as e:
+    except (FileNotFoundError, ValueError):
         print("ℹ️  Skipping - no parquet file found (run Stage 1 first)")
-        print(f"   💡 This example would generate optimal classification thresholds from your data")
+        print("   💡 This example would generate optimal classification thresholds from your data")
 
 
 def example_4_batch_processing():
@@ -147,7 +147,7 @@ def example_4_batch_processing():
             pattern="*.dbn*"
         )
         
-        print(f"✅ Batch conversion complete:")
+        print("✅ Batch conversion complete:")
         print(f"   📊 Files processed: {len(unlabeled_results)}")
         
         # Batch classify the results
@@ -158,12 +158,12 @@ def example_4_batch_processing():
             force_uniform=True
         )
         
-        print(f"✅ Batch classification complete:")
+        print("✅ Batch classification complete:")
         print(f"   📊 Files classified: {len(classified_results)}")
         
-    except (FileNotFoundError, ValueError) as e:
+    except (FileNotFoundError, ValueError):
         print("ℹ️  Skipping - no input directory found (example only)")
-        print(f"   💡 This would process multiple DBN files in one command")
+        print("   💡 This would process multiple DBN files in one command")
 
 
 def example_5_currency_configurations():

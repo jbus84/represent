@@ -9,8 +9,7 @@ import polars as pl
 import torch
 import pytest
 
-from represent.dataloader import create_market_depth_dataloader
-from represent.lazy_dataloader import LazyParquetDataset, LazyParquetDataLoader
+from represent.lazy_dataloader import LazyParquetDataset, LazyParquetDataLoader, create_parquet_dataloader
 from represent.config import load_currency_config
 
 
@@ -205,11 +204,11 @@ class TestLazyParquetDataLoader:
             assert batch_count >= 3
 
     def test_factory_function(self):
-        """Test create_market_depth_dataloader factory function."""
+        """Test create_parquet_dataloader factory function."""
         with tempfile.TemporaryDirectory() as temp_dir:
             parquet_path = self.create_test_parquet(Path(temp_dir))
 
-            dataloader = create_market_depth_dataloader(
+            dataloader = create_parquet_dataloader(
                 parquet_path=parquet_path, batch_size=16, sample_fraction=0.5
             )
 
@@ -284,7 +283,7 @@ class TestIntegration:
             labeled_df.write_parquet(labeled_parquet)
 
             # Test dataloader with labeled data
-            dataloader = create_market_depth_dataloader(
+            dataloader = create_parquet_dataloader(
                 parquet_path=labeled_parquet, batch_size=8, sample_fraction=1.0
             )
 
@@ -330,7 +329,7 @@ class TestPerformance:
             df.write_parquet(parquet_path)
 
             # Test dataloader performance
-            dataloader = create_market_depth_dataloader(
+            dataloader = create_parquet_dataloader(
                 parquet_path=parquet_path,
                 batch_size=32,
                 sample_fraction=0.1,  # Use 10% for quick test
@@ -388,7 +387,7 @@ class TestPerformance:
             df.write_parquet(parquet_path)
 
             # Create dataloader with small cache
-            dataloader = create_market_depth_dataloader(
+            dataloader = create_parquet_dataloader(
                 parquet_path=parquet_path,
                 batch_size=16,
                 sample_fraction=0.2,  # Use 20% of data

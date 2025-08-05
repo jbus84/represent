@@ -103,14 +103,14 @@ def test_core_functions():
 
 def test_dataloader_factory():
     """Test dataloader factory function."""
-    from represent.dataloader import create_market_depth_dataloader
+    from represent.lazy_dataloader import create_parquet_dataloader
 
     # Function should be importable
-    assert callable(create_market_depth_dataloader)
+    assert callable(create_parquet_dataloader)
 
     # Should raise error with missing file
     with pytest.raises((FileNotFoundError, OSError)):
-        create_market_depth_dataloader(parquet_path="/nonexistent/file.parquet", batch_size=32)
+        create_parquet_dataloader(parquet_path="/nonexistent/file.parquet", batch_size=32)
 
 
 def test_config_file_loading():

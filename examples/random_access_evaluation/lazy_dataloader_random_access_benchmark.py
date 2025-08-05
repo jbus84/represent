@@ -30,7 +30,7 @@ import torch
 # Add represent to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from represent.lazy_dataloader import LazyParquetDataset
+from represent.lazy_dataloader import LazyParquetDataset, create_parquet_dataloader
 
 # Performance targets from CLAUDE.md
 TARGET_SINGLE_SAMPLE_MS = 1.0  # <1ms per sample
@@ -212,7 +212,7 @@ class RandomAccessBenchmark:
         print("-" * 60)
 
         # Create dataloader with random sampling
-        dataloader = create_market_depth_dataloader(
+        dataloader = create_parquet_dataloader(
             parquet_path=self.parquet_path,
             batch_size=batch_size,
             shuffle=True,  # Enable random sampling

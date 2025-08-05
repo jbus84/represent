@@ -131,6 +131,8 @@ class UnlabeledDBNConverter:
             for i in range(0, len(symbol_data), chunk_size):
                 chunk_end = min(i + chunk_size, len(symbol_data))
                 chunk = symbol_data[i:chunk_end]
+                if not isinstance(chunk, pl.DataFrame):
+                    continue
 
                 # Generate market depth samples for this chunk
                 chunk_samples = self._process_symbol_chunk(chunk, symbol)
@@ -238,17 +240,17 @@ class UnlabeledDBNConverter:
 
             # Generate market depth representation
             try:
-                market_depth_tensor = self.processor.process(sample_window)
+                market_depth_representation = self.processor.process(sample_window)
 
                 # Convert to numpy array if it's a tensor
-                if hasattr(market_depth_tensor, "numpy"):
-                    features_array = market_depth_tensor.numpy()
+                import numpy as np
+                if not isinstance(market_depth_representation, np.ndarray):
+                    features_array = market_depth_representation.numpy()
                 else:
-                    features_array = market_depth_tensor
+                    features_array = market_depth_representation
                 
                 # Ensure we have a numpy array
                 if not hasattr(features_array, 'tobytes'):
-                    import numpy as np
                     features_array = np.array(features_array)
 
                 # Create sample record (no classification label)

@@ -12,7 +12,7 @@ import time
 # Add the represent package to the path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from represent import create_market_depth_dataloader
+from represent import create_parquet_dataloader
 from represent.api import RepresentAPI
 
 
@@ -58,7 +58,7 @@ def test_existing_classified_file():
     try:
         # Create dataloader
         print("🔄 Creating dataloader...")
-        dataloader = create_market_depth_dataloader(
+        dataloader = create_parquet_dataloader(
             parquet_path=str(test_file),
             batch_size=4,  # Small batch size
             shuffle=True,

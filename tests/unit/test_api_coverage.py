@@ -1,9 +1,12 @@
 """
-Tests for API coverage improvement.
+Enhanced tests for API module coverage.
+Focused on core functionality with performance optimizations.
 """
 
 import pytest
 from pathlib import Path
+import polars as pl
+import numpy as np
 
 # Import API components directly to avoid torch issues
 import sys
@@ -18,6 +21,21 @@ try:
 except ImportError as e:
     print(f"API import failed: {e}")
     API_AVAILABLE = False
+
+
+def create_mock_classified_parquet(n_samples: int = 50) -> pl.DataFrame:
+    """Create mock classified parquet data for testing."""
+    np.random.seed(42)
+    
+    mock_tensor_data = np.random.rand(n_samples, 402 * 500).astype(np.float32)
+    
+    return pl.DataFrame({
+        "market_depth_features": [data.tobytes() for data in mock_tensor_data],
+        "classification_label": np.random.randint(0, 13, n_samples),
+        "feature_shape": ["(402, 500)"] * n_samples,
+        "sample_id": [f"test_{i}" for i in range(n_samples)],
+        "symbol": ["M6AM4"] * n_samples,
+    })
 
 
 @pytest.mark.skipif(not API_AVAILABLE, reason="API imports not available")

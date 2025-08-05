@@ -18,7 +18,6 @@ Features demonstrated:
 import time
 from pathlib import Path
 
-import torch
 import torch.nn as nn
 import torch.optim as optim
 
@@ -115,8 +114,8 @@ def stage_2_dynamic_classification(unlabeled_file):
     
     print(f"✅ Stage 2 Complete! ({end_time - start_time:.1f}s)")
     print(f"   🎯 Classification quality: {classification_stats.get('uniform_quality', 'High')}")
-    print(f"   📊 Distribution: Uniform (7.69% per class)")
-    print(f"   📊 Classes: 0-12 (13-bin classification)")
+    print("   📊 Distribution: Uniform (7.69% per class)")
+    print("   📊 Classes: 0-12 (13-bin classification)")
     print(f"   📁 Output file: {classified_file}")
     
     # Show file size
@@ -147,14 +146,14 @@ def stage_3_ml_training(classified_file):
         cache_size=1000       # Optimize for memory
     )
     
-    print(f"✅ Dataloader created with guaranteed uniform distribution")
-    print(f"   🎯 Batch size: 32")
-    print(f"   🔀 Shuffled: Yes")
-    print(f"   📊 Sample fraction: 20% (for quick demo)")
-    print(f"   💾 Cache size: 1000 samples")
+    print("✅ Dataloader created with guaranteed uniform distribution")
+    print("   🎯 Batch size: 32")
+    print("   🔀 Shuffled: Yes")
+    print("   📊 Sample fraction: 20% (for quick demo)")
+    print("   💾 Cache size: 1000 samples")
     
     # Create simple CNN model for demo
-    print(f"\n🏗️  Creating PyTorch model...")
+    print("\n🏗️  Creating PyTorch model...")
     model = nn.Sequential(
         nn.Conv2d(2, 32, 3),                   # 2 features: volume + variance
         nn.ReLU(),
@@ -166,12 +165,12 @@ def stage_3_ml_training(classified_file):
     optimizer = optim.Adam(model.parameters(), lr=0.001)
     criterion = nn.CrossEntropyLoss()
     
-    print(f"   🧠 Model: CNN (2 features → 13 classes)")
-    print(f"   🎯 Optimizer: Adam")
-    print(f"   📊 Loss: CrossEntropyLoss")
+    print("   🧠 Model: CNN (2 features → 13 classes)")
+    print("   🎯 Optimizer: Adam")
+    print("   📊 Loss: CrossEntropyLoss")
     
     # Demonstrate training loop
-    print(f"\n🔄 Running demo training loop...")
+    print("\n🔄 Running demo training loop...")
     
     model.train()
     total_batches = 0
@@ -218,12 +217,12 @@ def stage_3_ml_training(classified_file):
     avg_loss = total_loss / total_batches
     samples_per_sec = (total_batches * 32) / training_time
     
-    print(f"\n✅ Training Demo Complete!")
+    print("\n✅ Training Demo Complete!")
     print(f"   ⏱️  Training time: {training_time:.2f}s")
     print(f"   📊 Total batches: {total_batches}")
     print(f"   📊 Average loss: {avg_loss:.4f}")
     print(f"   ⚡ Throughput: {samples_per_sec:.1f} samples/sec")
-    print(f"   🎯 Class balance: Guaranteed uniform (optimal for ML)")
+    print("   🎯 Class balance: Guaranteed uniform (optimal for ML)")
 
 
 def demonstrate_high_level_api():
@@ -241,19 +240,19 @@ def demonstrate_high_level_api():
     print(f"   🏗️  Architecture: {info['architecture']}")
     print(f"   🎯 Features: {info['supported_features']}")
     
-    print(f"\n🔄 High-level API can run complete pipeline in one call:")
-    print(f"   api.run_complete_pipeline(")
-    print(f"       dbn_path='data.dbn',")
-    print(f"       output_base_dir='/data/pipeline/',")
-    print(f"       currency='AUDUSD',")
-    print(f"       features=['volume', 'variance'],")
-    print(f"       force_uniform=True")
-    print(f"   )")
+    print("\n🔄 High-level API can run complete pipeline in one call:")
+    print("   api.run_complete_pipeline(")
+    print("       dbn_path='data.dbn',")
+    print("       output_base_dir='/data/pipeline/',")
+    print("       currency='AUDUSD',")
+    print("       features=['volume', 'variance'],")
+    print("       force_uniform=True")
+    print("   )")
     
-    print(f"\n💡 This automatically runs all 3 stages:")
-    print(f"   1. DBN → Unlabeled Parquet (Symbol-Grouped)")
-    print(f"   2. Dynamic Classification (Uniform Distribution)")
-    print(f"   3. ML-Ready Classified Data")
+    print("\n💡 This automatically runs all 3 stages:")
+    print("   1. DBN → Unlabeled Parquet (Symbol-Grouped)")
+    print("   2. Dynamic Classification (Uniform Distribution)")
+    print("   3. ML-Ready Classified Data")
 
 
 def main():

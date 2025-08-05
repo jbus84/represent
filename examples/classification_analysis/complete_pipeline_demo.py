@@ -22,7 +22,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from represent import (
-    create_market_depth_dataloader,  # Stage 3: ML training
+    create_parquet_dataloader,  # Stage 3: ML training
 )
 
 from represent.unlabeled_converter import UnlabeledDBNConverter
@@ -245,7 +245,7 @@ class CompletePipelineDemo:
             # Create lazy dataloader
             print("\n🔄 Creating lazy ML training dataloader...")
             
-            dataloader = create_market_depth_dataloader(
+            dataloader = create_parquet_dataloader(
                 parquet_path=str(largest_file),
                 batch_size=16,
                 shuffle=True,

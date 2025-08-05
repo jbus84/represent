@@ -128,9 +128,8 @@ def test_classification_with_sampling(data: pl.DataFrame, n_tests: int = 5000) -
     
     # Initialize converter
     currency_config = load_currency_config("AUDUSD")
-    converter = DBNToParquetConverter(
-        classification_config=currency_config.classification,
-        currency="AUDUSD"
+    converter = UnlabeledDBNConverter(
+        features=["volume", "variance"]
     )
     
     labels = []

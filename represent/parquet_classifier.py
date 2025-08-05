@@ -237,9 +237,10 @@ class ParquetClassifier:
         """Apply classification logic to DataFrame samples."""
         
         # Extract necessary configuration
-        lookback_rows = self.classification_config.lookback_rows
-        lookforward_input = self.classification_config.lookforward_input
-        lookforward_offset = self.classification_config.lookforward_offset
+        # Note: These are available but not used in current implementation
+        # lookback_rows = self.classification_config.lookback_rows
+        # lookforward_input = self.classification_config.lookforward_input
+        # lookforward_offset = self.classification_config.lookforward_offset
 
         classifications = []
         valid_samples = []
@@ -340,7 +341,6 @@ class ParquetClassifier:
         total_samples = len(df)
         
         # Calculate deviations from uniform distribution
-        target_count = total_samples / self.classification_config.nbins
         target_percentage = 100.0 / self.classification_config.nbins
         
         distribution = []
@@ -392,7 +392,7 @@ class ParquetClassifier:
         
         # For now, return the current classification
         classified_df = self._apply_classification_to_dataframe(df)
-        validation_results = self._validate_uniform_distribution(classified_df)
+        # validation_results = self._validate_uniform_distribution(classified_df)
         
         optimization_results = {
             "optimization_applied": False,

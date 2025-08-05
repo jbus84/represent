@@ -101,6 +101,7 @@ __all__ = [
     "generate_classification_config_from_parquet",
     "classify_with_generated_config",
     # High-level convenience API
+    "create_training_dataloader",
     "RepresentAPI",
     "api",
     "load_training_dataset",

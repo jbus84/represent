@@ -112,7 +112,7 @@ class ClassificationConfigGenerator:
         
         return price_changes
     
-    def calculate_quantile_thresholds(self, price_changes: np.ndarray) -> Dict[str, Union[List[float], Dict]]:
+    def calculate_quantile_thresholds(self, price_changes: np.ndarray) -> Dict[str, Union[List[float], Dict, str]]:
         """
         Calculate quantile-based classification thresholds.
         
@@ -141,7 +141,7 @@ class ClassificationConfigGenerator:
             idx = int(q * n_samples)
             if idx >= n_samples:
                 idx = n_samples - 1
-            thresholds.append(sorted_data[idx])
+            thresholds.append(float(sorted_data[idx]))
         
         # Calculate statistics
         data_stats = {
@@ -163,7 +163,7 @@ class ClassificationConfigGenerator:
         
         # Extract exactly 6 positive thresholds for compatibility with ClassificationConfig
         middle_idx = len(thresholds) // 2
-        positive_thresholds = {}
+        positive_thresholds: Dict[str, float] = {}
         
         # For 13-bin config, we need exactly 6 positive thresholds (bin_1 through bin_6)
         # Take thresholds from the second half of sorted thresholds
@@ -235,7 +235,7 @@ class ClassificationConfigGenerator:
             labels[i] = min(bin_idx, self.nbins - 1)
         
         # Calculate distribution
-        distribution = []
+        distribution: List[float] = []
         for class_idx in range(self.nbins):
             count = np.sum(labels == class_idx)
             percentage = (count / len(labels)) * 100.0
@@ -244,7 +244,7 @@ class ClassificationConfigGenerator:
         # Calculate quality metrics
         deviations = [abs(d - self.target_percent) for d in distribution]
         max_deviation = max(deviations) if deviations else float('inf')
-        avg_deviation = np.mean(deviations) if deviations else float('inf')
+        avg_deviation = float(np.mean(deviations)) if deviations else float('inf')
         
         # Determine quality rating
         if max_deviation < 1.0:
@@ -312,18 +312,26 @@ class ClassificationConfigGenerator:
         # Calculate quantile thresholds
         threshold_info = self.calculate_quantile_thresholds(training_data)
         
+        all_thresholds = threshold_info.get('all_thresholds')
+        if not isinstance(all_thresholds, list):
+            raise TypeError(f"Expected 'all_thresholds' to be a list, but got {type(all_thresholds)}")
+
         # Validate thresholds
         validation_metrics = self.validate_thresholds(
-            threshold_info['all_thresholds'], 
+            all_thresholds, 
             validation_data
         ) if len(validation_data) > 0 else {}
         
+        positive_thresholds = threshold_info.get('positive_thresholds')
+        if not isinstance(positive_thresholds, dict):
+            raise TypeError(f"Expected 'positive_thresholds' to be a dict, but got {type(positive_thresholds)}")
+
         # Create ClassificationConfig with proper bin_thresholds structure
         # Convert positive thresholds to the expected nested structure
-        bin_thresholds = {
+        bin_thresholds: Dict[int, Dict[int, Dict[Union[int, str], Dict[str, float]]]] = {
             self.nbins: {
                 100: {  # ticks_per_bin
-                    lookforward_input: threshold_info['positive_thresholds']
+                    lookforward_input: positive_thresholds
                 }
             }
         }
