@@ -9,7 +9,7 @@ This package provides a clean 3-stage architecture (v3.0.0):
 5. High-performance PyTorch integration
 """
 
-__version__ = "3.0.0"
+__version__ = "1.10.0"
 
 # V2.0.0 - 3-Stage Architecture API
 from .unlabeled_converter import convert_dbn_to_parquet, batch_convert_dbn_files as batch_convert_unlabeled

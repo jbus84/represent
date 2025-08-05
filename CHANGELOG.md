@@ -2,6 +2,29 @@
 
 <!-- version list -->
 
+## v1.10.0 (2025-08-05)
+
+### Bug Fixes
+
+- **lint**: Address ruff, mypy, and pyright errors
+  ([`759b5a1`](https://github.com/jbus84/represent/commit/759b5a185035442b4896de44b645cecd39f04355))
+
+### Documentation
+
+- Update readme
+  ([`7845702`](https://github.com/jbus84/represent/commit/78457021c1f46036e5a82f6d1f37d72d70bac6d6))
+
+### Features
+
+- Add dynamic classification config generation
+  ([`1d39ed3`](https://github.com/jbus84/represent/commit/1d39ed3cfdaa057b6b8979306edb787c43504935))
+
+### Refactoring
+
+- Remove static currency config files
+  ([`60cfc49`](https://github.com/jbus84/represent/commit/60cfc494d0a88a1f1c2cd801caaab8fa10a662df))
+
+
 ## v1.9.0 (2025-08-04)
 
 ### Features
