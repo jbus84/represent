@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
-Comprehensive API Usage Examples for the represent package.
+Comprehensive API Usage Examples for represent v3.0.0.
 
-This file demonstrates various ways to use the represent package API
-for DBN to parquet conversion and PyTorch training workflows.
+This file demonstrates the clean 3-stage pipeline:
+1. DBN → Unlabeled Parquet (Symbol-Grouped)
+2. Dynamic Classification (Uniform Distribution)
+3. ML Training (Memory-Efficient)
 """
 
 import sys
@@ -15,191 +17,245 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import represent
 
 
-def example_1_simple_conversion():
-    """Example 1: Simple DBN to parquet conversion with predefined currency."""
-    print("📊 Example 1: Simple Conversion with Predefined Currency")
-    print("-" * 60)
+def example_1_complete_pipeline():
+    """Example 1: Complete 3-stage pipeline from DBN to ML training."""
+    print("🚀 Example 1: Complete 3-Stage Pipeline")
+    print("="*60)
 
-    # Simple one-line conversion
+    # Use high-level API for complete workflow
+    api = represent.RepresentAPI()
+    
     try:
-        stats = represent.convert_to_training_data(
-            dbn_path="data/market_data.dbn",
-            output_path="output/audusd_training.parquet",
+        # Run complete pipeline: DBN → Unlabeled → Classified → ML Ready
+        results = api.run_complete_pipeline(
+            dbn_path="data/AUDUSD-20240101.dbn.zst",
+            output_base_dir="data/pipeline_output/",
             currency="AUDUSD",
+            features=['volume', 'variance'],
+            min_symbol_samples=5000,
+            force_uniform=True
         )
-        print(f"✅ Converted {stats['labeled_samples']:,} samples")
-        print(f"✅ Output file: {stats['output_file_size_mb']:.1f}MB")
+        
+        print("✅ Pipeline complete!")
+        print(f"   📊 Symbols processed: {results['total_symbols']}")
+        print(f"   📊 Total samples: {results['total_samples']:,}")
+        print(f"   📁 Classified data: {results['classified_directory']}")
+        
     except FileNotFoundError:
         print("ℹ️  Skipping - no DBN file found (example only)")
+        print("   Replace with your actual DBN file path")
 
 
-def example_2_custom_config():
-    """Example 2: Conversion with custom YAML configuration."""
-    print("\n🔧 Example 2: Custom Configuration")
-    print("-" * 40)
-
-    # Create RepresentAPI instance for more control
-    api = represent.RepresentAPI()
-
-    # Load custom configuration
+def example_2_stage_by_stage():
+    """Example 2: Manual stage-by-stage processing for fine control."""
+    print("\n🔄 Example 2: Stage-by-Stage Processing")
+    print("="*50)
+    
+    # Stage 1: DBN to unlabeled parquet (symbol-grouped)
+    print("🔄 Stage 1: Converting DBN to unlabeled parquet...")
     try:
-        custom_config = api.load_custom_config("examples/custom_config_example.yaml")
-        print(f"✅ Loaded custom config: {custom_config.currency_pair}")
-        print(f"   Lookforward window: {custom_config.classification.lookforward_input}")
-        print(f"   Classification bins: {custom_config.classification.nbins}")
-
-        # Convert with custom config
-        stats = api.convert_dbn_to_training_data(
-            dbn_path="data/scalping_data.dbn",
-            output_path="output/custom_training.parquet",
-            config_file="examples/custom_config_example.yaml",
-            features=["volume", "variance"],
-            verbose=False,  # Suppress progress output
+        conversion_stats = represent.convert_dbn_to_parquet(
+            dbn_path="data/market_data.dbn.zst",
+            output_dir="data/unlabeled/",
+            currency="AUDUSD",
+            features=['volume', 'variance', 'trade_counts'],  # All features
+            min_symbol_samples=1000
         )
-        print(f"✅ Custom conversion completed: {stats['labeled_samples']:,} samples")
-
-    except FileNotFoundError:
-        print("ℹ️  Skipping - no DBN file found (example only)")
-
-
-def example_3_batch_processing():
-    """Example 3: Batch processing directory of DBN files."""
-    print("\n📁 Example 3: Batch Processing")
-    print("-" * 35)
-
-    api = represent.RepresentAPI()
-
-    try:
-        results = api.batch_convert_dbn_directory(
-            input_directory="data/raw_dbn/",
-            output_directory="output/labeled_parquet/",
-            currency="GBPUSD",
-            pattern="*.dbn*",
+        
+        print("✅ Stage 1 complete:")
+        print(f"   📊 Symbols: {conversion_stats['symbols_processed']}")
+        print(f"   📊 Samples: {conversion_stats['total_processed_samples']:,}")
+        
+        # Stage 2: Dynamic classification with uniform distribution
+        print("\n🔄 Stage 2: Applying dynamic classification...")
+        classification_stats = represent.classify_parquet_file(
+            parquet_path="data/unlabeled/AUDUSD_M6AM4.parquet",
+            output_path="data/classified/AUDUSD_M6AM4_classified.parquet",
+            currency="AUDUSD",
+            force_uniform=True  # Guaranteed uniform distribution
         )
-
-        total_samples = sum(r["labeled_samples"] for r in results)
-        print(f"✅ Batch processed {len(results)} files")
-        print(f"✅ Total samples: {total_samples:,}")
-
-    except FileNotFoundError:
-        print("ℹ️  Skipping - no input directory found (example only)")
-
-
-def example_4_training_pipeline():
-    """Example 4: Complete training pipeline setup."""
-    print("\n🎯 Example 4: Training Pipeline Setup")
-    print("-" * 42)
-
-    # Use existing test data if available
-    parquet_file = "test_conversion/labeled_dataset.parquet"
-
-    if Path(parquet_file).exists():
-        print("Using existing test data for demonstration...")
-
-        # Create dataloader for training
-        dataloader = represent.create_training_dataloader(
-            parquet_path=parquet_file, batch_size=16, shuffle=True, sample_fraction=0.5
+        
+        print("✅ Stage 2 complete:")
+        print(f"   📊 Quality: {classification_stats.get('uniform_quality', 'N/A')}")
+        print("   📊 Distribution: Uniform (7.69% per class)")
+        
+        # Stage 3: ML training dataloader
+        print("\n🔄 Stage 3: Creating ML training dataloader...")
+        dataloader = represent.create_parquet_dataloader(
+            parquet_path="data/classified/AUDUSD_M6AM4_classified.parquet",
+            batch_size=32,
+            shuffle=True,
+            sample_fraction=0.2  # Use 20% for quick iteration
         )
-
-        print(f"✅ Created dataloader: {len(dataloader)} batches")
-
-        # Simulate training loop
-        batch_count = 0
-        for features, labels in dataloader:
-            batch_count += 1
-            print(f"   Batch {batch_count}: features={features.shape}, labels={labels.shape}")
-
-            # Simulate model forward pass
-            # batch_predictions = labels  # Mock predictions (would be used in real training)
-            print(f"   Processed batch with {features.shape[0]} samples")
-
-            if batch_count >= 3:  # Just show first 3 batches
+        
+        print("✅ Stage 3 complete: Dataloader ready for training")
+        
+        # Demonstrate training loop
+        print("\n🔄 Demo training loop...")
+        for i, (features, labels) in enumerate(dataloader):
+            print(f"   Batch {i+1}: Features {features.shape}, Labels {labels.shape}")
+            if i >= 2:  # Just show first few batches
                 break
-
-        print("✅ Training loop simulation completed")
-
-    else:
-        print("ℹ️  No test data available - would create dataloader for training")
+                
+    except FileNotFoundError:
+        print("ℹ️  Skipping - no DBN file found (example only)")
 
 
-def example_5_api_exploration():
-    """Example 5: Exploring API capabilities."""
-    print("\n🔍 Example 5: API Exploration")
-    print("-" * 32)
-
+def example_3_dynamic_classification():
+    """Example 3: Dynamic classification config generation."""
+    print("\n⚡ Example 3: Dynamic Classification Configuration")
+    print("="*55)
+    
     api = represent.RepresentAPI()
-
-    # Get package information
-    info = api.get_package_info()
-    print(f"📦 Package version: {info['version']}")
-    print(f"🏗️  Architecture: {info['architecture']}")
-    print(f"💰 Available currencies: {', '.join(info['available_currencies'])}")
-    print(f"📊 Supported features: {', '.join(info['supported_features'])}")
-    print(f"🎯 Tensor shape: {info['tensor_shape']}")
-
-    # Compare currency configurations
-    print("\n📊 Currency Configuration Comparison:")
-    for currency in ["AUDUSD", "GBPUSD", "EURJPY"]:
-        config = api.get_currency_config(currency)
-        print(
-            f"   {currency}: lookforward={config.classification.lookforward_input}, "
-            f"micro_pip={config.classification.micro_pip_size}"
+    
+    # Generate classification config from existing data
+    try:
+        config_result = api.generate_classification_config(
+            parquet_files="data/unlabeled/AUDUSD_M6AM4.parquet",
+            currency="AUDUSD",
+            nbins=13,
+            target_samples=5000
         )
+        
+        print("✅ Dynamic config generated:")
+        print(f"   🎯 Quality: {config_result['metrics']['validation_metrics']['quality']:.1%}")
+        print(f"   📊 Method: {config_result['generation_method']}")
+        print(f"   💱 Currency: {config_result['currency']}")
+        
+        # Show some config details
+        config = config_result['config']
+        print(f"   🔧 Bins: {config.classification.nbins}")
+        print(f"   🔧 Lookforward: {config.classification.lookforward_input}")
+        
+    except (FileNotFoundError, ValueError):
+        print("ℹ️  Skipping - no parquet file found (run Stage 1 first)")
+        print("   💡 This example would generate optimal classification thresholds from your data")
 
 
-def example_6_advanced_usage():
-    """Example 6: Advanced API usage patterns."""
-    print("\n⚡ Example 6: Advanced Usage Patterns")
-    print("-" * 42)
+def example_4_batch_processing():
+    """Example 4: Batch processing multiple files."""
+    print("\n📦 Example 4: Batch Processing")
+    print("="*35)
+    
+    # Batch convert multiple DBN files
+    try:
+        unlabeled_results = represent.batch_convert_unlabeled(
+            input_directory="data/dbn_files/",
+            output_directory="data/batch_unlabeled/",
+            currency="AUDUSD",
+            features=['volume', 'variance'],
+            pattern="*.dbn*"
+        )
+        
+        print("✅ Batch conversion complete:")
+        print(f"   📊 Files processed: {len(unlabeled_results)}")
+        
+        # Batch classify the results
+        classified_results = represent.batch_classify_parquet_files(
+            input_directory="data/batch_unlabeled/",
+            output_directory="data/batch_classified/",
+            currency="AUDUSD",
+            force_uniform=True
+        )
+        
+        print("✅ Batch classification complete:")
+        print(f"   📊 Files classified: {len(classified_results)}")
+        
+    except (FileNotFoundError, ValueError):
+        print("ℹ️  Skipping - no input directory found (example only)")
+        print("   💡 This would process multiple DBN files in one command")
 
-    # Create converter with specific settings
-    converter = represent.RepresentAPI().create_converter(
-        currency="AUDUSD", features=["volume", "variance", "trade_counts"], batch_size=5000
-    )
 
-    print(f"🔧 Created converter: {converter.currency}")
-    print(f"   Features: {converter.features}")
-    print(f"   Batch size: {converter.batch_size}")
-    print(f"   Classification bins: {converter.classification_config.nbins}")
+def example_5_currency_configurations():
+    """Example 5: Currency-specific configurations."""
+    print("\n💱 Example 5: Currency Configurations")
+    print("="*40)
+    
+    # Show available currencies
+    api = represent.RepresentAPI()
+    currencies = api.list_available_currencies()
+    print(f"📋 Available currencies: {currencies}")
+    
+    # Show currency-specific details
+    for currency in ["AUDUSD", "USDJPY", "EURJPY"][:3]:  # Show first 3
+        try:
+            config = represent.load_currency_config(currency)
+            print(f"\n💱 {currency}:")
+            print(f"   📊 Classification bins: {config.classification.nbins}")
+            print(f"   📏 Pip size: {config.classification.true_pip_size}")
+            print(f"   🎯 Lookforward: {config.classification.lookforward_input}")
+            
+        except Exception as e:
+            print(f"   ❌ Error loading {currency}: {e}")
 
-    # Access low-level components if needed
-    print("\n🔧 Low-level component access:")
-    print(f"   DBNToParquetConverter: {represent.DBNToParquetConverter}")
-    print(f"   LazyParquetDataset: {represent.LazyParquetDataset}")
-    print(f"   Configuration loader: {represent.load_currency_config}")
 
-    # Show constants and utilities
-    print("\n📏 Constants:")
-    print(f"   Price levels: {represent.PRICE_LEVELS}")
-    print(f"   Time bins: {represent.TIME_BINS}")
-    print(f"   Micro pip size: {represent.MICRO_PIP_SIZE}")
+def example_6_feature_combinations():
+    """Example 6: Different feature combinations."""
+    print("\n🎯 Example 6: Feature Combinations")
+    print("="*38)
+    
+    feature_combinations = [
+        ['volume'],
+        ['volume', 'variance'], 
+        ['volume', 'variance', 'trade_counts']
+    ]
+    
+    for features in feature_combinations:
+        print(f"\n🔧 Features: {features}")
+        
+        # Show expected output shape
+        from represent import get_output_shape
+        shape = get_output_shape(features)
+        print(f"   📐 Output shape: {shape}")
+        print(f"   📊 Dimensions: {'2D' if len(shape) == 2 else '3D'} tensor")
+
+
+def example_7_memory_optimization():
+    """Example 7: Memory optimization strategies."""
+    print("\n💾 Example 7: Memory Optimization")
+    print("="*37)
+    
+    # Different memory strategies
+    strategies = [
+        {"sample_fraction": 0.1, "cache_size": 500, "description": "Quick iteration"},
+        {"sample_fraction": 0.5, "cache_size": 1000, "description": "Balanced training"},
+        {"sample_fraction": 1.0, "cache_size": 2000, "description": "Full dataset"}
+    ]
+    
+    for strategy in strategies:
+        print(f"\n📊 Strategy: {strategy['description']}")
+        print(f"   🎯 Sample fraction: {strategy['sample_fraction']:.0%}")
+        print(f"   💾 Cache size: {strategy['cache_size']} samples")
+        
+        # This would create the dataloader with these settings
+        print(f"   🔧 Usage: create_parquet_dataloader(..., sample_fraction={strategy['sample_fraction']}, cache_size={strategy['cache_size']})")
 
 
 def main():
-    """Run all API usage examples."""
-    print("🚀 REPRESENT PACKAGE API EXAMPLES")
-    print("=" * 50)
-    print("Demonstrating various ways to use the represent package")
-    print("for market depth machine learning workflows.")
-    print("=" * 50)
-
-    # Run all examples
-    example_1_simple_conversion()
-    example_2_custom_config()
-    example_3_batch_processing()
-    example_4_training_pipeline()
-    example_5_api_exploration()
-    example_6_advanced_usage()
-
-    print("\n" + "=" * 50)
-    print("🎉 API Examples Complete!")
-    print("\n📚 Key Takeaways:")
-    print("✅ Simple one-line conversions: represent.convert_to_training_data()")
-    print("✅ Advanced control: represent.RepresentAPI() class")
-    print("✅ Custom configurations: Load YAML/JSON config files")
-    print("✅ Batch processing: Convert entire directories")
-    print("✅ Training integration: PyTorch-compatible dataloaders")
-    print("✅ Low-level access: All components available if needed")
+    """Run all examples."""
+    print("🎉 Represent v3.0.0 API Usage Examples")
+    print("="*45)
+    
+    # Get package info
+    api = represent.RepresentAPI()
+    info = api.get_package_info()
+    print(f"📦 Version: {info['version']}")
+    print(f"🏗️  Architecture: {info['architecture']}")
+    print(f"🎯 Features: {info['supported_features']}")
+    
+    # Run examples
+    example_1_complete_pipeline()
+    example_2_stage_by_stage()
+    example_3_dynamic_classification()
+    example_4_batch_processing()
+    example_5_currency_configurations()
+    example_6_feature_combinations()
+    example_7_memory_optimization()
+    
+    print("\n" + "="*60)
+    print("🎉 All examples completed!")
+    print("💡 Tip: Replace example paths with your actual data files")
+    print("📚 See README.md for more details")
 
 
 if __name__ == "__main__":

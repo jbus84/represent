@@ -1,14 +1,16 @@
 """
 Configuration models for market depth processing.
-Supports currency-specific configurations with default values and YAML loading.
+Supports currency-specific configurations with default values and dynamic generation.
 """
 
 from typing import Dict, Optional, Union
 from pathlib import Path
 import json
-import yaml
+import logging
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+
+logger = logging.getLogger(__name__)
 
 
 class SamplingConfig(BaseModel):
@@ -71,12 +73,12 @@ class ClassificationConfig(BaseModel):
             13: {
                 100: {
                     5000: {
-                        "bin_1": 0.47,
-                        "bin_2": 1.55,
-                        "bin_3": 2.69,
-                        "bin_4": 3.92,
-                        "bin_5": 5.45,
-                        "bin_6": 7.73,
+                        "bin_1": 1.41,
+                        "bin_2": 2.61,
+                        "bin_3": 3.75,
+                        "bin_4": 4.75,
+                        "bin_5": 6.53,
+                        "bin_6": 10.13,
                     },
                     3000: {
                         "bin_1": 0.5,
@@ -224,41 +226,34 @@ class CurrencyConfig(BaseModel):
 
 def load_currency_config(currency: str, config_dir: Optional[Path] = None) -> CurrencyConfig:
     """
-    Load currency-specific configuration from file.
-
+    Load currency-specific configuration.
+    
+    Note: Static config files have been replaced with dynamic config generation.
+    This function now returns optimized default configurations.
+    
     Args:
         currency: Currency pair identifier (e.g., 'AUDUSD')
-        config_dir: Directory containing configuration files
-
+        config_dir: Deprecated - config files no longer used
     Returns:
         CurrencyConfig for the specified currency
-
     Raises:
-        FileNotFoundError: If configuration file doesn't exist
-        ValueError: If configuration is invalid
+        ValueError: If currency is not supported
     """
-    if config_dir is None:
-        config_dir = Path(__file__).parent / "configs"
-
-    # Try YAML first, then JSON
-    yaml_file = config_dir / f"{currency.lower()}.yaml"
-    json_file = config_dir / f"{currency.lower()}.json"
-
-    if yaml_file.exists():
-        return _load_config_from_yaml(yaml_file)
-    elif json_file.exists():
-        return _load_config_from_json(json_file)
-    else:
-        # Return default configuration with currency-specific adjustments
-        return get_default_currency_config(currency)
+    if config_dir is not None:
+        logger.warning("config_dir parameter is deprecated. Static config files have been replaced with dynamic generation.")
+    
+    # Return optimized default configuration
+    return get_default_currency_config(currency)
 
 
 def load_config_from_file(config_path: Union[str, Path]) -> CurrencyConfig:
     """
-    Load configuration from a specific file path (YAML or JSON).
+    Load configuration from a specific file path (JSON only).
+    
+    Note: YAML support has been removed. Use dynamic config generation instead.
 
     Args:
-        config_path: Path to configuration file (.yaml/.yml or .json)
+        config_path: Path to configuration file (.json)
 
     Returns:
         CurrencyConfig loaded from file
@@ -272,36 +267,18 @@ def load_config_from_file(config_path: Union[str, Path]) -> CurrencyConfig:
     if not config_path.exists():
         raise FileNotFoundError(f"Configuration file not found: {config_path}")
 
-    if config_path.suffix.lower() in [".yaml", ".yml"]:
-        return _load_config_from_yaml(config_path)
-    elif config_path.suffix.lower() == ".json":
-        return _load_config_from_json(config_path)
+    if config_path.suffix.lower() == ".json":
+        try:
+            with open(config_path, "r") as f:
+                config_data = json.load(f)
+            return CurrencyConfig(**config_data)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON in configuration file {config_path}: {e}")
+        except Exception as e:
+            raise ValueError(f"Error loading configuration from {config_path}: {e}")
     else:
-        raise ValueError(f"Unsupported config file format: {config_path.suffix}")
+        raise ValueError(f"Unsupported config file format: {config_path.suffix}. Only JSON is supported.")
 
-
-def _load_config_from_yaml(yaml_path: Path) -> CurrencyConfig:
-    """Load configuration from YAML file."""
-    try:
-        with open(yaml_path, "r") as f:
-            config_data = yaml.safe_load(f)
-        return CurrencyConfig(**config_data)
-    except yaml.YAMLError as e:
-        raise ValueError(f"Invalid YAML configuration: {e}")
-    except Exception as e:
-        raise ValueError(f"Error loading YAML config: {e}")
-
-
-def _load_config_from_json(json_path: Path) -> CurrencyConfig:
-    """Load configuration from JSON file."""
-    try:
-        with open(json_path, "r") as f:
-            config_data = json.load(f)
-        return CurrencyConfig(**config_data)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"Invalid JSON in configuration file {json_path}: {e}")
-    except Exception as e:
-        raise ValueError(f"Error loading configuration from {json_path}: {e}")
 
 
 def get_default_currency_config(currency: str) -> CurrencyConfig:
@@ -395,21 +372,18 @@ def save_currency_config(config: CurrencyConfig, config_dir: Optional[Path] = No
 def list_available_currencies(config_dir: Optional[Path] = None) -> list[str]:
     """
     List all available currency configurations.
+    
+    Note: Static config files have been replaced with dynamic config generation.
+    This function now returns a predefined list of supported currencies.
 
     Args:
-        config_dir: Directory containing configuration files
+        config_dir: Deprecated - config files no longer used
 
     Returns:
         List of available currency pair identifiers
     """
-    if config_dir is None:
-        config_dir = Path(__file__).parent / "configs"
+    if config_dir is not None:
+        logger.warning("config_dir parameter is deprecated. Static config files have been replaced with dynamic generation.")
 
-    if not config_dir.exists():
-        return []
-
-    currencies: list[str] = []
-    for config_file in config_dir.glob("*.json"):
-        currencies.append(config_file.stem.upper())
-
-    return sorted(currencies)
+    # Return predefined list of supported currencies
+    return ["AUDUSD", "EURUSD", "GBPUSD", "USDJPY", "EURJPY"]

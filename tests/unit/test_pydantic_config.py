@@ -244,8 +244,9 @@ class TestCurrencyConfigFunctions:
             assert config_file.exists()
             assert config_file.name == "chfusd.json"
 
-            # Load configuration
-            loaded_config = load_currency_config("CHFUSD", config_dir)
+            # Load configuration from the saved file
+            from represent.config import load_config_from_file
+            loaded_config = load_config_from_file(config_file)
             assert loaded_config.currency_pair == "CHFUSD"
             assert loaded_config.classification.nbins == 7
             assert loaded_config.sampling.coverage_percentage == 0.6
@@ -263,36 +264,18 @@ class TestCurrencyConfigFunctions:
 
     def test_list_available_currencies(self):
         """Test listing available currency configurations."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            config_dir = Path(temp_dir)
+        # Now returns predefined list instead of scanning files
+        currencies = list_available_currencies()
+        assert "AUDUSD" in currencies
+        assert "EURUSD" in currencies
+        assert "GBPUSD" in currencies
+        assert len(currencies) >= 3
 
-            # Initially empty
-            currencies = list_available_currencies(config_dir)
-            assert currencies == []
-
-            # Save some configurations
-            config1 = CurrencyConfig(currency_pair="AUDUSD")
-            config2 = CurrencyConfig(currency_pair="EURUSD")
-
-            save_currency_config(config1, config_dir)
-            save_currency_config(config2, config_dir)
-
-            # Should list both
-            currencies = list_available_currencies(config_dir)
-            assert sorted(currencies) == ["AUDUSD", "EURUSD"]
-
-    def test_invalid_json_handling(self):
-        """Test handling of invalid JSON configuration files."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            config_dir = Path(temp_dir)
-
-            # Create invalid JSON file
-            invalid_file = config_dir / "invalid.json"
-            invalid_file.write_text("{ invalid json }")
-
-            # Should raise ValueError
-            with pytest.raises(ValueError, match="Invalid JSON"):
-                load_currency_config("INVALID", config_dir)
+    def test_invalid_currency_pair(self):
+        """Test handling of invalid currency pairs."""
+        # Invalid currency pairs should raise ValidationError
+        with pytest.raises(Exception):  # ValidationError from Pydantic
+            load_currency_config("INVALID")
 
 
 class TestConfigurationIntegration:

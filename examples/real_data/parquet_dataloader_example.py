@@ -18,8 +18,8 @@ from pathlib import Path
 import torch
 import numpy as np
 
-from represent.dataloader import MarketDepthDataset
 from represent.constants import SAMPLES
+from represent.lazy_dataloader import LazyParquetDataset
 
 
 def demonstrate_parquet_loading():
@@ -39,8 +39,8 @@ def demonstrate_parquet_loading():
     print("1. Creating MarketDepthDataset with parquet data source...")
     start_time = time.perf_counter()
 
-    dataset = MarketDepthDataset(
-        data_source=parquet_path,
+    dataset = LazyParquetDataset(
+        parquet_path=parquet_path,
         batch_size=500,
         buffer_size=SAMPLES,
         use_memory_mapping=True,  # Use memory mapping for large parquet files
@@ -196,8 +196,8 @@ def demonstrate_performance_comparison():
     for i in range(3):
         start_time = time.perf_counter()
 
-        dataset = MarketDepthDataset(
-            data_source=parquet_path,
+        dataset = LazyParquetDataset(
+            parquet_path=parquet_path,
             buffer_size=SAMPLES,
             use_memory_mapping=True,
             currency="AUDUSD",

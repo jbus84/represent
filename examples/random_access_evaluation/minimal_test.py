@@ -13,7 +13,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from represent.lazy_dataloader import LazyParquetDataset
-from represent.dataloader import create_market_depth_dataloader
+from represent.lazy_dataloader import create_parquet_dataloader
 
 
 def create_small_test_dataset(size: int = 100) -> Path:
@@ -83,7 +83,7 @@ def test_batch_loading(parquet_path: Path):
     """Test batch loading performance."""
     print("\n📦 Testing Batch Loading...")
 
-    dataloader = create_market_depth_dataloader(
+    dataloader = create_parquet_dataloader(
         parquet_path=parquet_path, batch_size=8, shuffle=True, sample_fraction=1.0, num_workers=0
     )
 

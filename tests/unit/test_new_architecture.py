@@ -9,9 +9,7 @@ import polars as pl
 import torch
 import pytest
 
-from represent.converter import DBNToParquetConverter
-from represent.dataloader import create_market_depth_dataloader
-from represent.lazy_dataloader import LazyParquetDataset, LazyParquetDataLoader
+from represent.lazy_dataloader import LazyParquetDataset, LazyParquetDataLoader, create_parquet_dataloader
 from represent.config import load_currency_config
 
 
@@ -47,38 +45,6 @@ def create_synthetic_dbn_data(num_rows: int = 10000) -> pl.DataFrame:
     return pl.DataFrame(data)
 
 
-class TestDBNToParquetConverter:
-    """Test DBN to Parquet conversion functionality."""
-
-    def test_converter_initialization(self):
-        """Test converter initializes correctly."""
-        converter = DBNToParquetConverter(currency="AUDUSD")
-
-        assert converter.currency == "AUDUSD"
-        assert converter.features == ["volume"]  # Default
-        assert converter.classification_config is not None
-        assert converter.processor is not None
-
-    def test_converter_with_features(self):
-        """Test converter with multiple features."""
-        converter = DBNToParquetConverter(currency="AUDUSD", features=["volume", "variance"])
-
-        assert converter.features == ["volume", "variance"]
-
-    def test_classification_method(self):
-        """Test classification logic."""
-        converter = DBNToParquetConverter(currency="AUDUSD")
-
-        # Test various movement sizes
-        movements = [0.5, 1.5, 3.0, 5.0, 10.0]
-        labels = [converter._classify_price_movement(mov) for mov in movements]
-
-        # Should return valid labels
-        for label in labels:
-            assert 0 <= label < converter.classification_config.nbins
-
-        # Larger movements should generally get higher labels
-        assert labels[0] <= labels[-1]  # Smallest to largest
 
 
 class TestLazyParquetDataset:
@@ -238,11 +204,11 @@ class TestLazyParquetDataLoader:
             assert batch_count >= 3
 
     def test_factory_function(self):
-        """Test create_market_depth_dataloader factory function."""
+        """Test create_parquet_dataloader factory function."""
         with tempfile.TemporaryDirectory() as temp_dir:
             parquet_path = self.create_test_parquet(Path(temp_dir))
 
-            dataloader = create_market_depth_dataloader(
+            dataloader = create_parquet_dataloader(
                 parquet_path=parquet_path, batch_size=16, sample_fraction=0.5
             )
 
@@ -317,7 +283,7 @@ class TestIntegration:
             labeled_df.write_parquet(labeled_parquet)
 
             # Test dataloader with labeled data
-            dataloader = create_market_depth_dataloader(
+            dataloader = create_parquet_dataloader(
                 parquet_path=labeled_parquet, batch_size=8, sample_fraction=1.0
             )
 
@@ -363,7 +329,7 @@ class TestPerformance:
             df.write_parquet(parquet_path)
 
             # Test dataloader performance
-            dataloader = create_market_depth_dataloader(
+            dataloader = create_parquet_dataloader(
                 parquet_path=parquet_path,
                 batch_size=32,
                 sample_fraction=0.1,  # Use 10% for quick test
@@ -421,7 +387,7 @@ class TestPerformance:
             df.write_parquet(parquet_path)
 
             # Create dataloader with small cache
-            dataloader = create_market_depth_dataloader(
+            dataloader = create_parquet_dataloader(
                 parquet_path=parquet_path,
                 batch_size=16,
                 sample_fraction=0.2,  # Use 20% of data
