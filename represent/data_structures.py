@@ -120,20 +120,27 @@ class OutputBuffer:
         self._temp_abs = np.empty((PRICE_LEVELS, TIME_BINS), dtype=VOLUME_DTYPE)
 
     def prepare_output(self, ask_grid: np.ndarray, bid_grid: np.ndarray) -> np.ndarray:
-        """Prepare normalized combined output."""
+        """Prepare normalized combined output using notebook approach."""
         # Calculate combined volume (ask - bid)
         np.subtract(ask_grid, bid_grid, out=self._temp_combined)
-
-        # Take absolute value
+        
+        # Create mask for negative values (bid > ask)
+        neg_mask = self._temp_combined < 0
+        
+        # Take absolute value 
         np.abs(self._temp_combined, out=self._temp_abs)
-
-        # Normalize to [0, 1] range
+        
+        # Normalize: (abs_combined - 0) / (abs_combined.max() - 0)
+        # min is always 0 volume
         max_val = np.max(self._temp_abs)
         if max_val > 0:
             np.divide(self._temp_abs, max_val, out=self._buffer)
         else:
             self._buffer.fill(0)
-
+            
+        # Restore negative sign for values where bid > ask
+        self._buffer[neg_mask] *= -1
+        
         return self._buffer
 
     @property

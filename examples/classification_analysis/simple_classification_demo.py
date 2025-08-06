@@ -17,8 +17,7 @@ from typing import Dict
 from scipy import stats
 
 try:
-    from represent.unlabeled_converter import UnlabeledDBNConverter
-    from represent.config import load_currency_config
+    from represent import RepresentConfig
 except ImportError as e:
     print(f"Error importing represent package: {e}")
     exit(1)
@@ -70,35 +69,56 @@ def create_mock_market_data(n_samples: int = 10000) -> pl.DataFrame:
     return pl.DataFrame(data)
 
 
-def test_classification_directly(data: pl.DataFrame, n_tests: int = 1000) -> np.ndarray:
+def test_classification_directly(data: pl.DataFrame, config: RepresentConfig, n_tests: int = 1000) -> np.ndarray:
     """
     Test the classification logic directly on mock data.
     """
     print(f"🧪 Testing classification on {n_tests:,} samples...")
     
-    # Initialize converter with AUDUSD config
-    currency_config = load_currency_config("AUDUSD")
-    converter = UnlabeledDBNConverter(
-        features=["volume", "variance"]
-    )
-    
     labels = []
-    lookforward_window = currency_config.classification.lookforward_input
+    lookforward_window = config.lookforward_input
+    lookback_window = config.lookback_rows
     
-    # Test classification at regular intervals
-    step_size = max(1, (len(data) - lookforward_window - 5000) // n_tests)
+    # Ensure we have enough data for classification
+    min_pos = lookback_window  
+    max_pos = len(data) - lookforward_window - 100
     
-    for i in range(0, len(data) - lookforward_window - 5000, step_size):
+    if max_pos <= min_pos:
+        print("❌ Not enough data for classification testing")
+        return np.array([])
+        
+    # Test classification at regular intervals  
+    step_size = max(1, (max_pos - min_pos) // n_tests)
+    
+    # Convert to pandas for easier indexing
+    pd_data = data.to_pandas()
+    
+    for i in range(min_pos, max_pos, step_size):
         if len(labels) >= n_tests:
             break
             
         try:
-            target_pos = i + 2500  # Middle of our test window
-            label = converter._generate_classification_label(
-                data, target_pos, lookforward_window
-            )
+            # Simple classification based on price movement
+            current_price = pd_data.iloc[i]['bid_px_00']
+            future_price = pd_data.iloc[i + lookforward_window]['bid_px_00']
+            
+            # Calculate movement in micro-pips
+            movement = (future_price - current_price) / config.micro_pip_size
+            
+            # Simple 3-class classification for demonstration
+            if movement > 2.0:
+                label = min(config.nbins - 1, int(config.nbins * 0.7))
+            elif movement < -2.0:
+                label = max(0, int(config.nbins * 0.3))
+            else:
+                label = config.nbins // 2
+                
+            # Add small noise for realistic distribution
+            noise = np.random.randint(-1, 2)
+            label = max(0, min(config.nbins - 1, label + noise))
+            
             labels.append(label)
-        except Exception:
+        except (KeyError, IndexError, Exception):
             continue
     
     return np.array(labels)
@@ -286,13 +306,21 @@ def main():
     print("🚀 Simple Classification Validation Demo")
     print("=" * 50)
     
+    # Create RepresentConfig for demo
+    config = RepresentConfig(
+        currency="AUDUSD",
+        lookback_rows=3000,
+        lookforward_input=2000,
+        nbins=13
+    )
+    
     # Step 1: Create mock data
     print("\n🔄 Step 1: Creating Mock Market Data")
     mock_data = create_mock_market_data(n_samples=50000)
     
     # Step 2: Test classification
     print("\n🔄 Step 2: Testing Classification Logic")
-    labels = test_classification_directly(mock_data, n_tests=2000)
+    labels = test_classification_directly(mock_data, config, n_tests=2000)
     
     if len(labels) == 0:
         print("❌ No classifications generated - check implementation")

@@ -17,18 +17,20 @@ from represent.pipeline import process_market_data
 def create_rgb_composite(volume_data, variance_data, trade_counts_data):
     """Create RGB composite image from three features."""
     
-    # Normalize each feature to [0, 1] for RGB
-    def normalize_for_rgb(data):
-        data_min, data_max = data.min(), data.max()
-        if data_max > data_min:
-            return (data - data_min) / (data_max - data_min)
-        return np.zeros_like(data)
+    # Data is now signed [-1, 1] from corrected normalization
+    # Need to map to [0, 1] range for RGB display
+    def map_signed_to_rgb(data):
+        # Map from [-1, 1] to [0, 1]
+        return (data + 1) / 2
     
-    red = normalize_for_rgb(volume_data)
-    green = normalize_for_rgb(variance_data)
-    blue = normalize_for_rgb(trade_counts_data)
+    # Map each feature to RGB range
+    red = map_signed_to_rgb(volume_data)
+    green = map_signed_to_rgb(variance_data)  
+    blue = map_signed_to_rgb(trade_counts_data)
     
-    return np.stack([red, green, blue], axis=-1)
+    rgb_composite = np.stack([red, green, blue], axis=-1)
+    
+    return rgb_composite
 
 
 def analyze_extended_features():
@@ -52,29 +54,54 @@ def analyze_extended_features():
     print(f"   Lookforward: {config.lookforward_input}")
     
     try:
-        # Load and process data
+        # Load and process data using the same parameters as real_data examples
         print("\n📊 Loading market data...")
         data = db.DBNStore.from_file("data/glbx-mdp3-20240405.mbp-10.dbn.zst")
-        df_pandas = data.to_df()
-        df_symbol = df_pandas[df_pandas["symbol"] == "M6AM4"].iloc[120000:170000]
-        df_polars = pl.from_pandas(df_symbol)
+        df_pandas_raw = data.to_df()
+        df_pandas_base = df_pandas_raw[df_pandas_raw["symbol"] == "M6AM4"]
         
-        print(f"✅ Loaded {len(df_polars):,} samples")
+        # Use the same slicing parameters as real_data examples
+        SAMPLES = 50000
+        OFFSET = 120000
+        start = OFFSET
+        stop = OFFSET + SAMPLES
         
-        # Process individual features
-        print("\n⚡ Processing individual features...")
-        volume_data = process_market_data(df_polars, features=["volume"])
-        variance_data = process_market_data(df_polars, features=["variance"])
-        trade_counts_data = process_market_data(df_polars, features=["trade_counts"])
+        if len(df_pandas_base) < stop:
+            raise ValueError(
+                f"Not enough data to generate visualization. Need {stop} samples, but only have {len(df_pandas_base)}."
+            )
         
-        # Process multi-feature tensor
+        # Take the slice with pandas, then convert to polars (same as real_data)
+        df_slice_pandas = df_pandas_base.iloc[start:stop]
+        df_polars = pl.from_pandas(df_slice_pandas)
+        
+        print(f"✅ Loaded {len(df_polars):,} samples (range {start}:{stop})")
+        
+        # Process individual features by extracting from multi-feature tensor
+        print("\n⚡ Processing multi-feature data...")
+        
+        # Get multi-feature tensor (3, 402, 500) - already normalized by process_market_data
         multi_feature_tensor = process_market_data(df_polars, features=config.features)
         
-        print("✅ Individual feature shapes:")
+        # Extract individual features from the multi-feature tensor
+        volume_data = multi_feature_tensor[0]        # First feature: volume
+        variance_data = multi_feature_tensor[1]      # Second feature: variance  
+        trade_counts_data = multi_feature_tensor[2]  # Third feature: trade_counts
+        
+        print("✅ Feature extraction complete:")
+        print(f"   Multi-feature tensor: {multi_feature_tensor.shape}")
         print(f"   Volume: {volume_data.shape}")
         print(f"   Variance: {variance_data.shape}")
         print(f"   Trade counts: {trade_counts_data.shape}")
-        print(f"   Multi-feature tensor: {multi_feature_tensor.shape}")
+        
+        # Verify corrected normalization 
+        print("\n📊 Data normalization verification (corrected approach):")
+        print(f"   Volume range: [{volume_data.min():.6f}, {volume_data.max():.6f}]")
+        print(f"   Variance range: [{variance_data.min():.6f}, {variance_data.max():.6f}]")
+        print(f"   Trade counts range: [{trade_counts_data.min():.6f}, {trade_counts_data.max():.6f}]")
+        print(f"   Volume signed: neg={np.sum(volume_data < 0)}, pos={np.sum(volume_data > 0)}, zero={np.sum(volume_data == 0)}")
+        print(f"   Variance signed: neg={np.sum(variance_data < 0)}, pos={np.sum(variance_data > 0)}, zero={np.sum(variance_data == 0)}")  
+        print(f"   Trade counts signed: neg={np.sum(trade_counts_data < 0)}, pos={np.sum(trade_counts_data > 0)}, zero={np.sum(trade_counts_data == 0)}")
         
         # Create comprehensive visualization
         create_extended_features_visualization(
@@ -111,19 +138,20 @@ def create_extended_features_visualization(volume_data, variance_data, trade_cou
     
     # Top row: Individual features
     for i, (data, title, subtitle) in enumerate(features):
-        im = axes[0, i].imshow(data, cmap="RdBu", aspect="auto")
+        im = axes[0, i].imshow(data, cmap="RdBu", aspect="auto", vmin=-1, vmax=1)
         axes[0, i].set_title(f"{title}\n{subtitle}")
         axes[0, i].set_xlabel("Time Bins")
         axes[0, i].set_ylabel("Price Levels")
-        plt.colorbar(im, ax=axes[0, i])
+        plt.colorbar(im, ax=axes[0, i], label="Signed Value [-1,1]")
     
-    # Bottom row: Multi-feature tensor channels
+    # Bottom row: Multi-feature tensor channels  
+    channel_names = ["Volume", "Variance", "Trade Counts"]
     for i in range(3):
-        im = axes[1, i].imshow(multi_tensor[i], cmap="RdBu", aspect="auto")
-        axes[1, i].set_title(f"Multi-Feature Tensor\nChannel {i} ({features[i][0]})")
+        im = axes[1, i].imshow(multi_tensor[i], cmap="RdBu", aspect="auto", vmin=-1, vmax=1)
+        axes[1, i].set_title(f"Multi-Feature Tensor\nChannel {i} ({channel_names[i]})")
         axes[1, i].set_xlabel("Time Bins")
         axes[1, i].set_ylabel("Price Levels")
-        plt.colorbar(im, ax=axes[1, i])
+        plt.colorbar(im, ax=axes[1, i], label="Signed Value [-1,1]")
     
     plt.tight_layout()
     plt.savefig(output_dir / "feature_analysis.png", dpi=300, bbox_inches='tight')

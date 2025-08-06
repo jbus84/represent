@@ -18,6 +18,7 @@ from pathlib import Path
 import torch
 import numpy as np
 
+from represent import RepresentConfig
 from represent.constants import SAMPLES
 from represent.lazy_dataloader import LazyParquetDataset
 
@@ -27,6 +28,21 @@ def demonstrate_parquet_loading():
     print("=" * 60)
     print("🗃️  PARQUET DATA LOADING DEMONSTRATION")
     print("=" * 60)
+
+    # Create RepresentConfig for this demonstration
+    config = RepresentConfig(
+        currency="AUDUSD",
+        features=["volume", "variance"],
+        lookback_rows=5000,
+        lookforward_input=3000,
+        batch_size=500
+    )
+    
+    print(f"📊 Configuration: {config.currency}")
+    print(f"   Features: {config.features}")
+    print(f"   Lookback: {config.lookback_rows:,} rows")
+    print(f"   Lookforward: {config.lookforward_input:,} rows")
+    print(f"   Batch size: {config.batch_size}\n")
 
     parquet_path = "/tmp/audusd_10files.parquet"
 
@@ -41,10 +57,10 @@ def demonstrate_parquet_loading():
 
     dataset = LazyParquetDataset(
         parquet_path=parquet_path,
-        batch_size=500,
-        buffer_size=SAMPLES,
-        use_memory_mapping=True,  # Use memory mapping for large parquet files
-        currency="AUDUSD",  # Use AUDUSD currency configuration
+        batch_size=config.batch_size,
+        sample_fraction=1.0,  # Use full dataset
+        shuffle=True,
+        cache_size=2000,  # Increase cache for better performance
     )
 
     creation_time = (time.perf_counter() - start_time) * 1000
