@@ -11,7 +11,7 @@ from typing import Dict, List, Optional, Union, Any
 
 import polars as pl
 
-from .config import load_currency_config
+from .config import create_represent_config
 
 
 class ParquetClassifier:
@@ -48,8 +48,7 @@ class ParquetClassifier:
         self.verbose = verbose
 
         # Load currency configuration
-        self.currency_config = load_currency_config(currency)
-        self.classification_config = self.currency_config.classification
+        self.config = create_represent_config(currency=currency)
 
         # Use optimal thresholds from our data analysis
         self.optimal_thresholds = {
@@ -238,9 +237,9 @@ class ParquetClassifier:
         
         # Extract necessary configuration
         # Note: These are available but not used in current implementation
-        # lookback_rows = self.classification_config.lookback_rows
-        # lookforward_input = self.classification_config.lookforward_input
-        # lookforward_offset = self.classification_config.lookforward_offset
+        # lookback_rows = self.config.lookback_rows
+        # lookforward_input = self.config.lookforward_input
+        # lookforward_offset = self.config.lookforward_offset
 
         classifications = []
         valid_samples = []
@@ -292,7 +291,7 @@ class ParquetClassifier:
         Returns:
             Classification label (0-12 for 13-class system)
         """
-        TRUE_PIP_SIZE = self.classification_config.true_pip_size
+        TRUE_PIP_SIZE = self.config.true_pip_size
         
         # Convert thresholds to actual values
         bin_1 = self.optimal_thresholds["bin_1"] * TRUE_PIP_SIZE
@@ -341,13 +340,13 @@ class ParquetClassifier:
         total_samples = len(df)
         
         # Calculate deviations from uniform distribution
-        target_percentage = 100.0 / self.classification_config.nbins
+        target_percentage = 100.0 / self.config.nbins
         
         distribution = []
         deviations = []
         max_deviation = 0.0
         
-        for label in range(self.classification_config.nbins):
+        for label in range(self.config.nbins):
             # Find count for this label
             label_row = label_counts.filter(pl.col("classification_label") == label)
             count = label_row["count"][0] if len(label_row) > 0 else 0

@@ -195,6 +195,51 @@ Works with any currency pair - automatic adaptation to market characteristics:
 - **USDJPY, EURJPY**: 0.01 pip size (JPY pairs)
 - **Any other pair**: Automatic detection
 
+## ⚙️ Simplified Configuration
+
+### **Flat, User-Friendly Structure**
+The new `RepresentConfig` eliminates complex nested structures with a simple, flat interface:
+
+```python
+from represent import RepresentConfig, create_represent_config
+
+# Simple configuration with fully configurable parameters
+config = RepresentConfig(
+    currency="AUDUSD", 
+    nbins=13,
+    samples=50000,
+    features=["volume", "variance"],
+    lookback_rows=3000,     # ✅ Fully configurable (no more hardcoded 2000!)
+    lookforward_input=4000, # ✅ Fully configurable
+    batch_size=1500,        # ✅ Configurable batch processing
+)
+
+# Or use the convenience function with currency-specific optimizations
+config = create_represent_config(
+    currency="GBPUSD",      # Automatically gets lookforward_input=3000 for volatility
+    samples=25000,
+    features=["volume"]
+)
+
+# Direct access to all parameters - no nested structures!
+print(f"Lookback: {config.lookback_rows}")        # Direct access
+print(f"Lookforward: {config.lookforward_input}") # No config.classification.lookforward_input
+print(f"Batch Size: {config.batch_size}")         # No more hardcoded values
+```
+
+### **Currency-Specific Optimizations**
+Automatic optimizations based on market characteristics:
+- **GBPUSD**: `lookforward_input=3000` (shorter window for high volatility)
+- **JPY pairs**: `true_pip_size=0.01`, `nbins=9` (adapted for JPY dynamics)
+- **All others**: Standard settings with `lookforward_input=5000`
+
+### **Key Improvements**
+- ✅ **No Hardcoded Values**: All timing parameters fully configurable
+- ✅ **Flat Structure**: Direct access to all parameters  
+- ✅ **Auto-Computed Fields**: `time_bins`, `min_symbol_samples` computed automatically
+- ✅ **Validation**: Built-in parameter validation with helpful error messages
+- ✅ **No Static Files**: No more complex nested config files to manage
+
 ## 🚀 High-Level API
 
 ```python

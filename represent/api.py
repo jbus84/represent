@@ -12,7 +12,7 @@ from .unlabeled_converter import convert_dbn_to_parquet, batch_convert_dbn_files
 from .parquet_classifier import classify_parquet_file, batch_classify_parquet_files
 from .lazy_dataloader import LazyParquetDataset, LazyParquetDataLoader
 from .lazy_dataloader import create_parquet_dataloader
-from .config import load_currency_config
+from .config import create_represent_config
 from .classification_config_generator import (
     generate_classification_config_from_parquet
 )
@@ -112,9 +112,9 @@ class RepresentAPI:
             currency: Currency pair identifier
 
         Returns:
-            CurrencyConfig object
+            RepresentConfig object
         """
-        return load_currency_config(currency)
+        return create_represent_config(currency=currency)
 
 
 

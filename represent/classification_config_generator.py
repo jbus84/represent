@@ -14,7 +14,7 @@ import polars as pl
 from datetime import datetime
 
 from .constants import MICRO_PIP_SIZE
-from .config import ClassificationConfig
+from .config import RepresentConfig
 
 logger = logging.getLogger(__name__)
 
@@ -270,11 +270,11 @@ class ClassificationConfigGenerator:
     def generate_classification_config(
         self, 
         parquet_files: Union[str, Path, List[Union[str, Path]]],
-        currency: str = "UNKNOWN",
+        currency: str = "AUDUSD",
         lookforward_input: int = 5000,
         lookback_rows: int = 5000,
         lookforward_offset: int = 500
-    ) -> Tuple[ClassificationConfig, Dict]:
+    ) -> Tuple[RepresentConfig, Dict]:
         """
         Generate optimized classification configuration from parquet data.
         
@@ -286,7 +286,7 @@ class ClassificationConfigGenerator:
             lookforward_offset: Lookforward offset
             
         Returns:
-            Tuple of (ClassificationConfig, validation_metrics)
+            Tuple of (RepresentConfig, validation_metrics)
             
         Raises:
             ValueError: If insufficient data or generation fails
@@ -326,22 +326,13 @@ class ClassificationConfigGenerator:
         if not isinstance(positive_thresholds, dict):
             raise TypeError(f"Expected 'positive_thresholds' to be a dict, but got {type(positive_thresholds)}")
 
-        # Create ClassificationConfig with proper bin_thresholds structure
-        # Convert positive thresholds to the expected nested structure
-        bin_thresholds: Dict[int, Dict[int, Dict[Union[int, str], Dict[str, float]]]] = {
-            self.nbins: {
-                100: {  # ticks_per_bin
-                    lookforward_input: positive_thresholds
-                }
-            }
-        }
-        
-        config = ClassificationConfig(
+        # Create RepresentConfig with simplified parameters
+        config = RepresentConfig(
+            currency=currency,
             nbins=self.nbins,
             lookforward_input=lookforward_input,
             lookback_rows=lookback_rows,
             lookforward_offset=lookforward_offset,
-            bin_thresholds=bin_thresholds
         )
         
         # Note: We can't add custom fields to Pydantic models, so we'll include
@@ -367,10 +358,10 @@ class ClassificationConfigGenerator:
 
 def generate_classification_config_from_parquet(
     parquet_files: Union[str, Path, List[Union[str, Path]]],
-    currency: str = "UNKNOWN",
+    currency: str = "AUDUSD",
     nbins: int = 13,
     **kwargs
-) -> Tuple[ClassificationConfig, Dict]:
+) -> Tuple[RepresentConfig, Dict]:
     """
     Convenience function to generate classification config from parquet data.
     
@@ -381,7 +372,7 @@ def generate_classification_config_from_parquet(
         **kwargs: Additional parameters for ClassificationConfigGenerator
         
     Returns:
-        Tuple of (ClassificationConfig, validation_metrics)
+        Tuple of (RepresentConfig, validation_metrics)
     """
     generator = ClassificationConfigGenerator(nbins=nbins, **kwargs)
     return generator.generate_classification_config(parquet_files, currency)

@@ -47,13 +47,8 @@ from .constants import (
     get_output_shape,
 )
 from .config import (
-    ClassificationConfig,
-    SamplingConfig,
-    CurrencyConfig,
-    load_currency_config,
-    load_config_from_file,
-    get_default_currency_config,
-    save_currency_config,
+    RepresentConfig,
+    create_represent_config,
     list_available_currencies,
 )
 
@@ -72,13 +67,8 @@ __all__ = [
     "create_processor",
     "MarketDepthProcessor",
     # Configuration
-    "ClassificationConfig",
-    "SamplingConfig",
-    "CurrencyConfig",
-    "load_currency_config",
-    "load_config_from_file",
-    "get_default_currency_config",
-    "save_currency_config",
+    "RepresentConfig",
+    "create_represent_config",
     "list_available_currencies",
     # Constants
     "MICRO_PIP_SIZE",

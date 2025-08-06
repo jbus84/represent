@@ -14,7 +14,7 @@ from represent.classification_config_generator import (
     generate_classification_config_from_parquet,
     classify_with_generated_config,
 )
-from represent.config import ClassificationConfig
+from represent.config import RepresentConfig
 
 
 def create_mock_parquet_data(n_samples: int = 100) -> pl.DataFrame:
@@ -125,7 +125,7 @@ class TestClassificationConfigGenerator:
                 parquet_path, currency="AUDUSD"
             )
             
-            assert isinstance(config, ClassificationConfig)
+            assert isinstance(config, RepresentConfig)
             assert config.nbins == 5
             assert "threshold_info" in metrics
             assert "generation_metadata" in metrics
@@ -162,7 +162,7 @@ class TestConvenienceFunctions:
                 parquet_path, currency="AUDUSD", nbins=5
             )
             
-            assert isinstance(config, ClassificationConfig)
+            assert isinstance(config, RepresentConfig)
             assert config.nbins == 5
 
     def test_classify_with_generated_config(self):

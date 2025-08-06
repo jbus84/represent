@@ -29,7 +29,7 @@ class UnlabeledDBNConverter:
 
     def __init__(
         self,
-        batch_size: int = 2000,
+        batch_size: int = 1000,
         features: Optional[List[str]] = None,
         min_symbol_samples: int = 1000,
     ):
