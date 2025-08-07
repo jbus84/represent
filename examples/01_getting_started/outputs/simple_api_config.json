@@ -1,0 +1,12 @@
+{
+  "currency": "AUDUSD",
+  "features": [
+    "volume"
+  ],
+  "samples": 1000,
+  "nbins": 13,
+  "lookback_rows": 5000,
+  "lookforward_input": 5000,
+  "timestamp": 1754564797.405605,
+  "demo_type": "simple_api"
+}

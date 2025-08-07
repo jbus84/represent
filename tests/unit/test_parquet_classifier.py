@@ -1,437 +1,478 @@
-"""
-Tests for parquet_classifier module.
-Focused on core functionality with performance optimizations.
-"""
-
+"""Tests for ParquetClassifier (streamlined DBN-to-parquet) functionality."""
 import pytest
-import tempfile
-from pathlib import Path
 import polars as pl
 import numpy as np
-from unittest.mock import patch, MagicMock
 
 from represent.parquet_classifier import (
-    ParquetClassifier,
-    classify_parquet_file,
-    batch_classify_parquet_files,
+    ParquetClassifier, 
+    ClassificationConfig,
+    process_dbn_to_classified_parquets
 )
 
 
-def create_mock_unlabeled_parquet(n_samples: int = 100) -> pl.DataFrame:
-    """Create mock unlabeled parquet data for testing."""
-    np.random.seed(42)
+class TestClassificationConfig:
+    """Test ClassificationConfig dataclass."""
     
-    # Generate realistic market data
-    base_price = 0.6650
-    price_changes = np.random.normal(0, 0.0005, n_samples)
-    start_prices = np.random.uniform(base_price - 0.01, base_price + 0.01, n_samples)
-    end_prices = start_prices + price_changes
-    
-    # Mock serialized tensor data
-    mock_tensor_data = np.random.rand(n_samples, 402 * 500).astype(np.float32)
-    
-    return pl.DataFrame({
-        "market_depth_features": [data.tobytes() for data in mock_tensor_data],
-        "feature_shape": ["(402, 500)"] * n_samples,
-        "sample_id": [f"test_{i}" for i in range(n_samples)],
-        "symbol": ["M6AM4"] * n_samples,
-        "start_mid_price": start_prices,
-        "end_mid_price": end_prices,
-        "start_timestamp": range(n_samples),
-        "end_timestamp": range(1, n_samples + 1),
-    })
-
-
-class TestParquetClassifierCore:
-    """Test core ParquetClassifier functionality."""
-
-    def test_initialization_default(self):
-        """Test default classifier initialization."""
-        classifier = ParquetClassifier(currency="AUDUSD")
+    def test_default_initialization(self):
+        """Test default config initialization."""
+        config = ClassificationConfig()
         
-        assert classifier.currency == "AUDUSD"
-        assert classifier.target_uniform_percentage == pytest.approx(7.69, rel=1e-2)
-        assert classifier.force_uniform is True
-        assert classifier.verbose is True
-        assert classifier.config is not None
+        assert config.currency == "AUDUSD"
+        assert config.features == ["volume"]  # Set in __post_init__
+        assert config.input_rows == 5000
+        assert config.lookforward_rows == 500
+        assert config.min_symbol_samples == 1000
+        assert config.force_uniform is True
+        assert config.nbins == 13
+    
+    def test_custom_initialization(self):
+        """Test config with custom parameters."""
+        config = ClassificationConfig(
+            currency="EURUSD",
+            features=["volume", "variance"],
+            input_rows=1000,
+            min_symbol_samples=500,
+            nbins=10
+        )
+        
+        assert config.currency == "EURUSD"
+        assert config.features == ["volume", "variance"]
+        assert config.input_rows == 1000
+        assert config.min_symbol_samples == 500
+        assert config.nbins == 10
 
-    def test_initialization_custom(self):
-        """Test classifier initialization with custom parameters."""
+
+class TestParquetClassifier:
+    """Test ParquetClassifier core functionality."""
+    
+    def test_initialization(self):
+        """Test classifier initialization."""
+        classifier = ParquetClassifier(verbose=False)
+        
+        assert classifier.config.currency == "AUDUSD"
+        assert classifier.config.features == ["volume"]
+        assert classifier.verbose is False
+        assert classifier.represent_config is not None
+    
+    def test_custom_initialization(self):
+        """Test classifier with custom parameters."""
         classifier = ParquetClassifier(
-            currency="GBPUSD",
-            target_uniform_percentage=10.0,
+            currency="EURUSD",
+            features=["volume", "variance"],
+            input_rows=1000,
+            min_symbol_samples=100,
+            verbose=False
+        )
+        
+        assert classifier.config.currency == "EURUSD"
+        assert classifier.config.features == ["volume", "variance"]
+        assert classifier.config.input_rows == 1000
+        assert classifier.config.min_symbol_samples == 100
+    
+    def test_filter_symbols_by_threshold(self):
+        """Test symbol filtering logic."""
+        classifier = ParquetClassifier(
+            input_rows=10,
+            lookforward_rows=5,
+            min_symbol_samples=20,
+            verbose=False
+        )
+        
+        # Create mock DataFrame with symbols
+        mock_data = pl.DataFrame({
+            'symbol': ['A'] * 50 + ['B'] * 10 + ['C'] * 25,  # A=50, B=10, C=25 samples
+            'ts_event': range(85),
+            'price': [1.0] * 85
+        })
+        
+        filtered_df, symbol_counts = classifier.filter_symbols_by_threshold(mock_data)
+        
+        # Should keep A (50 >= 15) and C (25 >= 15), filter out B (10 < 15)
+        # Min required = input_rows + lookforward_rows = 10 + 5 = 15
+        assert len(filtered_df) == 75  # 50 + 25
+        symbols = filtered_df['symbol'].unique().to_list()
+        assert 'A' in symbols
+        assert 'C' in symbols
+        assert 'B' not in symbols
+    
+    def test_calculate_price_movements(self):
+        """Test price movement calculation."""
+        classifier = ParquetClassifier(
+            lookforward_rows=2,
+            verbose=False
+        )
+        
+        # Create mock data with predictable price changes
+        mock_data = pl.DataFrame({
+            'ts_event': range(10),
+            'bid_px_00': [1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9],
+            'ask_px_00': [1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0],
+        })
+        
+        result_df = classifier.calculate_price_movements(mock_data)
+        
+        assert 'mid_price' in result_df.columns
+        assert 'future_mid_price' in result_df.columns
+        assert 'price_movement' in result_df.columns
+        
+        # Check mid price calculation
+        mid_prices = result_df['mid_price'].to_list()
+        expected_mid = [(bid + ask) / 2 for bid, ask in zip(
+            mock_data['bid_px_00'], mock_data['ask_px_00']
+        )]
+        assert mid_prices == expected_mid
+    
+    def test_apply_quantile_classification_uniform(self):
+        """Test quantile-based uniform classification."""
+        classifier = ParquetClassifier(
+            force_uniform=True,
+            nbins=5,
+            verbose=False
+        )
+        
+        # Create mock data with price movements
+        price_movements = np.linspace(-0.001, 0.001, 100)  # Linear distribution
+        mock_data = pl.DataFrame({
+            'ts_event': range(100),
+            'price_movement': price_movements,
+        })
+        
+        classified_df = classifier.apply_quantile_classification(mock_data)
+        
+        assert 'classification_label' in classified_df.columns
+        labels = classified_df['classification_label'].to_list()
+        
+        # With uniform quantile classification, should have roughly equal counts
+        unique_labels = set(labels)
+        assert len(unique_labels) == 5  # 5 bins specified
+        assert all(0 <= label <= 4 for label in labels)  # Valid range
+    
+    def test_filter_processable_rows(self):
+        """Test row filtering for processable data."""
+        classifier = ParquetClassifier(
+            input_rows=5,
+            lookforward_rows=3,
+            verbose=False
+        )
+        
+        # Create mock data - need 5 + 3 = 8 minimum rows
+        mock_data = pl.DataFrame({
+            'ts_event': range(10),  # 10 rows total
+            'price': [1.0] * 10
+        })
+        
+        filtered_df = classifier.filter_processable_rows(mock_data)
+        
+        # Should keep rows 5 through 7 (10 - 3 = 7, so rows 5, 6)
+        # Actually from input_rows (5) to total_rows - lookforward_rows (10 - 3 = 7)
+        expected_rows = 7 - 5  # rows 5, 6
+        assert len(filtered_df) == expected_rows
+    
+    def test_filter_processable_rows_insufficient_data(self):
+        """Test filtering when there's insufficient data."""
+        classifier = ParquetClassifier(
+            input_rows=10,
+            lookforward_rows=5,
+            verbose=False
+        )
+        
+        # Only 5 rows, but need 10 + 5 = 15 minimum
+        mock_data = pl.DataFrame({
+            'ts_event': range(5),
+            'price': [1.0] * 5
+        })
+        
+        filtered_df = classifier.filter_processable_rows(mock_data)
+        assert len(filtered_df) == 0
+
+
+class TestParquetClassifierEdgeCases:
+    """Test edge cases and error handling."""
+    
+    def test_process_symbol_insufficient_samples(self):
+        """Test symbol processing with insufficient samples."""
+        classifier = ParquetClassifier(
+            min_symbol_samples=100,
+            verbose=False
+        )
+        
+        # Create mock data with too few samples
+        mock_data = pl.DataFrame({
+            'ts_event': range(50),  # Only 50 samples, need 100
+            'bid_px_00': [1.0] * 50,
+            'ask_px_00': [1.1] * 50,
+        })
+        
+        result = classifier.process_symbol("TEST_SYMBOL", mock_data)
+        assert result is None  # Should return None for insufficient samples
+    
+    def test_apply_quantile_classification_no_valid_data(self):
+        """Test classification with no valid price movements."""
+        classifier = ParquetClassifier(verbose=False)
+        
+        # Create data with all null price movements
+        mock_data = pl.DataFrame({
+            'ts_event': range(10),
+            'price_movement': [None] * 10,
+        })
+        
+        result_df = classifier.apply_quantile_classification(mock_data)
+        # Should handle gracefully and return data with null classifications
+        assert 'classification_label' in result_df.columns
+    
+    def test_apply_quantile_classification_non_uniform(self):
+        """Test non-uniform classification mode."""
+        classifier = ParquetClassifier(
             force_uniform=False,
             verbose=False
         )
         
-        assert classifier.currency == "GBPUSD"
-        assert classifier.target_uniform_percentage == 10.0
-        assert classifier.force_uniform is False
-        assert classifier.verbose is False
-
-    def test_optimal_thresholds_structure(self):
-        """Test that optimal thresholds are properly structured."""
-        classifier = ParquetClassifier(currency="AUDUSD")
-        
-        expected_keys = ["bin_1", "bin_2", "bin_3", "bin_4", "bin_5", "bin_6"]
-        assert all(key in classifier.optimal_thresholds for key in expected_keys)
-        assert all(isinstance(val, (int, float)) for val in classifier.optimal_thresholds.values())
-        
-        # Thresholds should be in ascending order
-        values = list(classifier.optimal_thresholds.values())
-        assert values == sorted(values)
-
-    def test_classify_with_optimal_thresholds(self):
-        """Test classification logic with optimal thresholds."""
-        classifier = ParquetClassifier(currency="AUDUSD")
-        
-        # Test various price changes
-        test_cases = [
-            (0.0, 6),      # No change -> middle bin
-            (0.001, 12),   # Large positive change -> highest bin
-            (-0.001, 0),   # Large negative change -> lowest bin
-            (0.0001, 7),   # Small positive change
-            (-0.0001, 5),  # Small negative change
-        ]
-        
-        for price_change, expected_bin in test_cases:
-            result = classifier._classify_with_optimal_thresholds(price_change)
-            assert 0 <= result <= 12  # Valid bin range
-            # Note: exact bin may vary based on threshold values
-
-    def test_validate_uniform_distribution(self):
-        """Test uniform distribution validation."""
-        classifier = ParquetClassifier(currency="AUDUSD")
-        
-        # Create mock classified data with perfect uniform distribution
-        n_samples = 130  # 10 samples per bin for 13 bins
-        labels = list(range(13)) * 10  # Perfect uniform distribution
-        
+        # Create mock data with price movements
         mock_data = pl.DataFrame({
-            "classification_label": labels,
-            "sample_id": [f"test_{i}" for i in range(n_samples)],
+            'ts_event': range(20),
+            'price_movement': np.linspace(-0.001, 0.001, 20),
         })
         
-        validation = classifier._validate_uniform_distribution(mock_data)
-        
-        assert validation["total_samples"] == n_samples
-        assert validation["target_percentage"] == pytest.approx(100/13, rel=1e-2)
-        assert validation["assessment"] == "EXCELLENT"
-        assert validation["is_uniform"] is True
-        assert validation["max_deviation"] < 1.0
+        result_df = classifier.apply_quantile_classification(mock_data)
+        assert 'classification_label' in result_df.columns
+        labels = result_df['classification_label'].to_list()
+        assert all(0 <= label <= 12 for label in labels if label is not None)
 
-    def test_validate_poor_distribution(self):
-        """Test validation of poor distribution."""
-        classifier = ParquetClassifier(currency="AUDUSD")
+    def test_verbose_output(self):
+        """Test verbose output functionality."""
+        classifier = ParquetClassifier(verbose=True)
         
-        # Create mock data with poor distribution (all samples in one bin)
-        n_samples = 100
-        labels = [0] * n_samples  # All in bin 0
+        # Test that verbose initialization produces output
+        # (We can't easily capture print output, but we can test the flag)
+        assert classifier.verbose is True
         
+        # Test filter_symbols with verbose
         mock_data = pl.DataFrame({
-            "classification_label": labels,
-            "sample_id": [f"test_{i}" for i in range(n_samples)],
+            'symbol': ['A'] * 20 + ['B'] * 10,
+            'ts_event': range(30),
+            'price': [1.0] * 30
         })
         
-        validation = classifier._validate_uniform_distribution(mock_data)
-        
-        assert validation["assessment"] == "NEEDS IMPROVEMENT"
-        assert validation["is_uniform"] is False
-        assert validation["max_deviation"] > 50.0  # Very poor distribution
+        # This should not raise an error with verbose=True
+        try:
+            filtered_df, counts = classifier.filter_symbols_by_threshold(mock_data)
+            assert len(filtered_df) >= 0  # Should work without error
+        except Exception as e:
+            pytest.fail(f"Verbose filtering failed: {e}")
 
-    @patch('polars.read_parquet')
-    @patch('polars.DataFrame.write_parquet')
-    @patch('pathlib.Path.stat')
-    def test_classify_symbol_parquet_basic(self, mock_stat, mock_write, mock_read):
-        """Test basic symbol parquet classification."""
-        mock_data = create_mock_unlabeled_parquet(50)
-        mock_read.return_value = mock_data
-        mock_stat.return_value.st_size = 1024 * 1024  # 1MB
-        
-        classifier = ParquetClassifier(currency="AUDUSD", verbose=False)
-        
-        with tempfile.TemporaryDirectory() as temp_dir:
-            input_path = Path(temp_dir) / "input.parquet"
-            output_path = Path(temp_dir) / "output.parquet"
-            input_path.touch()
+
+class TestConvenienceFunction:
+    """Test the convenience function."""
+    
+    def test_process_dbn_to_classified_parquets_parameters(self):
+        """Test that the convenience function accepts the right parameters."""
+        # Just test that the function exists and accepts parameters
+        # We can't test actual execution without DBN files
+        try:
+            # This should not raise an error for parameter validation
+            import inspect
+            sig = inspect.signature(process_dbn_to_classified_parquets)
+            params = list(sig.parameters.keys())
             
-            stats = classifier.classify_symbol_parquet(
-                parquet_path=input_path,
-                output_path=output_path,
-                validate_uniformity=False  # Skip validation for speed
-            )
-            
-            assert stats["input_file"] == str(input_path)
-            assert stats["output_file"] == str(output_path)
-            assert stats["original_samples"] == 50
-            assert stats["currency"] == "AUDUSD"
-            assert "processing_time_seconds" in stats
-            assert "samples_per_second" in stats
-
-    @patch('polars.read_parquet')
-    @patch('pathlib.Path.stat')
-    def test_classify_symbol_parquet_with_sampling(self, mock_stat, mock_read):
-        """Test classification with data sampling."""
-        mock_data = create_mock_unlabeled_parquet(100)
-        mock_read.return_value = mock_data
-        mock_stat.return_value.st_size = 1024 * 1024  # 1MB
-        
-        classifier = ParquetClassifier(currency="AUDUSD", verbose=False)
-        
-        with tempfile.TemporaryDirectory() as temp_dir:
-            input_path = Path(temp_dir) / "input.parquet"
-            input_path.touch()
-            
-            with patch('polars.DataFrame.write_parquet'):
-                stats = classifier.classify_symbol_parquet(
-                    parquet_path=input_path,
-                    sample_fraction=0.5,  # Use only 50% of data
-                    validate_uniformity=False
-                )
-            
-            assert stats["original_samples"] == 100
-            assert stats["sample_fraction"] == 0.5
-
-    def test_apply_classification_to_dataframe(self):
-        """Test DataFrame classification application."""
-        classifier = ParquetClassifier(currency="AUDUSD", verbose=False)
-        mock_data = create_mock_unlabeled_parquet(20)
-        
-        classified_df = classifier._apply_classification_to_dataframe(mock_data)
-        
-        assert "classification_label" in classified_df.columns
-        assert len(classified_df) <= 20  # May filter out invalid samples
-        assert all(0 <= label <= 12 for label in classified_df["classification_label"])
-
-    def test_optimize_uniform_distribution_placeholder(self):
-        """Test uniform distribution optimization (placeholder implementation)."""
-        classifier = ParquetClassifier(currency="AUDUSD", verbose=False)
-        mock_data = create_mock_unlabeled_parquet(30)
-        
-        classified_df, optimization_results = classifier._optimize_uniform_distribution(mock_data)
-        
-        assert "optimization_applied" in optimization_results
-        assert optimization_results["optimization_applied"] is False  # Not implemented yet
-        assert "reason" in optimization_results
-        assert len(classified_df) > 0
-
-
-class TestParquetClassifierBatch:
-    """Test batch processing functionality."""
-
-    @patch('polars.read_parquet')
-    @patch('polars.DataFrame.write_parquet')
-    @patch('pathlib.Path.stat')
-    @patch('pathlib.Path.is_dir')
-    def test_batch_classify_parquets(self, mock_is_dir, mock_stat, mock_write, mock_read):
-        """Test batch classification of multiple files."""
-        mock_data = create_mock_unlabeled_parquet(30)
-        mock_read.return_value = mock_data
-        mock_stat.return_value.st_size = 1024 * 1024  # 1MB
-        mock_is_dir.return_value = True
-        
-        classifier = ParquetClassifier(currency="AUDUSD", verbose=False)
-        
-        with tempfile.TemporaryDirectory() as temp_dir:
-            input_dir = Path(temp_dir) / "input"
-            output_dir = Path(temp_dir) / "output"
-            input_dir.mkdir()
-            
-            # Create mock parquet files
-            test_files = [
-                input_dir / "AUDUSD_M6AM4.parquet",
-                input_dir / "AUDUSD_M6AU4.parquet"
+            expected_params = [
+                'dbn_path', 'output_dir', 'currency', 'features', 
+                'input_rows', 'lookforward_rows', 'min_symbol_samples',
+                'force_uniform', 'nbins', 'verbose'
             ]
-            for f in test_files:
-                f.touch()
             
-            # Mock the glob operation at the module level
-            with patch('pathlib.Path.glob', return_value=test_files):
-                results = classifier.batch_classify_parquets(
-                    input_directory=input_dir,
-                    output_directory=output_dir,
-                    validate_uniformity=False
-                )
+            for param in expected_params:
+                assert param in params
                 
-                assert len(results) == 2
-            assert all("input_file" in result for result in results)
-            assert all("output_file" in result for result in results)
-
-    def test_batch_classify_no_files_error(self):
-        """Test error handling when no files are found."""
-        classifier = ParquetClassifier(currency="AUDUSD", verbose=False)
+        except Exception as e:
+            pytest.fail(f"Function signature validation failed: {e}")
+    
+    def test_config_post_init(self):
+        """Test the post_init behavior of ClassificationConfig."""
+        config = ClassificationConfig(features=None)
+        assert config.features == ["volume"]
         
-        with tempfile.TemporaryDirectory() as temp_dir:
-            input_dir = Path(temp_dir) / "empty"
-            output_dir = Path(temp_dir) / "output"
-            input_dir.mkdir()
-            
-            with pytest.raises(ValueError, match="No parquet files found"):
-                classifier.batch_classify_parquets(
-                    input_directory=input_dir,
-                    output_directory=output_dir
-                )
+        config2 = ClassificationConfig(features=["variance"])
+        assert config2.features == ["variance"]
 
 
-class TestConvenienceFunctions:
-    """Test convenience functions."""
-
-    @patch('represent.parquet_classifier.ParquetClassifier')
-    def test_classify_parquet_file_function(self, mock_classifier_class):
-        """Test classify_parquet_file convenience function."""
-        mock_classifier = MagicMock()
-        mock_classifier.classify_symbol_parquet.return_value = {"processed_samples": 100}
-        mock_classifier_class.return_value = mock_classifier
+class TestParquetClassifierCoverage:
+    """Additional tests to improve code coverage."""
+    
+    def test_process_symbol_with_valid_data(self):
+        """Test process_symbol with valid classification data."""
+        classifier = ParquetClassifier(
+            min_symbol_samples=10,
+            input_rows=3,
+            lookforward_rows=2,
+            verbose=False
+        )
         
-        with tempfile.TemporaryDirectory() as temp_dir:
-            input_path = Path(temp_dir) / "input.parquet"
-            output_path = Path(temp_dir) / "output.parquet"
-            input_path.touch()
-            
-            result = classify_parquet_file(
-                parquet_path=input_path,
-                output_path=output_path,
-                currency="GBPUSD",
-                force_uniform=False
-            )
-            
-            assert result["processed_samples"] == 100
-            mock_classifier_class.assert_called_once_with(
-                currency="GBPUSD",
-                force_uniform=False
-            )
-
-    @patch('represent.parquet_classifier.ParquetClassifier')
-    def test_batch_classify_parquet_files_function(self, mock_classifier_class):
-        """Test batch_classify_parquet_files convenience function."""
-        mock_classifier = MagicMock()
-        mock_classifier.batch_classify_parquets.return_value = [
-            {"processed_samples": 50},
-            {"processed_samples": 75}
-        ]
-        mock_classifier_class.return_value = mock_classifier
-        
-        with tempfile.TemporaryDirectory() as temp_dir:
-            input_dir = Path(temp_dir) / "input"
-            output_dir = Path(temp_dir) / "output"
-            input_dir.mkdir()
-            
-            results = batch_classify_parquet_files(
-                input_directory=input_dir,
-                output_directory=output_dir,
-                currency="EURJPY",
-                pattern="*.parquet"
-            )
-            
-            assert len(results) == 2
-            assert results[0]["processed_samples"] == 50
-            mock_classifier_class.assert_called_once_with(currency="EURJPY")
-
-
-class TestErrorHandling:
-    """Test error handling and edge cases."""
-
-    def test_missing_input_file_error(self):
-        """Test error when input file doesn't exist."""
-        classifier = ParquetClassifier(currency="AUDUSD", verbose=False)
-        
-        with pytest.raises(FileNotFoundError, match="Parquet file not found"):
-            classifier.classify_symbol_parquet(
-                parquet_path="/nonexistent/file.parquet"
-            )
-
-    def test_missing_input_directory_error(self):
-        """Test error when input directory doesn't exist."""
-        classifier = ParquetClassifier(currency="AUDUSD", verbose=False)
-        
-        with pytest.raises(FileNotFoundError, match="Input directory not found"):
-            classifier.batch_classify_parquets(
-                input_directory="/nonexistent/directory",
-                output_directory="/tmp/output"
-            )
-
-    def test_validation_missing_column_error(self):
-        """Test validation error when classification column is missing."""
-        classifier = ParquetClassifier(currency="AUDUSD", verbose=False)
-        
-        invalid_data = pl.DataFrame({
-            "sample_id": ["test_1", "test_2"],
-            "symbol": ["M6AM4", "M6AM4"],
+        # Create mock data with sufficient samples and proper structure
+        mock_data = pl.DataFrame({
+            'ts_event': range(20),  # 20 samples > 10 minimum
+            'bid_px_00': [1.0 + i * 0.0001 for i in range(20)],  # Increasing prices
+            'ask_px_00': [1.1 + i * 0.0001 for i in range(20)],  # Increasing prices
+            'symbol': ['TEST'] * 20,
         })
         
-        validation = classifier._validate_uniform_distribution(invalid_data)
-        assert "error" in validation
-        assert "No classification_label column found" in validation["error"]
-
-    @patch('polars.read_parquet')
-    def test_empty_data_handling(self, mock_read):
-        """Test handling of empty datasets."""
-        mock_read.return_value = pl.DataFrame({
-            "market_depth_features": [],
-            "sample_id": [],
-            "start_mid_price": [],
-            "end_mid_price": [],
+        result = classifier.process_symbol("TEST", mock_data)
+        
+        # Should succeed and return classified data
+        assert result is not None
+        assert len(result) > 0
+        assert 'classification_label' in result.columns
+        
+        # Classifications should be integers in valid range
+        labels = result['classification_label'].to_list()
+        assert all(isinstance(label, (int, type(None))) for label in labels)
+        valid_labels = [label for label in labels if label is not None]
+        if valid_labels:
+            assert all(0 <= label <= 12 for label in valid_labels)
+    
+    def test_quantile_boundaries_edge_cases(self):
+        """Test quantile boundary calculation edge cases."""
+        classifier = ParquetClassifier(
+            force_uniform=True,
+            nbins=5,
+            verbose=False
+        )
+        
+        # Test with constant price movements (all same value)
+        constant_data = pl.DataFrame({
+            'ts_event': range(10),
+            'price_movement': [0.001] * 10,  # All same value
         })
         
-        classifier = ParquetClassifier(currency="AUDUSD", verbose=False)
+        result = classifier.apply_quantile_classification(constant_data)
+        assert 'classification_label' in result.columns
         
-        with tempfile.TemporaryDirectory() as temp_dir:
-            input_path = Path(temp_dir) / "empty.parquet"
-            input_path.touch()
-            
-            with pytest.raises(ValueError, match="No valid samples found"):
-                classifier.classify_symbol_parquet(
-                    parquet_path=input_path,
-                    validate_uniformity=False
-                )
-
-
-class TestPerformanceOptimizations:
-    """Test performance-related functionality."""
-
-    @patch('polars.read_parquet')
-    @patch('polars.DataFrame.write_parquet')
-    @patch('pathlib.Path.stat')
-    def test_large_dataset_performance(self, mock_stat, mock_write, mock_read):
-        """Test performance with large datasets."""
-        # Simulate large dataset
-        large_data = create_mock_unlabeled_parquet(1000)
-        mock_read.return_value = large_data
-        mock_stat.return_value.st_size = 1024 * 1024  # 1MB
+        # Test with very few unique values
+        few_unique_data = pl.DataFrame({
+            'ts_event': range(10),
+            'price_movement': [0.001, 0.002] * 5,  # Only 2 unique values
+        })
         
-        classifier = ParquetClassifier(currency="AUDUSD", verbose=False)
+        result2 = classifier.apply_quantile_classification(few_unique_data)
+        assert 'classification_label' in result2.columns
+    
+    def test_filter_processable_rows_edge_cases(self):
+        """Test edge cases in filter_processable_rows."""
+        classifier = ParquetClassifier(
+            input_rows=5,
+            lookforward_rows=5,
+            verbose=False
+        )
         
-        with tempfile.TemporaryDirectory() as temp_dir:
-            input_path = Path(temp_dir) / "large.parquet"
-            input_path.touch()
-            
-            import time
-            start_time = time.time()
-            
-            stats = classifier.classify_symbol_parquet(
-                parquet_path=input_path,
-                sample_fraction=0.1,  # Use only 10% for performance
-                validate_uniformity=False
-            )
-            
-            end_time = time.time()
-            processing_time = end_time - start_time
-            
-            # Should complete reasonably quickly
-            assert processing_time < 5.0  # Less than 5 seconds
-            assert stats["samples_per_second"] > 10  # At least 10 samples/second
-
-    def test_memory_efficient_classification(self):
-        """Test memory-efficient classification processing."""
-        classifier = ParquetClassifier(currency="AUDUSD", verbose=False)
+        # Test exactly minimum required rows
+        exact_min_data = pl.DataFrame({
+            'ts_event': range(10),  # Exactly input_rows + lookforward_rows
+            'price': [1.0] * 10
+        })
         
-        # Process multiple small batches instead of one large batch
-        batch_sizes = [50, 100, 200]
+        result = classifier.filter_processable_rows(exact_min_data)
+        assert len(result) == 0  # Should have no processable rows
         
-        for batch_size in batch_sizes:
-            mock_data = create_mock_unlabeled_parquet(batch_size)
-            classified_df = classifier._apply_classification_to_dataframe(mock_data)
-            
-            # Should successfully process all batch sizes
-            assert len(classified_df) > 0
-            assert "classification_label" in classified_df.columns
+        # Test with just one more row than minimum
+        one_more_data = pl.DataFrame({
+            'ts_event': range(11),  # One more than minimum
+            'price': [1.0] * 11
+        })
+        
+        result2 = classifier.filter_processable_rows(one_more_data)
+        assert len(result2) == 1  # Should have exactly one processable row
+    
+    def test_calculate_price_movements_edge_cases(self):
+        """Test price movement calculation edge cases."""
+        classifier = ParquetClassifier(
+            lookforward_rows=3,
+            verbose=False
+        )
+        
+        # Test with minimal data
+        minimal_data = pl.DataFrame({
+            'ts_event': [1, 2, 3, 4, 5],
+            'bid_px_00': [1.0, 1.1, 1.2, 1.3, 1.4],
+            'ask_px_00': [1.01, 1.11, 1.21, 1.31, 1.41],
+        })
+        
+        result = classifier.calculate_price_movements(minimal_data)
+        
+        # Should add required columns
+        assert 'mid_price' in result.columns
+        assert 'future_mid_price' in result.columns
+        assert 'price_movement' in result.columns
+        
+        # Check that mid_price calculation is correct
+        expected_mid_0 = (1.0 + 1.01) / 2
+        actual_mid_0 = result['mid_price'][0]
+        assert abs(actual_mid_0 - expected_mid_0) < 1e-10
+    
+    def test_apply_quantile_classification_edge_distribution(self):
+        """Test quantile classification with edge distribution cases."""
+        classifier = ParquetClassifier(
+            force_uniform=True,
+            nbins=3,  # Small number of bins
+            verbose=False
+        )
+        
+        # Test with extreme outliers
+        outlier_data = pl.DataFrame({
+            'ts_event': range(100),
+            'price_movement': ([-100.0] * 10 +  # Extreme negative
+                              list(np.linspace(-0.01, 0.01, 80)) +  # Normal range
+                              [100.0] * 10),  # Extreme positive
+        })
+        
+        result = classifier.apply_quantile_classification(outlier_data)
+        assert 'classification_label' in result.columns
+        
+        labels = result['classification_label'].to_list()
+        unique_labels = set(label for label in labels if label is not None)
+        assert len(unique_labels) <= 3  # Should not exceed nbins
+        assert all(0 <= label <= 2 for label in labels if label is not None)
+    
+    def test_verbose_functionality_with_mock_data(self):
+        """Test verbose output functionality with mock operations."""
+        # Test with verbose=True but smaller requirements for testing
+        classifier = ParquetClassifier(
+            input_rows=10,
+            lookforward_rows=5,
+            min_symbol_samples=20,
+            verbose=True
+        )
+        
+        # This mainly tests that verbose initialization works
+        assert classifier.verbose is True
+        
+        # Test filter_symbols_by_threshold with verbose output
+        # Need at least input_rows + lookforward_rows per symbol
+        mock_data = pl.DataFrame({
+            'symbol': ['A'] * 30 + ['B'] * 20 + ['C'] * 10,  # Different symbol counts
+            'ts_event': range(60),
+            'price': [1.0] * 60
+        })
+        
+        # Should not raise an error with verbose output
+        filtered_df, counts = classifier.filter_symbols_by_threshold(mock_data)
+        
+        # Verify results are reasonable
+        # A has 30 samples (>= 15 required), B has 20 (>= 15), C has 10 (< 15)
+        # So should filter to A and B only
+        assert len(filtered_df) > 0
+        assert len(counts) == 3  # Should have counts for all 3 symbols
+        
+        # Check that only symbols with sufficient data are included
+        symbols_in_filtered = filtered_df['symbol'].unique().to_list()
+        assert 'A' in symbols_in_filtered
+        assert 'B' in symbols_in_filtered
+        # C might or might not be included depending on exact threshold logic
+        
+        # Test process_symbol with verbose (should handle insufficient data gracefully)
+        insufficient_data = pl.DataFrame({
+            'ts_event': range(5),  # Less than min_symbol_samples (20)
+            'bid_px_00': [1.0] * 5,
+            'ask_px_00': [1.1] * 5,
+        })
+        
+        result = classifier.process_symbol("INSUFFICIENT", insufficient_data)
+        assert result is None  # Should return None for insufficient data

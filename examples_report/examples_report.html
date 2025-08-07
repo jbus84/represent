@@ -1,0 +1,949 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Represent Package - All Examples Report</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        .header h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .header .timestamp {
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        .summary-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 6px;
+            text-align: center;
+            border-left: 4px solid #3498db;
+        }
+        .summary-card.success { border-left-color: #27ae60; }
+        .summary-card.error { border-left-color: #e74c3c; }
+        .summary-card.time { border-left-color: #f39c12; }
+        .summary-card h3 {
+            margin: 0 0 10px 0;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .summary-card p {
+            margin: 0;
+            color: #7f8c8d;
+        }
+        .directory-section {
+            margin-bottom: 40px;
+        }
+        .directory-title {
+            background: #3498db;
+            color: white;
+            padding: 15px 20px;
+            margin: 0 0 20px 0;
+            border-radius: 6px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .example-card {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .example-header {
+            background: #fff;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .example-title {
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .example-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status-badge.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status-badge.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .duration {
+            color: #6c757d;
+            font-size: 14px;
+        }
+        .example-content {
+            padding: 20px;
+        }
+        .output-section {
+            margin: 15px 0;
+        }
+        .output-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #495057;
+        }
+        .output-content {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .error-content {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        .file-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .file-item {
+            background: #e3f2fd;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-family: monospace;
+            border-left: 3px solid #2196f3;
+        }
+        .no-output {
+            color: #6c757d;
+            font-style: italic;
+        }
+        .collapsible {
+            cursor: pointer;
+            user-select: none;
+        }
+        .collapsible:hover {
+            background: #f0f0f0;
+        }
+        .content {
+            display: none;
+        }
+        .content.show {
+            display: block;
+        }
+        .toggle-icon {
+            transition: transform 0.2s;
+        }
+        .toggle-icon.rotate {
+            transform: rotate(90deg);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Represent Package - All Examples Report</h1>
+            <div class="timestamp">Generated on 2025-08-07 12:07:28</div>
+        </div>
+        
+        <div class="summary">
+            <div class="summary-card success">
+                <h3>8</h3>
+                <p>Successful Examples</p>
+            </div>
+            <div class="summary-card error">
+                <h3>9</h3>
+                <p>Failed Examples</p>
+            </div>
+            <div class="summary-card">
+                <h3>17</h3>
+                <p>Total Examples</p>
+            </div>
+            <div class="summary-card time">
+                <h3>55.6s</h3>
+                <p>Total Runtime</p>
+            </div>
+        </div>
+
+        <div class="directory-section">
+            <h2 class="directory-title">
+                📂 01 Getting Started 
+                (1/5 successful)
+            </h2>
+
+            <div class="example-card">
+                <div class="example-header collapsible" onclick="toggleContent('api_usage_examples_py')">
+                    <div class="example-title">api_usage_examples.py</div>
+                    <div class="example-status">
+                        <span class="duration">1.4s</span>
+                        <span class="status-badge error">❌ Failed</span>
+                        <span class="toggle-icon" id="icon_api_usage_examples_py">▶</span>
+                    </div>
+                </div>
+                <div class="example-content content" id="content_api_usage_examples_py">
+
+                    <div class="output-section">
+                        <div class="output-title">📄 Output</div>
+                        <div class="output-content">🎉 Represent v3.0.0 API Usage Examples
+=============================================
+</div>
+                    </div>
+
+                    <div class="output-section">
+                        <div class="output-title">❌ Error</div>
+                        <div class="output-content error-content">Traceback (most recent call last):
+  File "/Users/danielfisher/repositories/represent/examples/01_getting_started/api_usage_examples.py", line 262, in <module>
+    main()
+  File "/Users/danielfisher/repositories/represent/examples/01_getting_started/api_usage_examples.py", line 240, in main
+    api = represent.RepresentAPI()
+          ^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'represent' has no attribute 'RepresentAPI'
+</div>
+                    </div>
+
+                    <div class="output-section">
+                        <div class="output-title">📁 Generated Files (1)</div>
+                        <div class="file-list">
+<div class="file-item">outputs/simple_api_config.json</div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="example-card">
+                <div class="example-header collapsible" onclick="toggleContent('new_config_demo_py')">
+                    <div class="example-title">new_config_demo.py</div>
+                    <div class="example-status">
+                        <span class="duration">0.9s</span>
+                        <span class="status-badge error">❌ Failed</span>
+                        <span class="toggle-icon" id="icon_new_config_demo_py">▶</span>
+                    </div>
+                </div>
+                <div class="example-content content" id="content_new_config_demo_py">
+
+                    <div class="output-section">
+                        <div class="output-title">❌ Error</div>
+                        <div class="output-content error-content">Traceback (most recent call last):
+  File "/Users/danielfisher/repositories/represent/examples/01_getting_started/new_config_demo.py", line 15, in <module>
+    from represent import RepresentConfig, create_represent_config
+ImportError: cannot import name 'RepresentConfig' from 'represent' (/Users/danielfisher/.pyenv/versions/3.12.7/lib/python3.12/site-packages/represent/__init__.py)
+</div>
+                    </div>
+
+                    <div class="output-section">
+                        <div class="output-title">📁 Generated Files (1)</div>
+                        <div class="file-list">
+<div class="file-item">outputs/simple_api_config.json</div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="example-card">
+                <div class="example-header collapsible" onclick="toggleContent('simple_api_demo_py')">
+                    <div class="example-title">simple_api_demo.py</div>
+                    <div class="example-status">
+                        <span class="duration">2.1s</span>
+                        <span class="status-badge success">✅ Success</span>
+                        <span class="toggle-icon" id="icon_simple_api_demo_py">▶</span>
+                    </div>
+                </div>
+                <div class="example-content content" id="content_simple_api_demo_py">
+
+                    <div class="output-section">
+                        <div class="output-title">📄 Output</div>
+                        <div class="output-content">🚀 Simple API Demo - Represent Package
+==================================================
+📊 Creating sample configuration...
+✅ Configuration created successfully!
+   Currency: AUDUSD
+   Features: ['volume']
+   Samples: 1000
+   NBins: 13
+   Lookback Rows: 5000
+   Lookforward Input: 5000
+📁 Sample output saved to: /Users/danielfisher/repositories/represent/examples/01_getting_started/outputs/simple_api_config.json
+
+🎯 Key Features Demonstrated:
+   ✅ Configuration creation with currency-specific optimizations
+   ✅ Automatic parameter calculation and validation
+   ✅ JSON export of configuration data
+   ✅ Output file generation for report system
+
+✅ Simple API Demo completed successfully!
+</div>
+                    </div>
+
+                    <div class="output-section">
+                        <div class="output-title">📁 Generated Files (1)</div>
+                        <div class="file-list">
+<div class="file-item">outputs/simple_api_config.json</div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="example-card">
+                <div class="example-header collapsible" onclick="toggleContent('simple_currency_config_demo_py')">
+                    <div class="example-title">simple_currency_config_demo.py</div>
+                    <div class="example-status">
+                        <span class="duration">0.9s</span>
+                        <span class="status-badge error">❌ Failed</span>
+                        <span class="toggle-icon" id="icon_simple_currency_config_demo_py">▶</span>
+                    </div>
+                </div>
+                <div class="example-content content" id="content_simple_currency_config_demo_py">
+
+                    <div class="output-section">
+                        <div class="output-title">❌ Error</div>
+                        <div class="output-content error-content">Traceback (most recent call last):
+  File "/Users/danielfisher/repositories/represent/examples/01_getting_started/simple_currency_config_demo.py", line 8, in <module>
+    from represent import RepresentConfig
+ImportError: cannot import name 'RepresentConfig' from 'represent' (/Users/danielfisher/.pyenv/versions/3.12.7/lib/python3.12/site-packages/represent/__init__.py)
+</div>
+                    </div>
+
+                    <div class="output-section">
+                        <div class="output-title">📁 Generated Files (1)</div>
+                        <div class="file-list">
+<div class="file-item">outputs/simple_api_config.json</div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="example-card">
+                <div class="example-header collapsible" onclick="toggleContent('simplified_config_demo_py')">
+                    <div class="example-title">simplified_config_demo.py</div>
+                    <div class="example-status">
+                        <span class="duration">0.9s</span>
+                        <span class="status-badge error">❌ Failed</span>
+                        <span class="toggle-icon" id="icon_simplified_config_demo_py">▶</span>
+                    </div>
+                </div>
+                <div class="example-content content" id="content_simplified_config_demo_py">
+
+                    <div class="output-section">
+                        <div class="output-title">❌ Error</div>
+                        <div class="output-content error-content">Traceback (most recent call last):
+  File "/Users/danielfisher/repositories/represent/examples/01_getting_started/simplified_config_demo.py", line 9, in <module>
+    from represent import RepresentConfig, create_represent_config
+ImportError: cannot import name 'RepresentConfig' from 'represent' (/Users/danielfisher/.pyenv/versions/3.12.7/lib/python3.12/site-packages/represent/__init__.py)
+</div>
+                    </div>
+
+                    <div class="output-section">
+                        <div class="output-title">📁 Generated Files (1)</div>
+                        <div class="file-list">
+<div class="file-item">outputs/simple_api_config.json</div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        <div class="directory-section">
+            <h2 class="directory-title">
+                📂 02 Global Thresholds 
+                (3/4 successful)
+            </h2>
+
+            <div class="example-card">
+                <div class="example-header collapsible" onclick="toggleContent('global_threshold_classification_demo_py')">
+                    <div class="example-title">global_threshold_classification_demo.py</div>
+                    <div class="example-status">
+                        <span class="duration">1.7s</span>
+                        <span class="status-badge success">✅ Success</span>
+                        <span class="toggle-icon" id="icon_global_threshold_classification_demo_py">▶</span>
+                    </div>
+                </div>
+                <div class="example-content content" id="content_global_threshold_classification_demo_py">
+
+                    <div class="output-section">
+                        <div class="output-title">📄 Output</div>
+                        <div class="output-content">🌐 GLOBAL THRESHOLD CLASSIFICATION WITH AUDUSD DATA
+================================================================================
+Demonstrating consistent classification using real market data
+Data source: /Users/danielfisher/data/databento/AUDUSD-micro
+================================================================================
+🌐 GLOBAL THRESHOLD CLASSIFICATION DEMONSTRATION
+================================================================================
+📁 Using AUDUSD market data from:
+   /Users/danielfisher/data/databento/AUDUSD-micro
+================================================================================
+📊 Found 313 DBN files available
+📋 Date range: 10.dbn to 10.dbn
+🎯 Will use first 20 files for threshold calculation
+\n🎯 STEP 1: CALCULATING GLOBAL THRESHOLDS
+============================================================
+📊 Sample configuration:
+   • Total files available: 313
+   • Files for thresholds: 20
+   • Sample fraction: 6.4%
+   • Currency: AUDUSD
+   • Classification bins: 13
+❌ Failed to calculate global thresholds: calculate_global_thresholds() got an unexpected keyword argument 'max_samples_per_file'
+\n⚠️  THE PROBLEM WITH PER-FILE QUANTILE APPROACH
+======================================================================
+❌ When each file calculates its own quantiles:
+   • File 1 (volatile day): Class 0 = movements ≤ -15.2 μpips
+   • File 2 (calm day):     Class 0 = movements ≤ -2.1 μpips
+   • File 3 (trending day): Class 0 = movements ≤ -8.7 μpips
+\n💥 CRITICAL PROBLEM:
+   A -5.0 μpip movement gets:
+   • File 1: Class 2 (above threshold)
+   • File 2: Class 0 (below threshold)
+   • File 3: Class 1 (middle threshold)
+\n🔥 RESULT: SAME PRICE MOVEMENT = DIFFERENT LABELS!
+   This makes ML training data inconsistent and reduces model performance.
+\n✅ GLOBAL THRESHOLD SOLUTION:
+   All files: Class 0 = movements ≤ -4.2 μpips (always consistent)
+   A -5.0 μpip movement ALWAYS gets Class 0 across ALL files!
+\n🎯 BENEFIT: Consistent, comparable, high-quality</div>
+                    </div>
+
+                    <div class="output-section">
+                        <div class="output-title">📁 Generated Files</div>
+                        <div class="no-output">No files generated or detected</div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="example-card">
+                <div class="example-header collapsible" onclick="toggleContent('global_threshold_demo_py')">
+                    <div class="example-title">global_threshold_demo.py</div>
+                    <div class="example-status">
+                        <span class="duration">0.9s</span>
+                        <span class="status-badge error">❌ Failed</span>
+                        <span class="toggle-icon" id="icon_global_threshold_demo_py">▶</span>
+                    </div>
+                </div>
+                <div class="example-content content" id="content_global_threshold_demo_py">
+
+                    <div class="output-section">
+                        <div class="output-title">❌ Error</div>
+                        <div class="output-content error-content">Traceback (most recent call last):
+  File "/Users/danielfisher/repositories/represent/examples/02_global_thresholds/global_threshold_demo.py", line 23, in <module>
+    from represent import (
+ImportError: cannot import name 'calculate_global_thresholds' from 'represent' (/Users/danielfisher/.pyenv/versions/3.12.7/lib/python3.12/site-packages/represent/__init__.py)
+</div>
+                    </div>
+
+                    <div class="output-section">
+                        <div class="output-title">📁 Generated Files</div>
+                        <div class="no-output">No files generated or detected</div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="example-card">
+                <div class="example-header collapsible" onclick="toggleContent('simple_global_threshold_demo_py')">
+                    <div class="example-title">simple_global_threshold_demo.py</div>
+                    <div class="example-status">
+                        <span class="duration">1.4s</span>
+                        <span class="status-badge success">✅ Success</span>
+                        <span class="toggle-icon" id="icon_simple_global_threshold_demo_py">▶</span>
+                    </div>
+                </div>
+                <div class="example-content content" id="content_simple_global_threshold_demo_py">
+
+                    <div class="output-section">
+                        <div class="output-title">📄 Output</div>
+                        <div class="output-content">🌐 SIMPLE GLOBAL THRESHOLD DEMONSTRATION
+============================================================
+📁 Data source: /Users/danielfisher/data/databento/AUDUSD-micro
+📁 Output: /Users/danielfisher/repositories/represent/examples/classification_analysis/outputs/simple_demo
+📊 Found 313 DBN files
+🎯 Will use first 10 files for threshold calculation
+\n🎯 STEP 1: Calculate Global Thresholds
+----------------------------------------
+❌ Failed: calculate_global_thresholds() got an unexpected keyword argument 'max_samples_per_file'
+\n❌ DEMONSTRATION FAILED
+Please check the error messages above
+</div>
+                    </div>
+
+                    <div class="output-section">
+                        <div class="output-title">📁 Generated Files</div>
+                        <div class="no-output">No files generated or detected</div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="example-card">
+                <div class="example-header collapsible" onclick="toggleContent('verify_row_classification_py')">
+                    <div class="example-title">verify_row_classification.py</div>
+                    <div class="example-status">
+                        <span class="duration">1.4s</span>
+                        <span class="status-badge success">✅ Success</span>
+                        <span class="toggle-icon" id="icon_verify_row_classification_py">▶</span>
+                    </div>
+                </div>
+                <div class="example-content content" id="content_verify_row_classification_py">
+
+                    <div class="output-section">
+                        <div class="output-title">📄 Output</div>
+                        <div class="output-content">🔍 ROW-LEVEL CLASSIFICATION VERIFICATION
+======================================================================
+Verifying that each row gets its own classification label
+======================================================================
+🔍 VERIFYING ROW-LEVEL CLASSIFICATION
+============================================================
+📊 Found 313 DBN files
+
+🎯 STEP 1: Calculate Global Thresholds for ALL Rows
+--------------------------------------------------
+❌ Failed: calculate_global_thresholds() got an unexpected keyword argument 'max_samples_per_file'
+
+❌ VERIFICATION FAILED
+Check output above for details
+</div>
+                    </div>
+
+                    <div class="output-section">
+                        <div class="output-title">📁 Generated Files</div>
+                        <div class="no-output">No files generated or detected</div>
+                    </div>
+
+                </div>
+            </div>
+
+        <div class="directory-section">
+            <h2 class="directory-title">
+                📂 03 Data Processing 
+                (2/3 successful)
+            </h2>
+
+            <div class="example-card">
+                <div class="example-header collapsible" onclick="toggleContent('dbn_to_parquet_example_py')">
+                    <div class="example-title">dbn_to_parquet_example.py</div>
+                    <div class="example-status">
+                        <span class="duration">0.9s</span>
+                        <span class="status-badge error">❌ Failed</span>
+                        <span class="toggle-icon" id="icon_dbn_to_parquet_example_py">▶</span>
+                    </div>
+                </div>
+                <div class="example-content content" id="content_dbn_to_parquet_example_py">
+
+                    <div class="output-section">
+                        <div class="output-title">❌ Error</div>
+                        <div class="output-content error-content">Traceback (most recent call last):
+  File "/Users/danielfisher/repositories/represent/examples/03_data_processing/dbn_to_parquet_example.py", line 24, in <module>
+    from represent import (
+ImportError: cannot import name 'convert_dbn_to_parquet' from 'represent' (/Users/danielfisher/.pyenv/versions/3.12.7/lib/python3.12/site-packages/represent/__init__.py)
+</div>
+                    </div>
+
+                    <div class="output-section">
+                        <div class="output-title">📁 Generated Files</div>
+                        <div class="no-output">No files generated or detected</div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="example-card">
+                <div class="example-header collapsible" onclick="toggleContent('fixed_optimized_demo_py')">
+                    <div class="example-title">fixed_optimized_demo.py</div>
+                    <div class="example-status">
+                        <span class="duration">11.3s</span>
+                        <span class="status-badge success">✅ Success</span>
+                        <span class="toggle-icon" id="icon_fixed_optimized_demo_py">▶</span>
+                    </div>
+                </div>
+                <div class="example-content content" id="content_fixed_optimized_demo_py">
+
+                    <div class="output-section">
+                        <div class="output-title">📄 Output</div>
+                        <div class="output-content">🚀 STREAMLINED CLASSIFICATION ANALYSIS
+============================================================
+🎯 Streamlined production data processing with uniform distribution
+============================================================
+🔄 Processing DBN data with streamlined approach...
+📊 Found 2 DBN files
+   1. glbx-mdp3-20240403.mbp-10.dbn.zst (7.4 MB)
+   2. glbx-mdp3-20240405.mbp-10.dbn.zst (8.9 MB)
+
+🚀 Processing 1/2: glbx-mdp3-20240403.mbp-10.dbn.zst
+   ✅ Generated 2 symbol files
+   📊 Classified 270,322 samples
+
+🚀 Processing 2/2: glbx-mdp3-20240405.mbp-10.dbn.zst
+   ✅ Generated 2 symbol files
+   📊 Classified 331,340 samples
+✅ Processing complete!
+   📊 Total samples: 601,662
+   ⏱️  Processing time: 5.9s
+📊 Creating analysis plot...
+   ✅ Saved plot: /Users/danielfisher/repositories/represent/examples/classification_analysis/outputs/streamlined_comprehensive_classification_analysis.png
+📄 Creating summary report...
+   ✅ Saved report: /Users/danielfisher/repositories/represent/examples/classification_analysis/outputs/streamlined_classification_validation_summary.md
+
+============================================================
+🎉 STREAMLINED ANALYSIS COMPLETE!
+============================================================
+📊 Total samples: 601,662
+📊 Processing rate: 101236 samples/sec
+📊 Quality: NEEDS_IMPROVEMENT
+📊 Avg deviation: 7.02%
+
+📁 Output files:
+   📊 Plot: streamlined_comprehensive_classification_analysis.png
+   📄 Report: streamlined_classification_validation_summary.md
+   📋 JSON: streamlined_detailed_results.json
+
+🚀 Ready for production with streamlined processing!
+🧹 Cleaning up resources...
+   ✅ Memory cleanup complete
+</div>
+                    </div>
+
+                    <div class="output-section">
+                        <div class="output-title">📁 Generated Files</div>
+                        <div class="no-output">No files generated or detected</div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="example-card">
+                <div class="example-header collapsible" onclick="toggleContent('streamlined_classifier_demo_py')">
+                    <div class="example-title">streamlined_classifier_demo.py</div>
+                    <div class="example-status">
+                        <span class="duration">7.4s</span>
+                        <span class="status-badge success">✅ Success</span>
+                        <span class="toggle-icon" id="icon_streamlined_classifier_demo_py">▶</span>
+                    </div>
+                </div>
+                <div class="example-content content" id="content_streamlined_classifier_demo_py">
+
+                    <div class="output-section">
+                        <div class="output-title">📄 Output</div>
+                        <div class="output-content">🚀 STREAMLINED DBN CLASSIFIER DEMONSTRATION
+======================================================================
+📋 Single DBN → Multiple Classified Parquet Files by Symbol
+======================================================================
+📊 Found 2 DBN files:
+   1. glbx-mdp3-20240403.mbp-10.dbn.zst (7.4 MB)
+   2. glbx-mdp3-20240405.mbp-10.dbn.zst (8.9 MB)
+
+🎯 Processing: glbx-mdp3-20240403.mbp-10.dbn.zst
+==================================================
+🚀 ParquetClassifier initialized
+   💱 Currency: AUDUSD
+   📊 Features: ['volume']
+   📈 Input rows: 5000
+   📉 Lookforward rows: 500
+   🎯 Min samples per symbol: 50
+   ⚖️  Force uniform: True
+   ⚠️  Global thresholds: Using per-symbol calculation (not recommended)
+🚀 Starting Streamlined DBN-to-Classified-Parquet Processing
+======================================================================
+📄 Loading DBN file: /Users/danielfisher/repositories/represent/data/glbx-mdp3-20240403.mbp-10.dbn.zst
+   ✅ Loaded 282,362 rows in 2.2s
+   📊 Columns: ['ts_event', 'rtype', 'publisher_id', 'instrument_id', 'action', 'side', 'depth', 'price', 'size', 'flags', 'ts_in_delta', 'sequence', 'bid_px_00', 'ask_px_00', 'bid_sz_00', 'ask_sz_00', 'bid_ct_00', 'ask_ct_00', 'bid_px_01', 'ask_px_01', 'bid_sz_01', 'ask_sz_01', 'bid_ct_01', 'ask_ct_01', 'bid_px_02', 'ask_px_02', 'bid_sz_02', 'ask_sz_02', 'bid_ct_02', 'ask_ct_02', 'bid_px_03', 'ask_px_03', 'bid_sz_03', 'ask_sz_03', 'bid_ct_03', 'ask_ct_03', 'bid_px_04', 'ask_px_04', 'bid_sz_04', 'ask_sz_04', 'bid_ct_04', 'ask_ct_04', 'bid_px_05', 'ask_px_05', 'bid_sz_05', 'ask_sz_05', 'bid_ct_05', 'ask_ct_05', 'bid_px_06', 'ask_px_06', 'bid_sz_06', 'ask_sz_06', 'bid_ct_06', 'ask_ct_06', 'bid_px_07', 'ask_px_07', 'bid_sz_07', 'ask_sz_07', 'bid_ct_07', 'ask_ct_07', 'bid_px_08', 'ask_px_08', 'bid_sz_08', 'ask_sz_08', 'bid_ct_08', 'ask_ct_08', 'bid_px_09', 'ask_px_09', 'bid_sz_09', 'ask_sz_09', 'bid_ct_09', 'ask_ct_09', 'symbol']
+   📊 Symbols: 3 unique
+🔍 Filtering symbols by threshold...
+   📊 Total s</div>
+                    </div>
+
+                    <div class="output-section">
+                        <div class="output-title">📁 Generated Files</div>
+                        <div class="no-output">No files generated or detected</div>
+                    </div>
+
+                </div>
+            </div>
+
+        <div class="directory-section">
+            <h2 class="directory-title">
+                📂 04 Ml Training 
+                (2/4 successful)
+            </h2>
+
+            <div class="example-card">
+                <div class="example-header collapsible" onclick="toggleContent('parquet_dataloader_example_py')">
+                    <div class="example-title">parquet_dataloader_example.py</div>
+                    <div class="example-status">
+                        <span class="duration">1.0s</span>
+                        <span class="status-badge error">❌ Failed</span>
+                        <span class="toggle-icon" id="icon_parquet_dataloader_example_py">▶</span>
+                    </div>
+                </div>
+                <div class="example-content content" id="content_parquet_dataloader_example_py">
+
+                    <div class="output-section">
+                        <div class="output-title">❌ Error</div>
+                        <div class="output-content error-content">Traceback (most recent call last):
+  File "/Users/danielfisher/repositories/represent/examples/04_ml_training/parquet_dataloader_example.py", line 21, in <module>
+    from represent import RepresentConfig
+ImportError: cannot import name 'RepresentConfig' from 'represent' (/Users/danielfisher/.pyenv/versions/3.12.7/lib/python3.12/site-packages/represent/__init__.py)
+</div>
+                    </div>
+
+                    <div class="output-section">
+                        <div class="output-title">📁 Generated Files</div>
+                        <div class="no-output">No files generated or detected</div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="example-card">
+                <div class="example-header collapsible" onclick="toggleContent('pytorch_training_example_py')">
+                    <div class="example-title">pytorch_training_example.py</div>
+                    <div class="example-status">
+                        <span class="duration">0.9s</span>
+                        <span class="status-badge error">❌ Failed</span>
+                        <span class="toggle-icon" id="icon_pytorch_training_example_py">▶</span>
+                    </div>
+                </div>
+                <div class="example-content content" id="content_pytorch_training_example_py">
+
+                    <div class="output-section">
+                        <div class="output-title">❌ Error</div>
+                        <div class="output-content error-content">Traceback (most recent call last):
+  File "/Users/danielfisher/repositories/represent/examples/04_ml_training/pytorch_training_example.py", line 12, in <module>
+    from represent import RepresentConfig, create_parquet_dataloader
+ImportError: cannot import name 'RepresentConfig' from 'represent' (/Users/danielfisher/.pyenv/versions/3.12.7/lib/python3.12/site-packages/represent/__init__.py)
+</div>
+                    </div>
+
+                    <div class="output-section">
+                        <div class="output-title">📁 Generated Files</div>
+                        <div class="no-output">No files generated or detected</div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="example-card">
+                <div class="example-header collapsible" onclick="toggleContent('streamlined_dataloader_demo_py')">
+                    <div class="example-title">streamlined_dataloader_demo.py</div>
+                    <div class="example-status">
+                        <span class="duration">1.8s</span>
+                        <span class="status-badge success">✅ Success</span>
+                        <span class="toggle-icon" id="icon_streamlined_dataloader_demo_py">▶</span>
+                    </div>
+                </div>
+                <div class="example-content content" id="content_streamlined_dataloader_demo_py">
+
+                    <div class="output-section">
+                        <div class="output-title">📄 Output</div>
+                        <div class="output-content">🚀 STREAMLINED DATALOADER PERFORMANCE DEMO
+======================================================================
+📋 Testing classified parquet files for ML training performance
+======================================================================
+📊 Found 2 classified parquet files:
+   1. AUDUSD_M6AM4_classified.parquet (3.7 MB)
+   2. AUDUSD_M6AU4_classified.parquet (1.0 MB)
+📊 Total data size: 4.7 MB
+🔄 Benchmarking single file loading performance...
+📊 Lazy dataset initialized: 230,545 samples from AUDUSD_M6AM4_classified.parquet
+❌ Performance analysis failed: market_depth_features
+
+Resolved plan until failure:
+
+	---> FAILED HERE RESOLVING 'sink' <---
+SLICE[offset: 0, len: 1]
+  Parquet SCAN [/Users/danielfisher/repositories/represent/examples/classification_analysis/outputs/streamlined_classified/AUDUSD_M6AM4_classified.parquet] [id: 4333831568]
+  PROJECT */77 COLUMNS
+
+❌ STREAMLINED DATALOADER VALIDATION FAILED!
+</div>
+                    </div>
+
+                    <div class="output-section">
+                        <div class="output-title">📁 Generated Files</div>
+                        <div class="no-output">No files generated or detected</div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="example-card">
+                <div class="example-header collapsible" onclick="toggleContent('streamlined_dataloader_simple_demo_py')">
+                    <div class="example-title">streamlined_dataloader_simple_demo.py</div>
+                    <div class="example-status">
+                        <span class="duration">18.8s</span>
+                        <span class="status-badge success">✅ Success</span>
+                        <span class="toggle-icon" id="icon_streamlined_dataloader_simple_demo_py">▶</span>
+                    </div>
+                </div>
+                <div class="example-content content" id="content_streamlined_dataloader_simple_demo_py">
+
+                    <div class="output-section">
+                        <div class="output-title">📄 Output</div>
+                        <div class="output-content">🚀 STREAMLINED SIMPLE DATALOADER DEMO
+============================================================
+📋 Testing on-demand feature generation approach
+============================================================
+📊 Found 2 classified parquet files:
+   1. AUDUSD_M6AM4_classified.parquet (3.7 MB)
+   2. AUDUSD_M6AU4_classified.parquet (1.0 MB)
+
+🔄 Benchmarking streamlined loading performance...
+
+   📋 Testing configuration: batch_16_frac_0.01_rows_1000
+📊 Loading full dataset from AUDUSD_M6AM4_classified.parquet...
+   ✅ Loaded 2,305 samples in 0.04s
+   📊 Sample fraction: 0.01 (2305/230545)
+      ✅ Processed 20 batches (320 samples) in 3.46s
+      📈 Rate: 93 samples/sec, 5.8 batches/sec
+      📊 Feature shape: torch.Size([16, 402, 500])
+
+   📋 Testing configuration: batch_32_frac_0.05_rows_1000
+📊 Loading full dataset from AUDUSD_M6AM4_classified.parquet...
+   ✅ Loaded 11,527 samples in 0.04s
+   📊 Sample fraction: 0.05 (11527/230545)
+      ✅ Processed 20 batches (640 samples) in 5.76s
+      📈 Rate: 111 samples/sec, 3.5 batches/sec
+      📊 Feature shape: torch.Size([32, 402, 500])
+
+   📋 Testing configuration: batch_32_frac_0.1_rows_5000
+📊 Loading full dataset from AUDUSD_M6AM4_classified.parquet...
+   ✅ Loaded 23,054 samples in 0.04s
+   📊 Sample fraction: 0.1 (23054/230545)
+      ✅ Processed 20 batches (640 samples) in 5.98s
+      📈 Rate: 107 samples/sec, 3.3 batches/sec
+      📊 Feature shape: torch.Size([32, 402, 500])
+
+🔄 Testing ML training with streamlined data...
+📊 Loading full dataset from AUDUSD_M6AM4_classified.parquet...
+   ✅ Loaded 4,610 samples in 0.04s
+   📊 Sample fraction: 0.02 (4610/230545)
+   🔄 Testing training loop...
+      ✅ Training successful!
+      📊 Batches: 5, Avg Loss: 2.5278
+      ⏱️  Time: 1.25s
+
+📊 Creating performance visualization...
+   ✅ Saved performance plot: /Users/danielfisher/repositories/represent/examples/classification_analysis/outputs/streamlined_simple_dataloader_performance.png
+
+🎉 STREAMLINED SIMPLE DATALOADER DEMO COMPLETE!
+====================</div>
+                    </div>
+
+                    <div class="output-section">
+                        <div class="output-title">📁 Generated Files</div>
+                        <div class="no-output">No files generated or detected</div>
+                    </div>
+
+                </div>
+            </div>
+
+        <div class="directory-section">
+            <h2 class="directory-title">
+                📂 05 Visualization 
+                (0/1 successful)
+            </h2>
+
+            <div class="example-card">
+                <div class="example-header collapsible" onclick="toggleContent('extended_features_visualization_py')">
+                    <div class="example-title">extended_features_visualization.py</div>
+                    <div class="example-status">
+                        <span class="duration">1.8s</span>
+                        <span class="status-badge error">❌ Failed</span>
+                        <span class="toggle-icon" id="icon_extended_features_visualization_py">▶</span>
+                    </div>
+                </div>
+                <div class="example-content content" id="content_extended_features_visualization_py">
+
+                    <div class="output-section">
+                        <div class="output-title">❌ Error</div>
+                        <div class="output-content error-content">Traceback (most recent call last):
+  File "/Users/danielfisher/repositories/represent/examples/05_visualization/extended_features_visualization.py", line 13, in <module>
+    from represent import RepresentConfig
+ImportError: cannot import name 'RepresentConfig' from 'represent' (/Users/danielfisher/.pyenv/versions/3.12.7/lib/python3.12/site-packages/represent/__init__.py)
+</div>
+                    </div>
+
+                    <div class="output-section">
+                        <div class="output-title">📁 Generated Files (1)</div>
+                        <div class="file-list">
+<div class="file-item">market_depth_visualization.png</div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        function toggleContent(exampleId) {
+            const content = document.getElementById('content_' + exampleId);
+            const icon = document.getElementById('icon_' + exampleId);
+            
+            if (content.classList.contains('show')) {
+                content.classList.remove('show');
+                icon.classList.remove('rotate');
+                icon.textContent = '▶';
+            } else {
+                content.classList.add('show');
+                icon.classList.add('rotate');
+                icon.textContent = '▼';
+            }
+        }
+        
+        // Auto-expand failed examples
+        document.addEventListener('DOMContentLoaded', function() {
+            const failedExamples = document.querySelectorAll('.status-badge.error');
+            failedExamples.forEach(badge => {
+                const card = badge.closest('.example-card');
+                const header = card.querySelector('.collapsible');
+                header.click();
+            });
+        });
+    </script>
+</body>
+</html>

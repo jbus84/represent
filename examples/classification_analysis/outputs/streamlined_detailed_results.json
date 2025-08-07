@@ -1,0 +1,86 @@
+{
+  "analysis_type": "streamlined_classification_analysis",
+  "timestamp": "2025-08-07 12:06:56",
+  "processing_stats": {
+    "files_processed": 2,
+    "total_samples": 601662,
+    "symbols_processed": 4,
+    "processing_time": 5.943156583001837
+  },
+  "statistical_analysis": {
+    "basic_stats": {
+      "total_samples": 601662,
+      "mean": 6.5084233340313995,
+      "std": 3.557615188674506,
+      "median": 9.0,
+      "min": 0,
+      "max": 12,
+      "range": "0 - 12"
+    },
+    "distribution": {
+      "0": {
+        "count": 7592,
+        "percentage": 1.261838041957112
+      },
+      "1": {
+        "count": 29425,
+        "percentage": 4.890619650235514
+      },
+      "2": {
+        "count": 59172,
+        "percentage": 9.834757721112517
+      },
+      "3": {
+        "count": 124539,
+        "percentage": 20.69916331761022
+      },
+      "4": {
+        "count": 33467,
+        "percentage": 5.5624254149339665
+      },
+      "5": {
+        "count": 11962,
+        "percentage": 1.9881594649487588
+      },
+      "6": {
+        "count": 8577,
+        "percentage": 1.4255512231119798
+      },
+      "7": {
+        "count": 5792,
+        "percentage": 0.9626667464456787
+      },
+      "8": {
+        "count": 18673,
+        "percentage": 3.1035697783805527
+      },
+      "9": {
+        "count": 99637,
+        "percentage": 16.560294650484824
+      },
+      "10": {
+        "count": 176361,
+        "percentage": 29.312304915384384
+      },
+      "11": {
+        "count": 18506,
+        "percentage": 3.075813330408103
+      },
+      "12": {
+        "count": 7959,
+        "percentage": 1.3228357449863877
+      }
+    },
+    "normality": {
+      "shapiro_stat": 0.9077508355396016,
+      "shapiro_p": 7.312935521743832e-48,
+      "is_normal": "False"
+    },
+    "uniformity": {
+      "expected_percentage": 7.6923076923076925,
+      "max_deviation": 21.61999722307669,
+      "avg_deviation": 7.0211215131324884,
+      "quality_assessment": "NEEDS_IMPROVEMENT"
+    }
+  }
+}

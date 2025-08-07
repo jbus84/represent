@@ -1,19 +1,45 @@
 """
 Represent: High-performance market depth ML pipeline.
 
-This package provides a clean 3-stage architecture (v3.0.0):
+This package provides flexible multi-stage architectures (v4.0.0):
+
+STREAMLINED 2-STAGE APPROACH (NEW):
+1. DBN → Classified Parquet (Direct, Symbol-by-Symbol)
+2. ML Training with On-demand Feature Generation
+
+CLASSIC 3-STAGE APPROACH:
 1. DBN to unlabeled symbol-grouped parquet conversion
-2. Post-processing classification with uniform distribution
+2. Post-processing classification with uniform distribution  
 3. Lazy loading parquet dataloader for ML training
-4. Currency-specific market configurations
-5. High-performance PyTorch integration
+
+Both approaches support:
+- Currency-specific market configurations
+- High-performance PyTorch integration
+- Quantile-based uniform distribution
+- Multi-feature extraction (volume, variance, trade_counts)
 """
 
 __version__ = "1.10.0"
 
-# V2.0.0 - 3-Stage Architecture API
+# V4.0.0 - Multi-approach Architecture API
+
+# Streamlined DBN-to-Classified-Parquet Approach
+from .parquet_classifier import (
+    ParquetClassifier,
+    classify_parquet_file, 
+    batch_classify_parquet_files,
+    process_dbn_to_classified_parquets
+)
+
+# Global Threshold Calculation
+from .global_threshold_calculator import (
+    GlobalThresholds,
+    GlobalThresholdCalculator,
+    calculate_global_thresholds
+)
+
+# Alternative: Unlabeled conversion approach
 from .unlabeled_converter import convert_dbn_to_parquet, batch_convert_dbn_files as batch_convert_unlabeled
-from .parquet_classifier import classify_parquet_file, batch_classify_parquet_files
 from .lazy_dataloader import (
     LazyParquetDataset,
     LazyParquetDataLoader,
@@ -54,12 +80,19 @@ from .config import (
 
 # Public API
 __all__ = [
-    # V2.0.0 - 3-Stage Architecture API
-    "convert_dbn_to_parquet",  # Stage 1: Unlabeled conversion
-    "batch_convert_unlabeled", 
-    "classify_parquet_file",   # Stage 2: Post-processing classification
+    # Streamlined DBN-to-Classified-Parquet Approach
+    "ParquetClassifier",
+    "process_dbn_to_classified_parquets",
+    "classify_parquet_file",
     "batch_classify_parquet_files",
-    "create_parquet_dataloader",  # Stage 3: ML training
+    # Global Threshold Calculation
+    "GlobalThresholds",
+    "GlobalThresholdCalculator",
+    "calculate_global_thresholds",
+    # Alternative: Unlabeled conversion approach
+    "convert_dbn_to_parquet",
+    "batch_convert_unlabeled",
+    "create_parquet_dataloader",
     "LazyParquetDataset",
     "LazyParquetDataLoader",
     # Core processing

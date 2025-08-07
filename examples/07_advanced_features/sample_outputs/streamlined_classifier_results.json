@@ -1,0 +1,248 @@
+{
+  "approach": "streamlined_dbn_classifier",
+  "timestamp": "2025-08-07 07:09:38",
+  "input_file": "/Users/danielfisher/repositories/represent/data/glbx-mdp3-20240403.mbp-10.dbn.zst",
+  "processing_stats": {
+    "input_file": "/Users/danielfisher/repositories/represent/data/glbx-mdp3-20240403.mbp-10.dbn.zst",
+    "output_directory": "/Users/danielfisher/repositories/represent/examples/classification_analysis/outputs/streamlined_classified",
+    "original_rows": 282362,
+    "filtered_rows": 282322,
+    "symbols_processed": 2,
+    "total_classified_samples": 270322,
+    "processing_time_seconds": 2.0725618750439025,
+    "samples_per_second": 130428.91662487705,
+    "config": {
+      "currency": "AUDUSD",
+      "features": [
+        "volume"
+      ],
+      "input_rows": 5000,
+      "lookforward_rows": 500,
+      "min_symbol_samples": 50,
+      "force_uniform": true,
+      "nbins": 13
+    },
+    "symbol_stats": {
+      "M6AU4": {
+        "samples": 39777,
+        "file_path": "/Users/danielfisher/repositories/represent/examples/classification_analysis/outputs/streamlined_classified/AUDUSD_M6AU4_classified.parquet",
+        "file_size_mb": 1.0334138870239258
+      },
+      "M6AM4": {
+        "samples": 230545,
+        "file_path": "/Users/danielfisher/repositories/represent/examples/classification_analysis/outputs/streamlined_classified/AUDUSD_M6AM4_classified.parquet",
+        "file_size_mb": 3.6804466247558594
+      }
+    }
+  },
+  "analysis_results": {
+    "total_samples": 270322,
+    "symbols_analyzed": 2,
+    "overall_distribution": {
+      "0": {
+        "count": 3812,
+        "percentage": 1.4101700934441148
+      },
+      "1": {
+        "count": 26326,
+        "percentage": 9.738756002101198
+      },
+      "2": {
+        "count": 55460,
+        "percentage": 20.516273185312333
+      },
+      "3": {
+        "count": 120903,
+        "percentage": 44.72554952981999
+      },
+      "4": {
+        "count": 29909,
+        "percentage": 11.064212309763912
+      },
+      "5": {
+        "count": 9652,
+        "percentage": 3.570556595467628
+      },
+      "6": {
+        "count": 4467,
+        "percentage": 1.6524737165306562
+      },
+      "7": {
+        "count": 2866,
+        "percentage": 1.06021707445195
+      },
+      "8": {
+        "count": 2000,
+        "percentage": 0.7398583911039427
+      },
+      "9": {
+        "count": 4491,
+        "percentage": 1.6613520172239031
+      },
+      "10": {
+        "count": 3127,
+        "percentage": 1.1567685944910144
+      },
+      "11": {
+        "count": 3680,
+        "percentage": 1.3613394396312546
+      },
+      "12": {
+        "count": 3629,
+        "percentage": 1.342473050658104
+      }
+    },
+    "symbol_stats": {
+      "M6AM4": {
+        "samples": 230545,
+        "distribution": {
+          "0": {
+            "count": 943,
+            "percentage": 0.40903077490294737
+          },
+          "1": {
+            "count": 23999,
+            "percentage": 10.409681407100566
+          },
+          "2": {
+            "count": 52299,
+            "percentage": 22.68494220217311
+          },
+          "3": {
+            "count": 117285,
+            "percentage": 50.872931531805065
+          },
+          "4": {
+            "count": 27099,
+            "percentage": 11.754321282179184
+          },
+          "5": {
+            "count": 7933,
+            "percentage": 3.4409768158060245
+          },
+          "6": {
+            "count": 337,
+            "percentage": 0.14617536706499817
+          },
+          "7": {
+            "count": 175,
+            "percentage": 0.07590708972218005
+          },
+          "8": {
+            "count": 32,
+            "percentage": 0.013880153549198637
+          },
+          "9": {
+            "count": 38,
+            "percentage": 0.01648268233967338
+          },
+          "10": {
+            "count": 54,
+            "percentage": 0.0234227591142727
+          },
+          "11": {
+            "count": 164,
+            "percentage": 0.07113578693964302
+          },
+          "12": {
+            "count": 187,
+            "percentage": 0.08111214730312954
+          }
+        },
+        "mean": 2.7627838382962113,
+        "std": 1.0180225156996552
+      },
+      "M6AU4": {
+        "samples": 39777,
+        "distribution": {
+          "0": {
+            "count": 2869,
+            "percentage": 7.212710863061568
+          },
+          "1": {
+            "count": 2327,
+            "percentage": 5.850114387711491
+          },
+          "2": {
+            "count": 3161,
+            "percentage": 7.946803429117328
+          },
+          "3": {
+            "count": 3618,
+            "percentage": 9.09570857530734
+          },
+          "4": {
+            "count": 2810,
+            "percentage": 7.064383940468109
+          },
+          "5": {
+            "count": 1719,
+            "percentage": 4.3215928803077155
+          },
+          "6": {
+            "count": 4130,
+            "percentage": 10.382884581542097
+          },
+          "7": {
+            "count": 2691,
+            "percentage": 6.7652160796440155
+          },
+          "8": {
+            "count": 1968,
+            "percentage": 4.947582773964855
+          },
+          "9": {
+            "count": 4453,
+            "percentage": 11.194911632350353
+          },
+          "10": {
+            "count": 3073,
+            "percentage": 7.72557005304573
+          },
+          "11": {
+            "count": 3516,
+            "percentage": 8.839278980315257
+          },
+          "12": {
+            "count": 3442,
+            "percentage": 8.65324182316414
+          }
+        },
+        "mean": 6.272117052568067,
+        "std": 3.772946587583997
+      }
+    },
+    "uniformity_analysis": {
+      "expected_percentage": 7.6923076923076925,
+      "max_deviation": 37.0332418375123,
+      "avg_deviation": 8.50393234734872,
+      "quality_assessment": "NEEDS_IMPROVEMENT",
+      "deviations_by_class": [
+        6.282137598863578,
+        2.0464483097935053,
+        12.82396549300464,
+        37.0332418375123,
+        3.3719046174562193,
+        4.121751096840065,
+        6.039833975777036,
+        6.632090617855742,
+        6.95244930120375,
+        6.030955675083789,
+        6.535539097816678,
+        6.330968252676438,
+        6.349834641649588
+      ]
+    },
+    "basic_stats": {
+      "mean": 3.2791707667152505,
+      "std": 2.126979563688714,
+      "min": 0,
+      "max": 12
+    }
+  },
+  "classified_files": [
+    "/Users/danielfisher/repositories/represent/examples/classification_analysis/outputs/streamlined_classified/AUDUSD_M6AM4_classified.parquet",
+    "/Users/danielfisher/repositories/represent/examples/classification_analysis/outputs/streamlined_classified/AUDUSD_M6AU4_classified.parquet"
+  ],
+  "plot_path": "/Users/danielfisher/repositories/represent/examples/classification_analysis/outputs/streamlined_classifier_analysis.png"
+}

@@ -1,0 +1,71 @@
+{
+  "analysis_type": "streamlined_simple_dataloader",
+  "timestamp": "2025-08-07 12:07:26",
+  "parquet_files": [
+    "/Users/danielfisher/repositories/represent/examples/classification_analysis/outputs/streamlined_classified/AUDUSD_M6AM4_classified.parquet",
+    "/Users/danielfisher/repositories/represent/examples/classification_analysis/outputs/streamlined_classified/AUDUSD_M6AU4_classified.parquet"
+  ],
+  "benchmark_results": {
+    "batch_16_frac_0.01_rows_1000": {
+      "config": {
+        "batch_size": 16,
+        "sample_fraction": 0.01,
+        "input_rows": 1000
+      },
+      "batch_count": 20,
+      "total_samples": 320,
+      "processing_time_seconds": 3.4590950830024667,
+      "samples_per_second": 92.50974382648151,
+      "batches_per_second": 5.781858989155094,
+      "features_shape": [
+        16,
+        402,
+        500
+      ],
+      "success": true
+    },
+    "batch_32_frac_0.05_rows_1000": {
+      "config": {
+        "batch_size": 32,
+        "sample_fraction": 0.05,
+        "input_rows": 1000
+      },
+      "batch_count": 20,
+      "total_samples": 640,
+      "processing_time_seconds": 5.7643530840286985,
+      "samples_per_second": 111.02720299581387,
+      "batches_per_second": 3.4696000936191833,
+      "features_shape": [
+        32,
+        402,
+        500
+      ],
+      "success": true
+    },
+    "batch_32_frac_0.1_rows_5000": {
+      "config": {
+        "batch_size": 32,
+        "sample_fraction": 0.1,
+        "input_rows": 5000
+      },
+      "batch_count": 20,
+      "total_samples": 640,
+      "processing_time_seconds": 5.978589042031672,
+      "samples_per_second": 107.0486690924172,
+      "batches_per_second": 3.3452709091380375,
+      "features_shape": [
+        32,
+        402,
+        500
+      ],
+      "success": true
+    }
+  },
+  "ml_training_results": {
+    "success": true,
+    "batches_processed": 5,
+    "average_loss": 2.527787923812866,
+    "training_time": 1.2499635830172338
+  },
+  "plot_path": "/Users/danielfisher/repositories/represent/examples/classification_analysis/outputs/streamlined_simple_dataloader_performance.png"
+}

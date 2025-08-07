@@ -16,6 +16,8 @@ from .config import create_represent_config
 from .classification_config_generator import (
     generate_classification_config_from_parquet
 )
+from .parquet_classifier import ParquetClassifier, process_dbn_to_classified_parquets
+from .global_threshold_calculator import GlobalThresholds, calculate_global_thresholds
 
 
 class RepresentAPI:
@@ -409,6 +411,124 @@ class RepresentAPI:
 
         return pipeline_results
 
+    def process_dbn_to_classified_parquets(
+        self,
+        dbn_path: Union[str, Path],
+        output_dir: Union[str, Path],
+        currency: str = "AUDUSD",
+        features: Optional[List[str]] = None,
+        input_rows: int = 5000,
+        lookforward_rows: int = 500,
+        min_symbol_samples: int = 1000,
+        force_uniform: bool = True,
+        nbins: int = 13,
+        verbose: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Streamlined approach: Process DBN file directly to classified parquet files.
+        
+        This is the new streamlined method that eliminates intermediate files by
+        processing DBN data directly to classified parquet files, one per symbol.
+        
+        Args:
+            dbn_path: Path to input DBN file
+            output_dir: Directory for output classified parquet files
+            currency: Currency pair for configuration
+            features: Features to extract ['volume', 'variance', 'trade_counts']
+            input_rows: Historical rows required for feature generation
+            lookforward_rows: Future rows required for classification targets
+            min_symbol_samples: Minimum samples required per symbol
+            force_uniform: Whether to enforce uniform class distribution
+            nbins: Number of classification bins
+            verbose: Whether to print progress information
+            
+        Returns:
+            Processing statistics dictionary
+            
+        Examples:
+            api = RepresentAPI()
+            
+            # Streamlined processing: DBN → Classified Parquet (one step)
+            results = api.process_dbn_to_classified_parquets(
+                'market_data.dbn',
+                '/data/classified/',
+                currency='AUDUSD',
+                features=['volume', 'variance'],
+                force_uniform=True
+            )
+            
+            # Files are immediately ready for ML training
+            print(f"Generated {results['symbols_processed']} classified files")
+        """
+        return process_dbn_to_classified_parquets(
+            dbn_path=dbn_path,
+            output_dir=output_dir,
+            currency=currency,
+            features=features,
+            input_rows=input_rows,
+            lookforward_rows=lookforward_rows,
+            min_symbol_samples=min_symbol_samples,
+            force_uniform=force_uniform,
+            nbins=nbins,
+            verbose=verbose,
+        )
+
+    def create_parquet_classifier(
+        self,
+        currency: str = "AUDUSD",
+        features: Optional[List[str]] = None,
+        input_rows: int = 5000,
+        lookforward_rows: int = 500,
+        min_symbol_samples: int = 1000,
+        force_uniform: bool = True,
+        nbins: int = 13,
+        verbose: bool = True,
+    ) -> ParquetClassifier:
+        """
+        Create a DBN-to-parquet classifier instance.
+        
+        Args:
+            currency: Currency pair for configuration
+            features: Features to extract
+            input_rows: Historical rows required for feature generation
+            lookforward_rows: Future rows required for classification targets
+            min_symbol_samples: Minimum samples required per symbol
+            force_uniform: Whether to enforce uniform class distribution
+            nbins: Number of classification bins
+            verbose: Whether to print progress information
+            
+        Returns:
+            ParquetClassifier instance
+            
+        Examples:
+            api = RepresentAPI()
+            
+            # Create classifier with custom settings
+            classifier = api.create_parquet_classifier(
+                currency='AUDUSD',
+                features=['volume'],
+                min_symbol_samples=500,
+                force_uniform=True
+            )
+            
+            # Process multiple files
+            for dbn_file in dbn_files:
+                results = classifier.process_dbn_to_classified_parquets(
+                    dbn_file, 
+                    '/data/classified/'
+                )
+        """
+        return ParquetClassifier(
+            currency=currency,
+            features=features,
+            input_rows=input_rows,
+            lookforward_rows=lookforward_rows,
+            min_symbol_samples=min_symbol_samples,
+            force_uniform=force_uniform,
+            nbins=nbins,
+            verbose=verbose,
+        )
+
     def list_available_currencies(self) -> List[str]:
         """
         List available predefined currency configurations.
@@ -469,6 +589,61 @@ class RepresentAPI:
             'generation_method': 'quantile_based_dynamic'
         }
 
+    def calculate_global_thresholds(
+        self,
+        data_directory: Union[str, Path],
+        currency: str = "AUDUSD",
+        nbins: int = 13,
+        lookforward_rows: int = 500,
+        sample_fraction: float = 0.5,
+        file_pattern: str = "*.dbn*",
+        verbose: bool = True,
+    ) -> GlobalThresholds:
+        """
+        Calculate global classification thresholds from a sample of DBN files.
+        
+        This ensures consistent classification thresholds across all symbols and files,
+        preventing the problems of per-file quantile calculation.
+        
+        Args:
+            data_directory: Directory containing DBN files
+            currency: Currency pair for configuration
+            nbins: Number of classification bins
+            lookforward_rows: Future rows required for price movement calculation
+            sample_fraction: Fraction of files to use for threshold calculation
+            file_pattern: Pattern to match DBN files
+            verbose: Whether to print progress information
+            
+        Returns:
+            GlobalThresholds object with quantile boundaries and metadata
+            
+        Example:
+            api = RepresentAPI()
+            
+            # Calculate global thresholds from first 50% of files
+            thresholds = api.calculate_global_thresholds(
+                "/Users/danielfisher/data/databento/AUDUSD-micro",
+                currency="AUDUSD",
+                sample_fraction=0.5
+            )
+            
+            # Use thresholds for consistent classification
+            results = api.process_dbn_to_classified_parquets(
+                "data.dbn",
+                "/data/classified/",
+                currency="AUDUSD",
+                global_thresholds=thresholds
+            )
+        """
+        return calculate_global_thresholds(
+            data_directory=data_directory,
+            currency=currency,
+            nbins=nbins,
+            lookforward_rows=lookforward_rows,
+            sample_fraction=sample_fraction,
+            file_pattern=file_pattern,
+            verbose=verbose,
+        )
 
     def get_package_info(self) -> Dict[str, Any]:
         """
@@ -481,12 +656,20 @@ class RepresentAPI:
 
         return {
             "version": __version__,
-            "architecture": "DBN → Unlabeled Parquet → Classification → PyTorch (v2.0.0+)",
+            "architecture": "Multi-approach: Classic 3-stage + Streamlined 2-stage (v4.0.0+)",
             "available_currencies": self.list_available_currencies(),
             "supported_features": ["volume", "variance", "trade_counts"],
             "tensor_shape": "(402, 500) - market depth representation",
-            "pipeline_stages": ["Raw Data Processing", "Post-Processing Classification", "ML Training"],
-            "dynamic_features": ["Quantile-based Config Generation", "Automatic Threshold Optimization"],
+            "pipeline_approaches": {
+                "classic_3_stage": ["DBN → Unlabeled Parquet", "Post-Processing Classification", "ML Training"],
+                "streamlined_2_stage": ["DBN → Classified Parquet (Direct)", "ML Training"]
+            },
+            "dynamic_features": [
+                "Quantile-based Config Generation", 
+                "Automatic Threshold Optimization",
+                "Streamlined Direct Processing",
+                "On-demand Feature Generation"
+            ],
         }
 
 
