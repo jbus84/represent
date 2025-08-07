@@ -46,23 +46,9 @@ class ExampleRunner:
         """Find all Python example files."""
         example_files = []
         
-        # Define the order to run examples (logical progression)
-        ordered_dirs = [
-            "01_getting_started",
-            "02_global_thresholds", 
-            "03_data_processing",
-            "04_ml_training",
-            "05_visualization",
-            "06_performance_analysis",
-            "07_advanced_features"
-        ]
-        
-        for dir_name in ordered_dirs:
-            dir_path = self.examples_dir / dir_name
-            if dir_path.exists():
-                # Find Python files in each directory
-                python_files = sorted(dir_path.glob("*.py"))
-                example_files.extend(python_files)
+        # Find all Python files directly in examples directory
+        python_files = sorted(self.examples_dir.glob("*.py"))
+        example_files.extend(python_files)
         
         return example_files
     

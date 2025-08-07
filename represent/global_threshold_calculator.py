@@ -38,7 +38,8 @@ class GlobalThresholdCalculator:
         self,
         currency: str = "AUDUSD",
         nbins: int = 13,
-        lookforward_rows: int = 500,
+        lookforward_rows: int = 5000,  # Total lookforward (will be split into offset + window)
+        lookforward_offset: int = 500,  # Gap before prediction window starts
         sample_fraction: float = 0.5,
         max_samples_per_file: int = 10000,
         verbose: bool = True,
@@ -57,15 +58,21 @@ class GlobalThresholdCalculator:
         self.currency = currency
         self.nbins = nbins
         self.lookforward_rows = lookforward_rows
+        self.lookforward_offset = lookforward_offset
         self.sample_fraction = sample_fraction
         self.max_samples_per_file = max_samples_per_file
         self.verbose = verbose
+        
+        # Calculate the statistical window size
+        self.statistical_window = self.lookforward_rows - self.lookforward_offset
         
         if self.verbose:
             print("🌐 GlobalThresholdCalculator initialized")
             print(f"   💱 Currency: {self.currency}")
             print(f"   📊 Bins: {self.nbins}")
-            print(f"   📈 Lookforward rows: {self.lookforward_rows}")
+            print(f"   📈 Lookforward offset: {self.lookforward_offset}")
+            print(f"   📉 Statistical window: {self.statistical_window}")
+            print(f"   📏 Total lookforward: {self.lookforward_rows}")
             print(f"   🔢 Sample fraction: {self.sample_fraction}")
             print(f"   📏 Max samples per file: {self.max_samples_per_file}")
 
@@ -92,6 +99,22 @@ class GlobalThresholdCalculator:
                     print(f"      ⚠️  Insufficient data: {len(df)} rows")
                 return None
             
+            # Filter out invalid/corrupted prices first
+            # For AUDUSD, valid prices should be roughly 0.50 to 0.80
+            # Anything outside this range is likely corrupted data
+            price_filter = (
+                (pl.col('bid_px_00') > 0.50) & (pl.col('bid_px_00') < 0.80) &
+                (pl.col('ask_px_00') > 0.50) & (pl.col('ask_px_00') < 0.80) &
+                (pl.col('bid_px_00') > 0) & (pl.col('ask_px_00') > 0)  # Exclude zeros
+            )
+            
+            df = df.filter(price_filter)
+            
+            if len(df) == 0:
+                if self.verbose:
+                    print("      ⚠️  No valid prices after filtering")
+                return None
+            
             # Calculate mid prices from bid/ask
             mid_price = (
                 (pl.col('ask_px_00') + pl.col('bid_px_00')) / 2
@@ -99,10 +122,19 @@ class GlobalThresholdCalculator:
             
             df = df.with_columns(mid_price)
             
-            # Calculate future mid price (lookforward_rows ahead)
+            # Calculate future mid price using simple point-to-point approach
+            # Use the total lookforward distance but avoid the bias from averaging
+            total_lookforward = self.lookforward_rows  # This includes offset + window
+            
+            if len(df) < total_lookforward:
+                if self.verbose:
+                    print(f"      ⚠️  Insufficient data for lookforward: {len(df)} < {total_lookforward}")
+                return None
+            
+            # Use simple shift approach but with proper total distance
             future_mid_price = (
                 pl.col('mid_price')
-                .shift(-self.lookforward_rows)
+                .shift(-total_lookforward)  # Use total lookforward distance
                 .alias('future_mid_price')
             )
             
@@ -115,12 +147,17 @@ class GlobalThresholdCalculator:
             
             df = df.with_columns(price_movement)
             
-            # Filter out rows with null price movements
-            valid_df = df.filter(pl.col('price_movement').is_not_null())
+            # Filter out rows with null price movements and extreme outliers
+            # For AUDUSD, typical movements should be within ±1000 micro-pips
+            # Anything beyond ±5000 is likely corrupted data or calculation error
+            valid_df = df.filter(
+                pl.col('price_movement').is_not_null() &
+                (pl.col('price_movement').abs() < 5000)  # Filter extreme movements
+            )
             
             if len(valid_df) == 0:
                 if self.verbose:
-                    print("      ⚠️  No valid price movements")
+                    print("      ⚠️  No valid price movements after filtering")
                 return None
             
             # Extract price movements as numpy array
@@ -274,7 +311,8 @@ def calculate_global_thresholds(
     data_directory: Union[str, Path],
     currency: str = "AUDUSD",
     nbins: int = 13,
-    lookforward_rows: int = 500,
+    lookforward_rows: int = 5000,
+    lookforward_offset: int = 500,
     sample_fraction: float = 0.5,
     file_pattern: str = "*.dbn*",
     verbose: bool = True,
@@ -312,6 +350,7 @@ def calculate_global_thresholds(
         currency=currency,
         nbins=nbins,
         lookforward_rows=lookforward_rows,
+        lookforward_offset=lookforward_offset,
         sample_fraction=sample_fraction,
         verbose=verbose,
     )

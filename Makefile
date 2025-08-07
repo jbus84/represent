@@ -1,4 +1,4 @@
-.PHONY: install test lint typecheck format build clean help test-performance test-fast test-fast-cov test-coverage coverage-report coverage-html test-unit test-e2e test-e2e-fast generate-visualization performance-analysis extended-features-demo run-all-examples
+.PHONY: install test lint typecheck format build clean help test-performance test-fast test-fast-cov test-coverage coverage-report coverage-html test-unit test-e2e test-e2e-fast comprehensive-demo run-all-examples
 
 # Default target
 help:
@@ -20,9 +20,7 @@ help:
 	@echo "  build                  - Build package"
 	@echo "  clean                  - Clean build artifacts"
 	@echo "  check-commit           - Lints and commits"
-	@echo "  generate-visualization - Generate the example visualization"
-	@echo "  performance-analysis   - Run PyTorch dataloader performance analysis"
-	@echo "  extended-features-demo - Run extended features visualization demo"
+	@echo "  comprehensive-demo     - Run comprehensive demo with all functionality"
 	@echo "  run-all-examples       - Run all examples and generate comprehensive HTML report"
 
 install:
@@ -32,14 +30,9 @@ check-commit: ## Run pre-commit checks and commit
 	.venv/bin/pre-commit run --all-files
 	.venv/bin/cz commit --all
 
-generate-visualization:
-	uv run python examples/generate_visualization.py
-
-performance-analysis:
-	uv run python examples/dataloader_performance_demo.py
-
-extended-features-demo:
-	uv run python examples/extended_features_visualization.py
+comprehensive-demo:
+	uv run python examples/comprehensive_demo.py
+	@echo "✅ Comprehensive demo complete! View report at comprehensive_demo_output/comprehensive_demo_report.html"
 
 run-all-examples:
 	@echo "🚀 Running all examples and generating HTML report..."
@@ -95,6 +88,7 @@ clean:
 	rm -rf *.egg-info/
 	rm -rf htmlcov/
 	rm -rf examples_report/
+	rm -rf comprehensive_demo_output/
 	rm -rf .coverage
 	rm -rf .pytest_cache/
 	find . -type d -name __pycache__ -exec rm -rf {} +

@@ -450,6 +450,59 @@ print(f"✅ Processing complete! {results['symbols_processed']} symbols processe
 print(f"📁 Classified data ready with {results['total_classified_samples']:,} samples")
 ```
 
+## 🎨 Comprehensive Demo
+
+**Run the complete functionality demonstration:**
+
+```bash
+# Run comprehensive demo with all features
+make comprehensive-demo
+
+# Or run directly
+python examples/comprehensive_demo.py
+
+# View interactive HTML report
+open comprehensive_demo_output/comprehensive_demo_report.html
+```
+
+The comprehensive demo showcases:
+
+### **🎨 Multi-Feature Extraction**
+- **Volume Features**: Traditional market depth (order sizes)
+- **Variance Features**: Price volatility patterns  
+- **Trade Count Features**: Activity from transaction counts
+- **RGB Visualization**: Combined multi-feature representation
+
+### **📈 Classification Analysis**  
+- **With Force Uniform**: Guaranteed 7.69% per class distribution
+- **Without Force Uniform**: Natural (biased) distribution
+- **Quality Metrics**: Uniformity deviation analysis
+- **Visual Comparison**: Side-by-side distribution plots
+
+### **⚡ DataLoader Performance**
+- **Multiple Configurations**: Batch sizes and worker counts
+- **Throughput Analysis**: Samples per second benchmarking
+- **Memory Usage**: RAM consumption tracking  
+- **Efficiency Metrics**: Performance optimization insights
+
+### **🧠 ML Sample Generation**
+- **Multi-Feature Tensors**: Ready for PyTorch training
+- **Normalized Data**: All features in [0,1] range
+- **Uniform Labels**: Balanced classification distribution
+- **Code Examples**: Direct integration patterns
+
+**Generated Output:**
+```
+comprehensive_demo_output/
+├── comprehensive_demo_report.html          # Interactive report
+├── comprehensive_demo_report.md            # Documentation
+├── feature_extraction_demo.png             # Feature visualization
+├── classification_distribution_demo.png    # Classification analysis
+├── dataloader_performance_demo.png         # Performance benchmarks
+├── ml_sample_generation_demo.png           # ML integration
+└── demo_results.json                       # Raw results data
+```
+
 ## ⚡ Performance
 
 - **Stage 1 (Processing)**: 500+ samples/second direct DBN-to-classified-parquet processing

@@ -1,164 +1,20 @@
 {
-  "timestamp": "2025-08-07T12:07:28.797216",
+  "timestamp": "2025-08-07T12:54:29.918951",
   "summary": {
-    "total_examples": 17,
-    "successful": 8,
-    "failed": 9,
-    "total_duration": 55.60220804007258
+    "total_examples": 1,
+    "successful": 1,
+    "failed": 0,
+    "total_duration": 7.668619124975521
   },
   "results": [
     {
-      "name": "api_usage_examples.py",
-      "path": "01_getting_started/api_usage_examples.py",
-      "success": false,
-      "duration": 1.3877848750562407,
-      "output_length": 84,
-      "error": "Traceback (most recent call last):\n  File \"/Users/danielfisher/repositories/represent/examples/01_getting_started/api_usage_examples.py\", line 262, in <module>\n    main()\n  File \"/Users/danielfisher/repositories/represent/examples/01_getting_started/api_usage_examples.py\", line 240, in main\n    api = represent.RepresentAPI()\n          ^^^^^^^^^^^^^^^^^^^^^^\nAttributeError: module 'represent' has no attribute 'RepresentAPI'\n",
-      "generated_files_count": 1
-    },
-    {
-      "name": "new_config_demo.py",
-      "path": "01_getting_started/new_config_demo.py",
-      "success": false,
-      "duration": 0.9043831249582581,
-      "output_length": 0,
-      "error": "Traceback (most recent call last):\n  File \"/Users/danielfisher/repositories/represent/examples/01_getting_started/new_config_demo.py\", line 15, in <module>\n    from represent import RepresentConfig, create_represent_config\nImportError: cannot import name 'RepresentConfig' from 'represent' (/Users/danielfisher/.pyenv/versions/3.12.7/lib/python3.12/site-packages/represent/__init__.py)\n",
-      "generated_files_count": 1
-    },
-    {
-      "name": "simple_api_demo.py",
-      "path": "01_getting_started/simple_api_demo.py",
+      "name": "comprehensive_demo.py",
+      "path": "comprehensive_demo.py",
       "success": true,
-      "duration": 2.148312999983318,
-      "output_length": 689,
-      "error": null,
-      "generated_files_count": 1
-    },
-    {
-      "name": "simple_currency_config_demo.py",
-      "path": "01_getting_started/simple_currency_config_demo.py",
-      "success": false,
-      "duration": 0.8926052080350928,
-      "output_length": 0,
-      "error": "Traceback (most recent call last):\n  File \"/Users/danielfisher/repositories/represent/examples/01_getting_started/simple_currency_config_demo.py\", line 8, in <module>\n    from represent import RepresentConfig\nImportError: cannot import name 'RepresentConfig' from 'represent' (/Users/danielfisher/.pyenv/versions/3.12.7/lib/python3.12/site-packages/represent/__init__.py)\n",
-      "generated_files_count": 1
-    },
-    {
-      "name": "simplified_config_demo.py",
-      "path": "01_getting_started/simplified_config_demo.py",
-      "success": false,
-      "duration": 0.9120615409919992,
-      "output_length": 0,
-      "error": "Traceback (most recent call last):\n  File \"/Users/danielfisher/repositories/represent/examples/01_getting_started/simplified_config_demo.py\", line 9, in <module>\n    from represent import RepresentConfig, create_represent_config\nImportError: cannot import name 'RepresentConfig' from 'represent' (/Users/danielfisher/.pyenv/versions/3.12.7/lib/python3.12/site-packages/represent/__init__.py)\n",
-      "generated_files_count": 1
-    },
-    {
-      "name": "global_threshold_classification_demo.py",
-      "path": "02_global_thresholds/global_threshold_classification_demo.py",
-      "success": true,
-      "duration": 1.7154820840223692,
-      "output_length": 2175,
+      "duration": 7.668619124975521,
+      "output_length": 4451,
       "error": null,
       "generated_files_count": 0
-    },
-    {
-      "name": "global_threshold_demo.py",
-      "path": "02_global_thresholds/global_threshold_demo.py",
-      "success": false,
-      "duration": 0.9122086249990389,
-      "output_length": 0,
-      "error": "Traceback (most recent call last):\n  File \"/Users/danielfisher/repositories/represent/examples/02_global_thresholds/global_threshold_demo.py\", line 23, in <module>\n    from represent import (\nImportError: cannot import name 'calculate_global_thresholds' from 'represent' (/Users/danielfisher/.pyenv/versions/3.12.7/lib/python3.12/site-packages/represent/__init__.py)\n",
-      "generated_files_count": 0
-    },
-    {
-      "name": "simple_global_threshold_demo.py",
-      "path": "02_global_thresholds/simple_global_threshold_demo.py",
-      "success": true,
-      "duration": 1.4142651250003837,
-      "output_length": 586,
-      "error": null,
-      "generated_files_count": 0
-    },
-    {
-      "name": "verify_row_classification.py",
-      "path": "02_global_thresholds/verify_row_classification.py",
-      "success": true,
-      "duration": 1.366311833029613,
-      "output_length": 615,
-      "error": null,
-      "generated_files_count": 0
-    },
-    {
-      "name": "dbn_to_parquet_example.py",
-      "path": "03_data_processing/dbn_to_parquet_example.py",
-      "success": false,
-      "duration": 0.9056368750170805,
-      "output_length": 0,
-      "error": "Traceback (most recent call last):\n  File \"/Users/danielfisher/repositories/represent/examples/03_data_processing/dbn_to_parquet_example.py\", line 24, in <module>\n    from represent import (\nImportError: cannot import name 'convert_dbn_to_parquet' from 'represent' (/Users/danielfisher/.pyenv/versions/3.12.7/lib/python3.12/site-packages/represent/__init__.py)\n",
-      "generated_files_count": 0
-    },
-    {
-      "name": "fixed_optimized_demo.py",
-      "path": "03_data_processing/fixed_optimized_demo.py",
-      "success": true,
-      "duration": 11.323976874991786,
-      "output_length": 1639,
-      "error": null,
-      "generated_files_count": 0
-    },
-    {
-      "name": "streamlined_classifier_demo.py",
-      "path": "03_data_processing/streamlined_classifier_demo.py",
-      "success": true,
-      "duration": 7.370065333030652,
-      "output_length": 7930,
-      "error": null,
-      "generated_files_count": 0
-    },
-    {
-      "name": "parquet_dataloader_example.py",
-      "path": "04_ml_training/parquet_dataloader_example.py",
-      "success": false,
-      "duration": 1.0435216249898076,
-      "output_length": 0,
-      "error": "Traceback (most recent call last):\n  File \"/Users/danielfisher/repositories/represent/examples/04_ml_training/parquet_dataloader_example.py\", line 21, in <module>\n    from represent import RepresentConfig\nImportError: cannot import name 'RepresentConfig' from 'represent' (/Users/danielfisher/.pyenv/versions/3.12.7/lib/python3.12/site-packages/represent/__init__.py)\n",
-      "generated_files_count": 0
-    },
-    {
-      "name": "pytorch_training_example.py",
-      "path": "04_ml_training/pytorch_training_example.py",
-      "success": false,
-      "duration": 0.9051832500263117,
-      "output_length": 0,
-      "error": "Traceback (most recent call last):\n  File \"/Users/danielfisher/repositories/represent/examples/04_ml_training/pytorch_training_example.py\", line 12, in <module>\n    from represent import RepresentConfig, create_parquet_dataloader\nImportError: cannot import name 'RepresentConfig' from 'represent' (/Users/danielfisher/.pyenv/versions/3.12.7/lib/python3.12/site-packages/represent/__init__.py)\n",
-      "generated_files_count": 0
-    },
-    {
-      "name": "streamlined_dataloader_demo.py",
-      "path": "04_ml_training/streamlined_dataloader_demo.py",
-      "success": true,
-      "duration": 1.800090457953047,
-      "output_length": 924,
-      "error": null,
-      "generated_files_count": 0
-    },
-    {
-      "name": "streamlined_dataloader_simple_demo.py",
-      "path": "04_ml_training/streamlined_dataloader_simple_demo.py",
-      "success": true,
-      "duration": 18.794758832955267,
-      "output_length": 2364,
-      "error": null,
-      "generated_files_count": 0
-    },
-    {
-      "name": "extended_features_visualization.py",
-      "path": "05_visualization/extended_features_visualization.py",
-      "success": false,
-      "duration": 1.805559375032317,
-      "output_length": 0,
-      "error": "Traceback (most recent call last):\n  File \"/Users/danielfisher/repositories/represent/examples/05_visualization/extended_features_visualization.py\", line 13, in <module>\n    from represent import RepresentConfig\nImportError: cannot import name 'RepresentConfig' from 'represent' (/Users/danielfisher/.pyenv/versions/3.12.7/lib/python3.12/site-packages/represent/__init__.py)\n",
-      "generated_files_count": 1
     }
   ]
 }
