@@ -14,7 +14,6 @@ from represent.constants import (
     DEFAULT_FEATURES,
     ASK_COUNT_COLUMNS,
     BID_COUNT_COLUMNS,
-    VARIANCE_COLUMN,
 )
 from tests.unit.fixtures.sample_data import generate_realistic_market_data
 
@@ -53,8 +52,7 @@ class TestExtendedFeatures:
         """Test single variance feature extraction."""
         data = generate_realistic_market_data(50000)
 
-        # Add variance column to data
-        data = data.with_columns(pl.lit(0.1).alias(VARIANCE_COLUMN))
+        # Note: Variance feature is calculated dynamically from volume data
 
         processor = MarketDepthProcessor(features=["variance"])
         result = processor.process(data)
@@ -88,7 +86,7 @@ class TestExtendedFeatures:
             if col not in data.columns:
                 data = data.with_columns(pl.lit(1.0).alias(col))
 
-        data = data.with_columns(pl.lit(0.1).alias(VARIANCE_COLUMN))
+        # Variance feature calculated dynamically from volume data - no separate column needed
 
         processor = MarketDepthProcessor(features=["volume", "variance", "trade_counts"])
         result = processor.process(data)
@@ -106,7 +104,7 @@ class TestExtendedFeatures:
             if col not in data.columns:
                 data = data.with_columns(pl.lit(1.0).alias(col))
 
-        data = data.with_columns(pl.lit(0.1).alias(VARIANCE_COLUMN))
+        # Variance feature calculated dynamically from volume data - no separate column needed
 
         # Test with different feature order inputs
         processor1 = MarketDepthProcessor(features=["trade_counts", "volume", "variance"])
@@ -271,7 +269,7 @@ class TestFeaturePerformance:
             if col not in data.columns:
                 data = data.with_columns(pl.lit(1.0).alias(col))
 
-        data = data.with_columns(pl.lit(0.1).alias(VARIANCE_COLUMN))
+        # Variance feature calculated dynamically from volume data - no separate column needed
 
         processor = MarketDepthProcessor(features=["volume", "variance", "trade_counts"])
 

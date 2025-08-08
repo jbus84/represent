@@ -29,8 +29,6 @@ BID_ANCHOR_COLUMN: Final[str] = "bid_px_00"
 
 # Performance tuning constants
 PRICE_RANGE: Final[int] = 200  # Price levels on each side of mid
-CACHE_LINE_SIZE: Final[int] = 64  # For cache-aligned allocations
-MAX_PRICE_DEVIATION: Final[int] = 1000  # Maximum price deviation in micro-pips
 
 # NOTE: MICRO_PIP_MULTIPLIER moved to RepresentConfig - use (1.0 / config.micro_pip_size)
 OUTPUT_SHAPE: Final[tuple[int, int]] = (PRICE_LEVELS, TIME_BINS)
@@ -76,8 +74,8 @@ FEATURE_INDEX_MAP: Final[dict[str, int]] = {
     FeatureType.TRADE_COUNTS.value: 2,
 }
 
-# Variance column name from DBN files
-VARIANCE_COLUMN: Final[str] = "market_depth_extraction_micro_pips_var"
+# NOTE: Variance feature is calculated dynamically from volume data in pipeline.py
+# No separate variance column is needed - variance is computed via .var() on volume columns
 
 
 # Extended output shapes
