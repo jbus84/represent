@@ -190,22 +190,22 @@
                     <div class="feature-card">
                         <h3>Volume Features</h3>
                         <p><strong>Shape:</strong> (402, 500)</p>
-                        <p><strong>Range:</strong> [-0.994, 1.000]</p>
-                        <p><strong>Mean:</strong> -0.287</p>
+                        <p><strong>Range:</strong> [-1.000, 1.000]</p>
+                        <p><strong>Mean:</strong> 0.330</p>
                     </div>
 
                     <div class="feature-card">
                         <h3>Variance Features</h3>
                         <p><strong>Shape:</strong> (402, 500)</p>
-                        <p><strong>Range:</strong> [-1.000, 0.976]</p>
-                        <p><strong>Mean:</strong> -0.090</p>
+                        <p><strong>Range:</strong> [-0.981, 1.000]</p>
+                        <p><strong>Mean:</strong> 0.170</p>
                     </div>
 
                     <div class="feature-card">
                         <h3>Trade_Counts Features</h3>
                         <p><strong>Shape:</strong> (402, 500)</p>
-                        <p><strong>Range:</strong> [-0.850, 1.000]</p>
-                        <p><strong>Mean:</strong> -0.244</p>
+                        <p><strong>Range:</strong> [-0.947, 1.000]</p>
+                        <p><strong>Mean:</strong> 0.345</p>
                     </div>
 
                 </div>
@@ -235,8 +235,8 @@ features = processor.extract_features(
 )
 
 # Output shapes:
-# Single feature: (402, 500)
-# Multi-feature: (3, 402, 500)
+# Single feature: (PRICE_LEVELS, TIME_BINS)
+# Multi-feature: (3, PRICE_LEVELS, TIME_BINS)
                 </div>
             </div>
 
@@ -260,7 +260,7 @@ features = processor.extract_features(
                         <p>Without Force Uniform Samples</p>
                     </div>
                     <div class="stat-card">
-                        <h4>1.83%</h4>
+                        <h4>2.11%</h4>
                         <p>Std Deviation</p>
                     </div>
 
@@ -291,8 +291,8 @@ features = processor.extract_features(
                         <tr>
                             <td><strong>Without Force Uniform</strong></td>
                             <td>3,298</td>
-                            <td>1.83%</td>
-                            <td class="performance-good">EXCELLENT</td>
+                            <td>2.11%</td>
+                            <td class="performance-warning">GOOD</td>
                         </tr>
 
                     </tbody>
@@ -330,36 +330,36 @@ features = processor.extract_features(
                             <td><strong>Small Batch</strong></td>
                             <td>16</td>
                             <td>2</td>
-                            <td class="performance-good">33879 sps</td>
+                            <td class="performance-good">38601 sps</td>
                             <td class="performance-good">8 MB</td>
-                            <td>33879.2</td>
+                            <td>38601.1</td>
                         </tr>
 
                         <tr>
                             <td><strong>Medium Batch</strong></td>
                             <td>32</td>
                             <td>4</td>
-                            <td class="performance-good">80454 sps</td>
+                            <td class="performance-good">80545 sps</td>
                             <td class="performance-good">16 MB</td>
-                            <td>80454.2</td>
+                            <td>80545.4</td>
                         </tr>
 
                         <tr>
                             <td><strong>Large Batch</strong></td>
                             <td>64</td>
                             <td>6</td>
-                            <td class="performance-good">150274 sps</td>
+                            <td class="performance-good">147385 sps</td>
                             <td class="performance-good">32 MB</td>
-                            <td>150274.2</td>
+                            <td>147384.8</td>
                         </tr>
 
                         <tr>
                             <td><strong>XL Batch</strong></td>
                             <td>128</td>
                             <td>8</td>
-                            <td class="performance-good">156032 sps</td>
+                            <td class="performance-good">202881 sps</td>
                             <td class="performance-good">64 MB</td>
-                            <td>156031.6</td>
+                            <td>202880.9</td>
                         </tr>
 
                     </tbody>

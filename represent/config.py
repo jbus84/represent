@@ -83,6 +83,11 @@ class RepresentConfig(BaseModel):
         gt=0, 
         description="Number of ticks per time bin"
     )
+    jump_size: int = Field(
+        default=100,
+        gt=0,
+        description="Step size for sampling positions in price movement calculation (performance optimization)"
+    )
     
     # Sampling configuration
     sampling_mode: str = Field(

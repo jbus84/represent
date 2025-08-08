@@ -14,7 +14,7 @@ import databento as db
 from dataclasses import dataclass
 
 from .config import create_represent_config
-from .constants import JUMP_SIZE
+# JUMP_SIZE now comes from RepresentConfig
 
 
 @dataclass
@@ -127,7 +127,7 @@ class GlobalThresholdCalculator:
             
             # Iterate through valid sample positions using JUMP_SIZE steps
             total_lookforward = self.config.lookforward_input + self.config.lookforward_offset
-            for stop_row in range(self.config.lookback_rows, len(mid_prices) - total_lookforward, JUMP_SIZE):
+            for stop_row in range(self.config.lookback_rows, len(mid_prices) - total_lookforward, self.config.jump_size):
                 # Define time windows according to the correct methodology
                 lookback_start = stop_row - self.config.lookback_rows
                 lookback_end = stop_row

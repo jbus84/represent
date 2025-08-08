@@ -14,17 +14,14 @@ Key Features:
 
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Union, Any, Tuple
+from typing import Dict, List, Optional, Union, Any, Tuple, cast
 import numpy as np
 import polars as pl
 import databento as db
 from dataclasses import dataclass
 
 from .config import create_represent_config
-from .constants import (
-    LOOKFORWARD_OFFSET, LOOKFORWARD_INPUT, LOOKBACK_ROWS, 
-    LOOKFORWARD_ROWS, INPUT_ROWS, JUMP_SIZE
-)
+# No longer need hardcoded constants - using RepresentConfig now
 from .global_threshold_calculator import GlobalThresholds
 
 
@@ -55,46 +52,52 @@ class ParquetClassifier:
         self,
         currency: str = "AUDUSD",
         features: Optional[List[str]] = None,
-        min_symbol_samples: int = 1000,
+        min_symbol_samples: Optional[int] = None,
         force_uniform: bool = True,
-        nbins: int = 13,
+        nbins: Optional[int] = None,
         global_thresholds: Optional[GlobalThresholds] = None,
         verbose: bool = True,
     ):
         
         """
-        Initialize streamlined classifier using lookback vs lookforward methodology.
+        Initialize streamlined classifier using RepresentConfig for standardized configuration.
 
         Args:
             currency: Currency pair for configuration
-            features: Features to extract (volume, variance, trade_counts)
-            min_symbol_samples: Minimum samples required per symbol
+            features: Features to extract (if None, uses config default)
+            min_symbol_samples: Minimum samples required per symbol (if None, uses config default)
             force_uniform: Whether to enforce uniform class distribution
-            nbins: Number of classification bins
+            nbins: Number of classification bins (if None, uses config default)
             global_thresholds: Pre-calculated global thresholds for consistent classification
             verbose: Whether to print progress information
         """
+        # Load RepresentConfig for this currency
+        self.represent_config = create_represent_config(currency)
+        
+        # Get computed values to avoid type checker issues
+        default_min_samples: int = cast(int, self.represent_config.min_symbol_samples)
+        
+        # Create ClassificationConfig with config values as defaults
         self.config = ClassificationConfig(
             currency=currency,
-            features=features or ["volume"],
-            min_symbol_samples=min_symbol_samples,
+            features=features or self.represent_config.features,
+            min_symbol_samples=min_symbol_samples if min_symbol_samples is not None else default_min_samples,
             force_uniform=force_uniform,
-            nbins=nbins,
+            nbins=nbins if nbins is not None else self.represent_config.nbins,
             global_thresholds=global_thresholds,
         )
         
         self.verbose = verbose
-        self.represent_config = create_represent_config(currency)
         
         if self.verbose:
             print("🚀 ParquetClassifier initialized")
             print(f"   💱 Currency: {self.config.currency}")
             print(f"   📊 Features: {self.config.features}")
-            print(f"   📈 Lookback rows: {LOOKBACK_ROWS}")
-            print(f"   📉 Lookforward offset: {LOOKFORWARD_OFFSET}")
-            print(f"   📏 Lookforward window: {LOOKFORWARD_INPUT}")
-            print(f"   📏 Total lookforward: {LOOKFORWARD_ROWS}")
-            print(f"   📊 Input rows: {INPUT_ROWS}")
+            print(f"   📈 Lookback rows: {self.represent_config.lookback_rows}")
+            print(f"   📉 Lookforward offset: {self.represent_config.lookforward_offset}")
+            print(f"   📏 Lookforward window: {self.represent_config.lookforward_input}")
+            print(f"   📏 Total lookforward: {self.represent_config.lookforward_input + self.represent_config.lookforward_offset}")
+            print(f"   🔄 Jump size: {self.represent_config.jump_size}")
             print(f"   🎯 Min samples per symbol: {self.config.min_symbol_samples}")
             print(f"   ⚖️  Force uniform: {self.config.force_uniform}")
             if self.config.global_thresholds:
@@ -146,7 +149,7 @@ class ParquetClassifier:
             print("🔍 Filtering symbols by threshold...")
         
         # Calculate minimum required samples using new methodology constants
-        min_required = INPUT_ROWS + LOOKBACK_ROWS + LOOKFORWARD_ROWS
+        min_required = self.represent_config.lookback_rows + self.represent_config.lookforward_input + self.represent_config.lookforward_offset
         
         # Count samples per symbol
         symbol_counts = df.group_by('symbol').len().sort('len', descending=True)
@@ -201,13 +204,13 @@ class ParquetClassifier:
         
         # Calculate price movements using correct lookback vs lookforward methodology
         # Use JUMP_SIZE sampling for performance and to avoid overly similar adjacent values
-        for stop_row in range(LOOKBACK_ROWS, len(mid_prices) - LOOKFORWARD_ROWS, JUMP_SIZE):
+        for stop_row in range(self.represent_config.lookback_rows, len(mid_prices) - (self.represent_config.lookforward_input + self.represent_config.lookforward_offset), self.represent_config.jump_size):
             # Define time windows according to the correct methodology
-            lookback_start = stop_row - LOOKBACK_ROWS
+            lookback_start = stop_row - self.represent_config.lookback_rows
             lookback_end = stop_row
             
-            target_start_row = stop_row + 1 + LOOKFORWARD_OFFSET
-            target_stop_row = stop_row + LOOKFORWARD_ROWS
+            target_start_row = stop_row + 1 + self.represent_config.lookforward_offset
+            target_stop_row = stop_row + self.represent_config.lookforward_input
             
             # Calculate lookback mean (historical average)
             lookback_mean = np.mean(mid_prices[lookback_start:lookback_end])
@@ -449,11 +452,10 @@ class ParquetClassifier:
             'config': {
                 'currency': self.config.currency,
                 'features': self.config.features,
-                'lookback_rows': LOOKBACK_ROWS,
-                'lookforward_offset': LOOKFORWARD_OFFSET,
-                'lookforward_input': LOOKFORWARD_INPUT,
-                'lookforward_rows': LOOKFORWARD_ROWS,
-                'input_rows': INPUT_ROWS,
+                'lookback_rows': self.represent_config.lookback_rows,
+                'lookforward_offset': self.represent_config.lookforward_offset,
+                'lookforward_input': self.represent_config.lookforward_input,
+                'jump_size': self.represent_config.jump_size,
                 'min_symbol_samples': self.config.min_symbol_samples,
                 'force_uniform': self.config.force_uniform,
                 'nbins': self.config.nbins,

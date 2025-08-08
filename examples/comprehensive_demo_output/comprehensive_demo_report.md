@@ -22,18 +22,18 @@ Demonstration of extracting and visualizing different market depth features with
 
 #### Volume Features
 - **Shape**: (402, 500)
-- **Range**: [-0.994, 1.000]
-- **Mean**: -0.287
+- **Range**: [-1.000, 1.000]
+- **Mean**: 0.330
 
 #### Variance Features
 - **Shape**: (402, 500)
-- **Range**: [-1.000, 0.976]
-- **Mean**: -0.090
+- **Range**: [-0.981, 1.000]
+- **Mean**: 0.170
 
 #### Trade_Counts Features
 - **Shape**: (402, 500)
-- **Range**: [-0.850, 1.000]
-- **Mean**: -0.244
+- **Range**: [-0.947, 1.000]
+- **Mean**: 0.345
 
 ### Key Features
 - **Volume Features**: Traditional market depth from order sizes
@@ -53,8 +53,8 @@ features = processor.extract_features(
 )
 
 # Output shapes:
-# Single feature: (402, 500)
-# Multi-feature: (3, 402, 500)
+# Single feature: (PRICE_LEVELS, TIME_BINS)
+# Multi-feature: (3, PRICE_LEVELS, TIME_BINS)
 ```
 
 ![Feature Extraction Visualization](feature_extraction_demo.png)
@@ -75,8 +75,8 @@ Comparison of classification distributions with and without force_uniform to dem
 
 #### Without Force Uniform
 - **Total Samples**: 3,298
-- **Std Deviation**: 1.83%
-- **Quality**: EXCELLENT
+- **Std Deviation**: 2.11%
+- **Quality**: GOOD
 
 ### Why Force Uniform Matters
 
@@ -97,10 +97,10 @@ Comprehensive benchmarking of DataLoader configurations to identify optimal sett
 
 | Configuration | Batch Size | Workers | Throughput (sps) | Memory (MB) | Efficiency |
 |---------------|------------|---------|------------------|-------------|------------|
-| Small Batch | 16 | 2 | 33879 | 8 | 33879.2 |
-| Medium Batch | 32 | 4 | 80454 | 16 | 80454.2 |
-| Large Batch | 64 | 6 | 150274 | 32 | 150274.2 |
-| XL Batch | 128 | 8 | 156032 | 64 | 156031.6 |
+| Small Batch | 16 | 2 | 38601 | 8 | 38601.1 |
+| Medium Batch | 32 | 4 | 80545 | 16 | 80545.4 |
+| Large Batch | 64 | 6 | 147385 | 32 | 147384.8 |
+| XL Batch | 128 | 8 | 202881 | 64 | 202880.9 |
 
 ### Performance Targets
 - **Throughput**: >1000 samples/second for real-time training
@@ -211,4 +211,4 @@ dataloader = create_parquet_dataloader(
 
 ---
 
-*Report generated on 2025-08-08 07:07:15*
+*Report generated on 2025-08-08 09:45:56*
