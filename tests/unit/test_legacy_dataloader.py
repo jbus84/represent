@@ -14,10 +14,8 @@ import pytest
 import torch
 
 from represent.constants import (
-    SAMPLES,
     PRICE_LEVELS,
     TIME_BINS,
-    TICKS_PER_BIN,
     ASK_PRICE_COLUMNS,
     BID_PRICE_COLUMNS,
 )
@@ -58,7 +56,7 @@ class TestMarketDepthDataset:
         dataset = MarketDepthDataset()
 
         assert dataset.batch_size == 500
-        assert dataset.buffer_size == SAMPLES
+        assert dataset.buffer_size == 50000
         assert dataset.ring_buffer_size == 0
         assert not dataset.is_ready_for_processing
 
@@ -86,10 +84,10 @@ class TestMarketDepthDataset:
 
     def test_current_representation_generation(self):
         """Test generating representation from ring buffer."""
-        dataset = MarketDepthDataset(buffer_size=SAMPLES)
+        dataset = MarketDepthDataset(buffer_size=50000)
 
         # Fill buffer completely
-        data = generate_realistic_market_data(SAMPLES)
+        data = generate_realistic_market_data(50000)
         dataset.add_streaming_data(data)
 
         assert dataset.is_ready_for_processing
@@ -114,14 +112,14 @@ class TestMarketDepthDataset:
 
     def test_dataset_from_dataframe(self):
         """Test dataset creation from DataFrame."""
-        data = generate_realistic_market_data(SAMPLES + 6000)  # Just enough for a few batches
+        data = generate_realistic_market_data(50000 + 6000)  # Just enough for a few batches
 
         # Add mid_price column for classification
         data = data.with_columns(
             ((pl.col(ASK_PRICE_COLUMNS[0]) + pl.col(BID_PRICE_COLUMNS[0])) / 2).alias("mid_price")
         )
 
-        dataset = MarketDepthDataset(data_source=data, batch_size=TICKS_PER_BIN)
+        dataset = MarketDepthDataset(data_source=data, batch_size=100)  # Standard ticks per bin
 
         # Should have batches available
         assert len(dataset) > 0
@@ -149,10 +147,10 @@ class TestMarketDepthDataset:
     @pytest.mark.performance
     def test_performance_benchmark(self):
         """Benchmark dataloader performance against requirements."""
-        dataset = MarketDepthDataset(buffer_size=SAMPLES)
+        dataset = MarketDepthDataset(buffer_size=50000)
 
         # Fill buffer
-        data = generate_realistic_market_data(SAMPLES)
+        data = generate_realistic_market_data(50000)
         dataset.add_streaming_data(data)
 
         # Run multiple iterations to get stable timing
@@ -189,10 +187,10 @@ class TestMarketDepthDataset:
         process = psutil.Process(os.getpid())
         initial_memory = process.memory_info().rss / 1024 / 1024  # MB
 
-        dataset = MarketDepthDataset(buffer_size=SAMPLES)
+        dataset = MarketDepthDataset(buffer_size=50000)
 
         # Fill buffer with data
-        data = generate_realistic_market_data(SAMPLES)
+        data = generate_realistic_market_data(50000)
         dataset.add_streaming_data(data)
 
         # Generate multiple representations
@@ -210,7 +208,7 @@ class TestMarketDepthDataset:
         """Test classification target generation functionality."""
         # Create dataset with classification configuration
         dataset = MarketDepthDataset(
-            buffer_size=SAMPLES,
+            buffer_size=50000,
             classification_config={
                 "nbins": 5,
                 "lookforward_input": 1000,
@@ -220,7 +218,7 @@ class TestMarketDepthDataset:
         )
 
         # Generate test data with sufficient size for lookforward/lookback
-        data = generate_realistic_market_data(SAMPLES + 2000)
+        data = generate_realistic_market_data(50000 + 2000)
 
         # Add mid_price column
         data = data.with_columns(
@@ -257,7 +255,7 @@ class TestMarketDepthDataset:
     def test_classification_different_bin_counts(self):
         """Test classification with different bin configurations."""
         dataset = MarketDepthDataset(
-            buffer_size=SAMPLES,
+            buffer_size=50000,
             classification_config={
                 "lookforward_input": 1000,
                 "lookback_rows": 1000,
@@ -266,7 +264,7 @@ class TestMarketDepthDataset:
         )
 
         # Generate test data
-        data = generate_realistic_market_data(SAMPLES + 2000)
+        data = generate_realistic_market_data(50000 + 2000)
         data = data.with_columns(
             ((pl.col(ASK_PRICE_COLUMNS[0]) + pl.col(BID_PRICE_COLUMNS[0])) / 2).alias("mid_price")
         )
@@ -290,10 +288,10 @@ class TestMarketDepthDataset:
 
     def test_classification_with_default_config(self):
         """Test that classification works with default configuration."""
-        dataset = MarketDepthDataset(buffer_size=SAMPLES)
+        dataset = MarketDepthDataset(buffer_size=50000)
 
         # Generate test data
-        data = generate_realistic_market_data(SAMPLES + 10000)  # More data for default config
+        data = generate_realistic_market_data(50000 + 10000)  # More data for default config
         data = data.with_columns(
             ((pl.col(ASK_PRICE_COLUMNS[0]) + pl.col(BID_PRICE_COLUMNS[0])) / 2).alias("mid_price")
         )
@@ -308,7 +306,7 @@ class TestMarketDepthDataset:
     def test_classification_insufficient_data(self):
         """Test classification behavior with insufficient data."""
         dataset = MarketDepthDataset(
-            buffer_size=SAMPLES,
+            buffer_size=50000,
             classification_config={
                 "lookback_rows": 5000,
                 "lookforward_input": 5000,
@@ -341,7 +339,7 @@ class TestMarketDepthDataset:
         )
 
         # Generate test data with sufficient size for lookforward/lookback
-        data = generate_realistic_market_data(SAMPLES + 2000)
+        data = generate_realistic_market_data(50000 + 2000)
         data = data.with_columns(
             ((pl.col(ASK_PRICE_COLUMNS[0]) + pl.col(BID_PRICE_COLUMNS[0])) / 2).alias("mid_price")
         )
@@ -384,7 +382,7 @@ class TestMarketDepthDataset:
         dataset = MarketDepthDataset()
 
         # Generate test data (more data for default config requirements)
-        data = generate_realistic_market_data(SAMPLES + 10000)
+        data = generate_realistic_market_data(50000 + 10000)
         data = data.with_columns(
             ((pl.col(ASK_PRICE_COLUMNS[0]) + pl.col(BID_PRICE_COLUMNS[0])) / 2).alias("mid_price")
         )
@@ -432,7 +430,7 @@ class TestFactoryFunctions:
     def test_create_file_dataloader(self):
         """Test file dataloader creation with synthetic data."""
         # Create smaller dataset for testing (only need to verify functionality)
-        data = generate_realistic_market_data(SAMPLES + 6000)  # Just enough for a few batches
+        data = generate_realistic_market_data(50000 + 6000)  # Just enough for a few batches
 
         # Test direct dataset creation (equivalent to create_file_dataloader) with limited coverage
         dataset = MarketDepthDataset(
@@ -473,8 +471,8 @@ class TestPerformanceRegression:
         process = psutil.Process(os.getpid())
         initial_memory = process.memory_info().rss / 1024 / 1024  # MB
 
-        dataset = MarketDepthDataset(buffer_size=SAMPLES)
-        data = generate_realistic_market_data(SAMPLES)
+        dataset = MarketDepthDataset(buffer_size=50000)
+        data = generate_realistic_market_data(50000)
         dataset.add_streaming_data(data)
 
         # Run sufficient iterations to detect leaks
@@ -498,8 +496,8 @@ class TestPerformanceRegression:
         import threading
         import queue
 
-        dataset = MarketDepthDataset(buffer_size=SAMPLES)
-        data = generate_realistic_market_data(SAMPLES)
+        dataset = MarketDepthDataset(buffer_size=50000)
+        data = generate_realistic_market_data(50000)
         dataset.add_streaming_data(data)
 
         results_queue = queue.Queue()
@@ -547,7 +545,7 @@ class TestPerformanceRegression:
 @pytest.fixture
 def sample_dataloader():
     """Fixture providing a sample dataloader for testing."""
-    data = generate_realistic_market_data(SAMPLES + 6000)
+    data = generate_realistic_market_data(50000 + 6000)
     dataset = MarketDepthDataset(
         data_source=data,
         sampling_config={"coverage_percentage": 0.01},  # Only process 1% for speed
@@ -582,8 +580,8 @@ class TestBackgroundBatchProducer:
 
     def test_background_producer_initialization(self):
         """Test background producer initializes correctly."""
-        dataset = MarketDepthDataset(buffer_size=SAMPLES)
-        data = generate_realistic_market_data(SAMPLES)
+        dataset = MarketDepthDataset(buffer_size=50000)
+        data = generate_realistic_market_data(50000)
         dataset.add_streaming_data(data)
 
         producer = BackgroundBatchProducer(dataset=dataset, queue_size=2, auto_start=False)
@@ -595,8 +593,8 @@ class TestBackgroundBatchProducer:
 
     def test_background_producer_start_stop(self):
         """Test background producer start and stop functionality."""
-        dataset = MarketDepthDataset(buffer_size=SAMPLES)
-        data = generate_realistic_market_data(SAMPLES)
+        dataset = MarketDepthDataset(buffer_size=50000)
+        data = generate_realistic_market_data(50000)
         dataset.add_streaming_data(data)
 
         producer = BackgroundBatchProducer(dataset=dataset, queue_size=2, auto_start=False)
@@ -616,8 +614,8 @@ class TestBackgroundBatchProducer:
 
     def test_background_batch_generation(self):
         """Test that background producer generates valid batches."""
-        dataset = MarketDepthDataset(buffer_size=SAMPLES)
-        data = generate_realistic_market_data(SAMPLES)
+        dataset = MarketDepthDataset(buffer_size=50000)
+        data = generate_realistic_market_data(50000)
         dataset.add_streaming_data(data)
 
         producer = BackgroundBatchProducer(dataset=dataset, queue_size=3, auto_start=True)
@@ -643,8 +641,8 @@ class TestBackgroundBatchProducer:
 
     def test_background_producer_performance_monitoring(self):
         """Test performance monitoring features."""
-        dataset = MarketDepthDataset(buffer_size=SAMPLES)
-        data = generate_realistic_market_data(SAMPLES)
+        dataset = MarketDepthDataset(buffer_size=50000)
+        data = generate_realistic_market_data(50000)
         dataset.add_streaming_data(data)
 
         producer = BackgroundBatchProducer(dataset=dataset, queue_size=2, auto_start=True)
@@ -672,8 +670,8 @@ class TestBackgroundBatchProducer:
 
     def test_background_producer_thread_safety(self):
         """Test thread safety of background producer."""
-        dataset = MarketDepthDataset(buffer_size=SAMPLES)
-        data = generate_realistic_market_data(SAMPLES)
+        dataset = MarketDepthDataset(buffer_size=50000)
+        data = generate_realistic_market_data(50000)
         dataset.add_streaming_data(data)
 
         producer = BackgroundBatchProducer(dataset=dataset, queue_size=4, auto_start=True)
@@ -706,7 +704,7 @@ class TestHighPerformanceDataLoader:
     def test_high_performance_dataloader_initialization(self):
         """Test HighPerformanceDataLoader initializes correctly."""
         # Create dataset with data source for proper iteration
-        data = generate_realistic_market_data(SAMPLES + 50000)  # Much more data
+        data = generate_realistic_market_data(50000 + 50000)  # Much more data
         dataset = MarketDepthDataset(
             data_source=data,
             sampling_config={"coverage_percentage": 0.1},  # 10% coverage for enough batches
@@ -726,7 +724,7 @@ class TestHighPerformanceDataLoader:
     def test_high_performance_dataloader_basic_operations(self):
         """Test basic HighPerformanceDataLoader operations."""
         # Create dataset with data source for proper iteration
-        data = generate_realistic_market_data(SAMPLES + 50000)  # Much more data
+        data = generate_realistic_market_data(50000 + 50000)  # Much more data
         dataset = MarketDepthDataset(
             data_source=data,
             sampling_config={"coverage_percentage": 0.1},  # 10% coverage for enough batches
@@ -754,7 +752,7 @@ class TestHighPerformanceDataLoader:
     def test_high_performance_dataloader_factory_function(self):
         """Test factory function for HighPerformanceDataLoader."""
         # Create dataset with data source for proper iteration
-        data = generate_realistic_market_data(SAMPLES + 50000)  # Much more data
+        data = generate_realistic_market_data(50000 + 50000)  # Much more data
         dataset = MarketDepthDataset(
             data_source=data,
             sampling_config={"coverage_percentage": 0.1},  # 10% coverage for enough batches
@@ -776,7 +774,7 @@ class TestHighPerformanceDataLoader:
     def test_high_performance_dataloader_multiple_features(self):
         """Test HighPerformanceDataLoader with multiple features."""
         # Create dataset with multiple features and data source
-        data = generate_realistic_market_data(SAMPLES + 6000)
+        data = generate_realistic_market_data(50000 + 6000)
         dataset = MarketDepthDataset(
             data_source=data,
             features=["volume", "variance"],
@@ -797,7 +795,7 @@ class TestHighPerformanceDataLoader:
     def test_high_performance_dataloader_device_safety(self):
         """Test HighPerformanceDataLoader device safety features."""
         # Create dataset with data source for proper iteration
-        data = generate_realistic_market_data(SAMPLES + 6000)
+        data = generate_realistic_market_data(50000 + 6000)
         dataset = MarketDepthDataset(
             data_source=data,
             sampling_config={"coverage_percentage": 0.01},  # Small coverage for speed
@@ -821,7 +819,7 @@ class TestHighPerformanceDataLoader:
     def test_high_performance_dataloader_performance(self):
         """Test HighPerformanceDataLoader performance."""
         # Generate substantial data for realistic performance test and use as data source
-        large_data = generate_realistic_market_data(SAMPLES + 20000)
+        large_data = generate_realistic_market_data(50000 + 20000)
         dataset = MarketDepthDataset(
             data_source=large_data,
             sampling_config={"coverage_percentage": 0.05},  # 5% coverage for more batches
@@ -870,7 +868,7 @@ class TestBackgroundProcessingIntegration:
 
         # Create dataset with data source for proper iteration
         # Generate more data and increase coverage to ensure we get enough batches
-        data = generate_realistic_market_data(SAMPLES + 20000)  # More data
+        data = generate_realistic_market_data(50000 + 20000)  # More data
         dataset = MarketDepthDataset(
             data_source=data,
             sampling_config={"coverage_percentage": 0.05},  # Increase to 5% for more batches

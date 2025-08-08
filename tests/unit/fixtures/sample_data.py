@@ -14,12 +14,11 @@ from tests.unit.reference_implementation import (
     BID_VOL_COLUMNS,
     ASK_COUNT_COLUMNS,
     BID_COUNT_COLUMNS,
-    SAMPLES,
 )
 
 
 def generate_realistic_market_data(
-    n_samples: int = SAMPLES,
+    n_samples: int = 50000,  # Standard expected dataset size
     base_price: float = 0.6600,
     spread: float = 0.0002,
     seed: Optional[int] = 42,

@@ -9,7 +9,6 @@ import polars as pl
 
 from represent.pipeline import MarketDepthProcessor, process_market_data, create_processor
 from represent.constants import (
-    SAMPLES,
     PRICE_LEVELS,
     TIME_BINS,
     DEFAULT_FEATURES,
@@ -25,7 +24,7 @@ class TestExtendedFeatures:
 
     def test_single_feature_volume(self):
         """Test single volume feature extraction."""
-        data = generate_realistic_market_data(SAMPLES)
+        data = generate_realistic_market_data(50000)
         processor = MarketDepthProcessor(features=["volume"])
 
         result = processor.process(data)
@@ -36,7 +35,7 @@ class TestExtendedFeatures:
 
     def test_single_feature_trade_counts(self):
         """Test single trade_counts feature extraction."""
-        data = generate_realistic_market_data(SAMPLES)
+        data = generate_realistic_market_data(50000)
 
         # Add count columns to data
         for col in ASK_COUNT_COLUMNS + BID_COUNT_COLUMNS:
@@ -52,7 +51,7 @@ class TestExtendedFeatures:
 
     def test_single_feature_variance(self):
         """Test single variance feature extraction."""
-        data = generate_realistic_market_data(SAMPLES)
+        data = generate_realistic_market_data(50000)
 
         # Add variance column to data
         data = data.with_columns(pl.lit(0.1).alias(VARIANCE_COLUMN))
@@ -66,7 +65,7 @@ class TestExtendedFeatures:
 
     def test_multiple_features_2d(self):
         """Test multiple features (2 features) extraction."""
-        data = generate_realistic_market_data(SAMPLES)
+        data = generate_realistic_market_data(50000)
 
         # Add count columns to data
         for col in ASK_COUNT_COLUMNS + BID_COUNT_COLUMNS:
@@ -82,7 +81,7 @@ class TestExtendedFeatures:
 
     def test_multiple_features_3d(self):
         """Test all three features extraction."""
-        data = generate_realistic_market_data(SAMPLES)
+        data = generate_realistic_market_data(50000)
 
         # Add count columns and variance column to data
         for col in ASK_COUNT_COLUMNS + BID_COUNT_COLUMNS:
@@ -100,7 +99,7 @@ class TestExtendedFeatures:
 
     def test_feature_ordering_consistency(self):
         """Test that features are ordered consistently."""
-        data = generate_realistic_market_data(SAMPLES)
+        data = generate_realistic_market_data(50000)
 
         # Add all required columns
         for col in ASK_COUNT_COLUMNS + BID_COUNT_COLUMNS:
@@ -125,7 +124,7 @@ class TestExtendedFeatures:
 
     def test_default_features(self):
         """Test default features behavior."""
-        data = generate_realistic_market_data(SAMPLES)
+        data = generate_realistic_market_data(50000)
 
         # Test with no features specified
         processor = MarketDepthProcessor()
@@ -150,7 +149,7 @@ class TestExtendedFeatures:
 
     def test_process_market_data_api_with_features(self):
         """Test process_market_data API with features parameter."""
-        data = generate_realistic_market_data(SAMPLES)
+        data = generate_realistic_market_data(50000)
 
         # Test single feature
         result_single = process_market_data(data, features=["volume"])
@@ -180,7 +179,7 @@ class TestExtendedFeatures:
 
     def test_variance_feature_calculation(self):
         """Test that variance feature calculates volume variance correctly."""
-        data = generate_realistic_market_data(SAMPLES)
+        data = generate_realistic_market_data(50000)
         # Variance feature now calculates variance of volume data, not from a separate column
 
         processor = MarketDepthProcessor(features=["variance"])
@@ -195,7 +194,7 @@ class TestExtendedFeatures:
 
     def test_feature_data_isolation(self):
         """Test that different features are processed independently."""
-        data = generate_realistic_market_data(SAMPLES)
+        data = generate_realistic_market_data(50000)
 
         # Add count columns to data
         for col in ASK_COUNT_COLUMNS + BID_COUNT_COLUMNS:
@@ -232,7 +231,7 @@ class TestFeaturePerformance:
         """Test that multiple features don't significantly degrade performance."""
         import time
 
-        data = generate_realistic_market_data(SAMPLES)
+        data = generate_realistic_market_data(50000)
 
         # Add required columns
         for col in ASK_COUNT_COLUMNS + BID_COUNT_COLUMNS:
@@ -265,7 +264,7 @@ class TestFeaturePerformance:
         """Test that extended features meet latency requirements."""
         import time
 
-        data = generate_realistic_market_data(SAMPLES)
+        data = generate_realistic_market_data(50000)
 
         # Add all required columns
         for col in ASK_COUNT_COLUMNS + BID_COUNT_COLUMNS:
@@ -296,7 +295,7 @@ class TestBackwardCompatibility:
 
     def test_existing_api_unchanged(self):
         """Test that existing API calls work without modification."""
-        data = generate_realistic_market_data(SAMPLES)
+        data = generate_realistic_market_data(50000)
 
         # These should work exactly as before
         processor = MarketDepthProcessor()
@@ -311,7 +310,7 @@ class TestBackwardCompatibility:
 
     def test_default_behavior_unchanged(self):
         """Test that default behavior produces same results as before."""
-        data = generate_realistic_market_data(SAMPLES)
+        data = generate_realistic_market_data(50000)
 
         # Default should be volume-only
         processor_default = MarketDepthProcessor()

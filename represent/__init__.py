@@ -56,9 +56,6 @@ from .classification_config_generator import (
 # Core processing and configuration
 from .pipeline import process_market_data, create_processor, MarketDepthProcessor
 from .constants import (
-    MICRO_PIP_SIZE,
-    TICKS_PER_BIN,
-    SAMPLES,
     PRICE_LEVELS,
     TIME_BINS,
     ASK_PRICE_COLUMNS,
@@ -104,9 +101,6 @@ __all__ = [
     "create_represent_config",
     "list_available_currencies",
     # Constants
-    "MICRO_PIP_SIZE",
-    "TICKS_PER_BIN",
-    "SAMPLES",
     "PRICE_LEVELS",
     "TIME_BINS",
     "ASK_PRICE_COLUMNS",

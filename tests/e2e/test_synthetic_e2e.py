@@ -9,10 +9,10 @@ import polars as pl
 import time
 
 from represent import process_market_data, create_processor
-from represent.constants import OUTPUT_SHAPE, SAMPLES
+from represent.constants import OUTPUT_SHAPE
 
 
-def create_realistic_synthetic_data(n_samples: int = SAMPLES, seed: int = 42) -> pl.DataFrame:
+def create_realistic_synthetic_data(n_samples: int = 50000, seed: int = 42) -> pl.DataFrame:
     """Create synthetic but realistic market data for E2E testing."""
     np.random.seed(seed)
 
@@ -81,7 +81,7 @@ class TestSyntheticE2E:
     def test_full_pipeline_synthetic_data(self):
         """Test complete pipeline with synthetic realistic data."""
         # Generate realistic synthetic data
-        data = create_realistic_synthetic_data(n_samples=SAMPLES, seed=42)
+        data = create_realistic_synthetic_data(n_samples=50000, seed=42)
 
         # Process the data
         result = process_market_data(data)
@@ -105,7 +105,7 @@ class TestSyntheticE2E:
 
         # Generate different datasets
         datasets = [
-            create_realistic_synthetic_data(n_samples=SAMPLES, seed=i) for i in range(42, 45)
+            create_realistic_synthetic_data(n_samples=50000, seed=i) for i in range(42, 45)
         ]
 
         results = []
@@ -127,7 +127,7 @@ class TestSyntheticE2E:
     @pytest.mark.performance
     def test_synthetic_data_performance(self):
         """Test performance with synthetic data."""
-        data = create_realistic_synthetic_data(n_samples=SAMPLES, seed=42)
+        data = create_realistic_synthetic_data(n_samples=50000, seed=42)
 
         # Warm up
         process_market_data(data)
@@ -162,7 +162,7 @@ class TestSyntheticE2E:
         for condition in conditions:
             # Create data with specific conditions
             np.random.seed(42)
-            data = create_realistic_synthetic_data(n_samples=SAMPLES, seed=42)
+            data = create_realistic_synthetic_data(n_samples=50000, seed=42)
 
             # Process the data
             result = process_market_data(data)
@@ -176,7 +176,7 @@ class TestSyntheticE2E:
     @pytest.mark.e2e
     def test_data_quality_validation_synthetic(self):
         """Test data quality validation with synthetic data."""
-        data = create_realistic_synthetic_data(n_samples=SAMPLES, seed=42)
+        data = create_realistic_synthetic_data(n_samples=50000, seed=42)
 
         # Validate data structure
         required_columns = [
@@ -214,14 +214,14 @@ class TestSyntheticE2E:
     def test_large_synthetic_dataset(self):
         """Test processing of large synthetic dataset."""
         # Use the standard size but test multiple batches for "large" processing
-        data = create_realistic_synthetic_data(n_samples=SAMPLES, seed=42)
+        data = create_realistic_synthetic_data(n_samples=50000, seed=42)
 
         start_time = time.perf_counter()
         result = process_market_data(data)
         end_time = time.perf_counter()
 
         duration = end_time - start_time
-        throughput = SAMPLES / duration
+        throughput = 50000 / duration
 
         # Validate output
         assert result.shape == OUTPUT_SHAPE
@@ -230,13 +230,13 @@ class TestSyntheticE2E:
         # Performance should still be good
         assert throughput > 50000, f"Dataset throughput too low: {throughput:.0f} rps"
 
-        print(f"Dataset ({SAMPLES} records) performance: {throughput:.0f} rps")
+        print(f"Dataset ({50000} records) performance: {throughput:.0f} rps")
 
     @pytest.mark.e2e
     def test_edge_cases_synthetic(self):
         """Test edge cases with synthetic data."""
         # Test with standard size data containing some extreme values
-        extreme_data = create_realistic_synthetic_data(n_samples=SAMPLES, seed=42)
+        extreme_data = create_realistic_synthetic_data(n_samples=50000, seed=42)
 
         # Add some extreme price movements
         extreme_data = extreme_data.with_columns(
@@ -259,7 +259,7 @@ class TestSyntheticDataCompatibility:
     @pytest.mark.e2e
     def test_api_consistency_synthetic(self):
         """Test that both API methods give identical results with synthetic data."""
-        data = create_realistic_synthetic_data(n_samples=SAMPLES, seed=42)
+        data = create_realistic_synthetic_data(n_samples=50000, seed=42)
 
         # Test direct function
         result1 = process_market_data(data)
@@ -275,7 +275,7 @@ class TestSyntheticDataCompatibility:
     @pytest.mark.e2e
     def test_deterministic_processing_synthetic(self):
         """Test that processing is deterministic with synthetic data."""
-        data = create_realistic_synthetic_data(n_samples=SAMPLES, seed=42)
+        data = create_realistic_synthetic_data(n_samples=50000, seed=42)
 
         # Process multiple times
         results = []
@@ -300,7 +300,7 @@ class TestSyntheticDataCompatibility:
 
         # Process multiple datasets
         for i in range(5):
-            data = create_realistic_synthetic_data(n_samples=SAMPLES, seed=42 + i)
+            data = create_realistic_synthetic_data(n_samples=50000, seed=42 + i)
             result = process_market_data(data)
             assert result.shape == OUTPUT_SHAPE
 

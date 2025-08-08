@@ -7,20 +7,14 @@ import numpy as np
 from typing import Final, Union
 from enum import Enum
 
-# Core processing constants (from notebook analysis)
-MICRO_PIP_SIZE: Final[float] = 0.00001
-TICKS_PER_BIN: Final[int] = 100
-SAMPLES: Final[int] = 50000  # 500 * TICKS_PER_BIN
+# NOTE: Core processing constants have been moved to RepresentConfig:
+# - MICRO_PIP_SIZE → config.micro_pip_size
+# - TICKS_PER_BIN → config.ticks_per_bin
+# - SAMPLES → use config.samples for processing batch size, or calculate expected size dynamically
+# Use create_represent_config() to access these values.
 PRICE_LEVELS: Final[int] = 402  # 200 bid + 200 ask + 2 mid
 TIME_BINS: Final[int] = 500
 
-# Price movement calculation constants (lookback vs lookforward methodology)
-LOOKFORWARD_OFFSET: Final[int] = 500    # Gap before statistical window starts
-LOOKFORWARD_INPUT: Final[int] = 5000    # Statistical window size
-LOOKBACK_ROWS: Final[int] = 5000        # Historical window for lookback mean
-LOOKFORWARD_ROWS: Final[int] = LOOKFORWARD_OFFSET + LOOKFORWARD_INPUT  # Total: 5500
-INPUT_ROWS: Final[int] = 5000           # Market depth input window
-JUMP_SIZE: Final[int] = 100             # Step size between samples
 
 # Column definitions for 10-level market data
 ASK_PRICE_COLUMNS: Final[list[str]] = [f"ask_px_{str(i).zfill(2)}" for i in range(10)]
@@ -38,8 +32,7 @@ PRICE_RANGE: Final[int] = 200  # Price levels on each side of mid
 CACHE_LINE_SIZE: Final[int] = 64  # For cache-aligned allocations
 MAX_PRICE_DEVIATION: Final[int] = 1000  # Maximum price deviation in micro-pips
 
-# Pre-computed constants for performance
-MICRO_PIP_MULTIPLIER: Final[float] = 1.0 / MICRO_PIP_SIZE  # 100000.0
+# NOTE: MICRO_PIP_MULTIPLIER moved to RepresentConfig - use (1.0 / config.micro_pip_size)
 OUTPUT_SHAPE: Final[tuple[int, int]] = (PRICE_LEVELS, TIME_BINS)
 
 # NumPy data types for optimal performance

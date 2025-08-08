@@ -8,9 +8,6 @@ import polars as pl
 from typing import Optional, Union
 
 from .constants import (
-    MICRO_PIP_MULTIPLIER,
-    TICKS_PER_BIN,
-    SAMPLES,
     ASK_PRICE_COLUMNS,
     BID_PRICE_COLUMNS,
     ASK_VOL_COLUMNS,
@@ -29,6 +26,7 @@ from .constants import (
     FeatureType,
     get_output_shape,
 )
+from .config import create_represent_config
 from .data_structures import PriceLookupTable, VolumeGrid, OutputBuffer
 
 
@@ -39,14 +37,24 @@ class MarketDepthProcessor:
     Now supports multiple feature types: volume, variance, and trade_counts.
     """
 
-    def __init__(self, features: Optional[Union[list[str], list[FeatureType]]] = None):
+    def __init__(
+        self, 
+        features: Optional[Union[list[str], list[FeatureType]]] = None,
+        currency: str = "AUDUSD"
+    ):
         """Initialize processor with pre-allocated structures.
 
         Args:
             features: List of features to extract. Can be strings or FeatureType enums.
                      Options: 'volume', 'variance', 'trade_counts' or FeatureType enum values
                      Defaults to ['volume'] for backward compatibility.
+            currency: Currency pair for configuration (used for micro_pip_size and ticks_per_bin)
         """
+        # Load RepresentConfig for this currency
+        self.config = create_represent_config(currency)
+        
+        # Pre-compute values for performance
+        self.micro_pip_multiplier = 1.0 / self.config.micro_pip_size
         # Validate and set features
         if features is None:
             self.features: list[str] = DEFAULT_FEATURES.copy()
@@ -111,17 +119,18 @@ class MarketDepthProcessor:
 
         # Pre-compile price conversion expressions
         ask_exprs = [
-            (pl.col(col) * MICRO_PIP_MULTIPLIER).round().cast(pl.Int64).alias(col)
+            (pl.col(col) * self.micro_pip_multiplier).round().cast(pl.Int64).alias(col)
             for col in ASK_PRICE_COLUMNS
         ]
         bid_exprs = [
-            (pl.col(col) * MICRO_PIP_MULTIPLIER).round().cast(pl.Int64).alias(col)
+            (pl.col(col) * self.micro_pip_multiplier).round().cast(pl.Int64).alias(col)
             for col in BID_PRICE_COLUMNS
         ]
         self._price_conversion_expressions = ask_exprs + bid_exprs
 
-        # Pre-compile time bin expression
-        self._time_bin_expression = (pl.int_range(0, SAMPLES) // TICKS_PER_BIN).alias("tick_bin")
+        # Pre-compile time bin expression using config values
+        expected_samples = self.config.samples * 2  # Use 2x config samples as the "standard" size
+        self._time_bin_expression = (pl.int_range(0, expected_samples) // self.config.ticks_per_bin).alias("tick_bin")
 
         self._compiled_expressions_ready = True
 
@@ -135,8 +144,9 @@ class MarketDepthProcessor:
         if input_length is None:
             input_length = len(df)
 
-        # For standard 50K samples, use pre-compiled expression
-        if input_length == SAMPLES:
+        # For standard expected size, use pre-compiled expression
+        expected_samples = self.config.samples * 2  # Same as used in _prepare_expressions
+        if input_length == expected_samples:
             return df.with_columns(self._time_bin_expression)
 
         # For other sizes, create dynamic time bins
@@ -339,6 +349,7 @@ class MarketDepthProcessor:
 # Factory function for easy instantiation
 def create_processor(
     features: Optional[Union[list[str], list[FeatureType]]] = None,
+    currency: str = "AUDUSD"
 ) -> MarketDepthProcessor:
     """Create a new market depth processor instance.
 
@@ -346,13 +357,16 @@ def create_processor(
         features: List of features to extract. Can be strings or FeatureType enums.
                  Options: 'volume', 'variance', 'trade_counts' or FeatureType enum values
                  Defaults to ['volume'] for backward compatibility.
+        currency: Currency pair for configuration (used for micro_pip_size and ticks_per_bin)
     """
-    return MarketDepthProcessor(features=features)
+    return MarketDepthProcessor(features=features, currency=currency)
 
 
 # Main API function that matches the reference implementation interface
 def process_market_data(
-    df: pl.DataFrame, features: Optional[Union[list[str], list[FeatureType]]] = None
+    df: pl.DataFrame, 
+    features: Optional[Union[list[str], list[FeatureType]]] = None,
+    currency: str = "AUDUSD"
 ) -> np.ndarray:
     """
     Process market data and return normalized depth representation.
@@ -365,11 +379,12 @@ def process_market_data(
         features: List of features to extract. Can be strings or FeatureType enums.
                  Options: 'volume', 'variance', 'trade_counts' or FeatureType enum values
                  Defaults to ['volume'] for backward compatibility.
+        currency: Currency pair for configuration (used for micro_pip_size and ticks_per_bin)
 
     Returns:
         numpy array with normalized market depth:
         - Single feature: shape (402, 500)
         - Multiple features: shape (N, 402, 500) where N is number of features
     """
-    processor = create_processor(features=features)
+    processor = create_processor(features=features, currency=currency)
     return processor.process(df)
