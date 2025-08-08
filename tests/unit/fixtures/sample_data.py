@@ -7,7 +7,8 @@ import polars as pl
 from datetime import datetime, timezone
 from typing import Optional
 
-from tests.unit.reference_implementation import (
+# Import from the actual represent module instead of reference implementation
+from represent.constants import (
     ASK_PRICE_COLUMNS,
     BID_PRICE_COLUMNS,
     ASK_VOL_COLUMNS,

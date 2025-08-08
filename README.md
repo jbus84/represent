@@ -1,22 +1,22 @@
 # Represent v4.0.0
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-204%20passed-green.svg)](https://github.com/your-repo/represent)
-[![Coverage](https://img.shields.io/badge/coverage-86.4%25-brightgreen.svg)](https://github.com/your-repo/represent)
+[![Tests](https://img.shields.io/badge/tests-217%20passed-green.svg)](https://github.com/your-repo/represent)
+[![Coverage](https://img.shields.io/badge/coverage-76%25-yellow.svg)](https://github.com/your-repo/represent)
 [![Performance](https://img.shields.io/badge/latency-<10ms-orange.svg)](https://github.com/your-repo/represent)
 
-High-performance Python package for creating normalized market depth representations from limit order book data using a **streamlined DBN-to-parquet pipeline** with **dynamic classification** and **guaranteed uniform distribution**.
+High-performance Python package for creating normalized market depth representations from limit order book data using a **streamlined DBN-to-parquet pipeline** with **dynamic configuration** and **guaranteed uniform distribution**.
 
 ## 🚀 Key Features
 
 - **🔄 Streamlined Pipeline**: DBN→Classified Parquet→ML Training (single-pass processing)
-- **⚡ Dynamic Classification**: Adaptive thresholds computed from actual market data
+- **⚖️ Dynamic Configuration**: TIME_BINS computed as `samples // ticks_per_bin` (250 for AUDUSD)
 - **📊 Guaranteed Uniform Distribution**: 7.69% per class (13-bin) for optimal ML training
 - **💾 Symbol-Grouped Processing**: Separate parquet files per symbol for targeted analysis
 - **🔋 Memory-Efficient Training**: Lazy loading with configurable batch sizes for large datasets
 - **🎯 Multi-Feature Support**: Volume, variance, and trade count features (configurable)
 - **🧠 PyTorch Integration**: Production-ready DataLoader with direct tensor operations
-- **⚡ Performance Optimized**: 86.4% test coverage with <25s test execution
+- **⚡ Performance Optimized**: RepresentConfig system eliminates hardcoded constants
 - **📈 Real-World Tested**: Validated on AUDUSD, GBPUSD, and EURJPY market data
 
 ## 📦 Installation
@@ -31,6 +31,25 @@ pip install represent
 # Development installation
 git clone <repository-url> && cd represent
 uv sync --all-extras
+```
+
+## 🔧 v4.0.0 Architecture Updates
+
+### **RepresentConfig System**
+Replaced hardcoded constants with dynamic configuration:
+- **TIME_BINS**: Now computed as `samples // ticks_per_bin = 25000 // 100 = 250`
+- **Output Shape**: Dynamic `(402, time_bins)` instead of hardcoded `(402, 500)`
+- **Currency-Specific**: Each currency pair has optimized parameters
+- **Consistent**: All components use same configuration source
+
+### **Key Configuration Changes:**
+```python
+from represent import create_represent_config
+
+config = create_represent_config("AUDUSD")
+print(f"TIME_BINS: {config.time_bins}")        # 250 (computed)
+print(f"Output Shape: {config.output_shape}")  # (402, 250)
+print(f"Micro Pip Size: {config.micro_pip_size}")  # 0.00001
 ```
 
 ## 🏗️ Streamlined 2-Stage Architecture
@@ -156,7 +175,7 @@ criterion = nn.CrossEntropyLoss()
 print("🔄 Training with guaranteed uniform distribution...")
 for epoch in range(5):
     for features, labels in dataloader:
-        # features: (32, 2, 402, 500) for volume+variance
+        # features: (32, 2, 402, 250) for volume+variance with dynamic TIME_BINS
         # labels: (32,) with uniform distribution (7.69% each class 0-12)
         outputs = model(features)
         loss = criterion(outputs, labels)
@@ -564,6 +583,40 @@ uv run pytest -m performance
 - ✅ Symbol-specific processing with full context
 - ✅ Reduced storage requirements with no intermediate files
 - ✅ Simplified API with direct processing
+
+## 🧪 Testing & Code Quality
+
+### **Test Suite Organization**
+The test suite has been reorganized to align with the current architecture:
+
+- **✅ 217 Tests Passing**: Comprehensive coverage of all core functionality
+- **✅ 76% Code Coverage**: Focus on critical paths and user-facing APIs  
+- **✅ Removed Legacy Tests**: Eliminated 4 outdated test modules that no longer matched current architecture
+- **✅ Added New Test Coverage**: Enhanced tests for `GlobalThresholdCalculator`, `ParquetClassifier`, and `RepresentConfig`
+
+### **Removed Outdated Components:**
+- ❌ `test_legacy_dataloader.py` - Old ring buffer architecture  
+- ❌ `test_reference_implementation.py` - Notebook-based reference code
+- ❌ `test_benchmarks.py` - Benchmarks against removed reference implementation
+- ❌ `reference_implementation.py` - Static reference module
+
+### **Enhanced Test Coverage:**
+- ✅ **Global Threshold Calculator**: Comprehensive tests for threshold calculation logic
+- ✅ **API Integration**: Tests for high-level API consistency and parameter handling  
+- ✅ **Configuration System**: Tests for RepresentConfig dynamic computation
+- ✅ **Error Handling**: Robust tests for edge cases and error conditions
+
+### **Test Execution:**
+```bash
+# Run full test suite with coverage
+make test
+
+# Run quick tests (excluding performance tests)
+make test-fast
+
+# Generate HTML coverage report
+make coverage-html
+```
 
 ## 📄 License
 
