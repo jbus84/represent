@@ -40,7 +40,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from represent import (  # noqa: E402
     calculate_global_thresholds,
     process_dbn_to_classified_parquets,
-    RepresentConfig
+    create_represent_config,
+    PRICE_LEVELS,
+    TIME_BINS
 )
 from represent.pipeline import process_market_data  # noqa: E402
 
@@ -352,13 +354,12 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
             print("   🔄 Loading real data and extracting features...")
             df = pl.read_parquet(data_file)
             
-            # Create configuration exactly like the working examples
-            config = RepresentConfig(
-                currency=self.currency,
-                lookback_rows=5000,      # Match working examples
-                lookforward_input=3000,  # Match working examples
-                features=self.features   # All features
-            )
+            # Create configuration using the proper config system
+            config = create_represent_config(self.currency)
+            
+            # Override features if specified
+            if self.features:
+                config.features = self.features
             
             print("   📊 Configuration:")
             print(f"      Currency: {config.currency}")
@@ -367,16 +368,18 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
             print(f"      Lookforward: {config.lookforward_input}")
             
             # Process one symbol's data using the correct represent API
-            symbol_data = df.filter(df['symbol'] == 'M6AM4').head(5000)  # Use sufficient samples
-            if len(symbol_data) < 500:
+            # Use sufficient samples based on config requirements
+            min_required = config.lookback_rows + config.lookforward_input + config.lookforward_offset
+            symbol_data = df.filter(df['symbol'] == 'M6AM4').head(min_required * 2)  # Use extra for safety
+            if len(symbol_data) < min_required:
                 print("      ⚠️  Insufficient data, using first symbol with more data")
-                symbol_data = df.head(5000)
+                symbol_data = df.head(min_required * 2)
             
             print("   ⚡ Processing multi-feature data...")
             
             # Use process_market_data - this is the core represent API for feature extraction
             
-            # Get multi-feature tensor (n_features, 402, 500) - already normalized by process_market_data
+            # Get multi-feature tensor (n_features, PRICE_LEVELS, TIME_BINS) - already normalized by process_market_data
             multi_feature_tensor = process_market_data(symbol_data, features=config.features)
             
             print(f"   ✅ Multi-feature tensor: {multi_feature_tensor.shape}")
@@ -424,11 +427,11 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
         for feature in self.features:
             # Create realistic-looking dummy arrays
             if feature == "volume":
-                array = np.random.exponential(0.3, (402, 500))
+                array = np.random.exponential(0.3, (PRICE_LEVELS, TIME_BINS))
             elif feature == "variance":
-                array = np.random.gamma(2, 0.1, (402, 500))
+                array = np.random.gamma(2, 0.1, (PRICE_LEVELS, TIME_BINS))
             else:  # trade_counts
-                array = np.random.poisson(0.2, (402, 500)).astype(float)
+                array = np.random.poisson(0.2, (PRICE_LEVELS, TIME_BINS)).astype(float)
             
             # Normalize
             array = (array - array.min()) / (array.max() - array.min() + 1e-8)
@@ -1175,12 +1178,11 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
             df = pl.read_parquet(data_file)
             
             # Use the same configuration as feature extraction demo
-            config = RepresentConfig(
-                currency=self.currency,
-                lookback_rows=5000,
-                lookforward_input=3000,
-                features=self.features
-            )
+            config = create_represent_config(self.currency)
+            
+            # Override features if specified
+            if self.features:
+                config.features = self.features
             
             # Get data with sufficient samples for processing
             symbol_data = df.filter(df['symbol'] == 'M6AU4')  # Use the same symbol that worked
@@ -1271,11 +1273,11 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
                 for feature in self.features:
                     # Create realistic feature arrays
                     if feature == "volume":
-                        feature_array = np.random.exponential(0.3, (402, 500))
+                        feature_array = np.random.exponential(0.3, (PRICE_LEVELS, TIME_BINS))
                     elif feature == "variance":
-                        feature_array = np.random.gamma(2, 0.1, (402, 500))
+                        feature_array = np.random.gamma(2, 0.1, (PRICE_LEVELS, TIME_BINS))
                     else:  # trade_counts
-                        feature_array = np.random.poisson(0.2, (402, 500)).astype(float)
+                        feature_array = np.random.poisson(0.2, (PRICE_LEVELS, TIME_BINS)).astype(float)
                     
                     # Normalize to [0, 1]
                     feature_array = (feature_array - feature_array.min()) / (feature_array.max() - feature_array.min() + 1e-8)
@@ -1289,10 +1291,10 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
             
             # Create tensor format
             if len(self.features) == 1:
-                feature_tensor_shape = (batch_size, 402, 500)
+                feature_tensor_shape = (batch_size, PRICE_LEVELS, TIME_BINS)
                 feature_tensor = np.array([s['features'][self.features[0]] for s in samples])
             else:
-                feature_tensor_shape = (batch_size, len(self.features), 402, 500)
+                feature_tensor_shape = (batch_size, len(self.features), PRICE_LEVELS, TIME_BINS)
                 feature_tensor = np.array([
                     np.stack([s['features'][f] for f in self.features])
                     for s in samples
@@ -1384,9 +1386,9 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
         feature_stats = {}
         for feat_idx, feature in enumerate(self.features):
             if len(self.features) == 1:
-                feature_data = feature_tensor  # Shape: (batch, 402, 500)
+                feature_data = feature_tensor  # Shape: (batch, PRICE_LEVELS, TIME_BINS)
             else:
-                feature_data = feature_tensor[:, feat_idx, :, :]  # Shape: (batch, 402, 500)
+                feature_data = feature_tensor[:, feat_idx, :, :]  # Shape: (batch, PRICE_LEVELS, TIME_BINS)
             
             feature_stats[feature] = {
                 'mean': np.mean(feature_data),
@@ -1727,8 +1729,8 @@ features = processor.extract_features(
 )
 
 # Output shapes:
-# Single feature: (402, 500)
-# Multi-feature: (3, 402, 500)
+# Single feature: (PRICE_LEVELS, TIME_BINS)
+# Multi-feature: (3, PRICE_LEVELS, TIME_BINS)
                 </div>
             </div>
 """
@@ -2064,8 +2066,8 @@ features = processor.extract_features(
 )
 
 # Output shapes:
-# Single feature: (402, 500)
-# Multi-feature: (3, 402, 500)
+# Single feature: (PRICE_LEVELS, TIME_BINS)
+# Multi-feature: (3, PRICE_LEVELS, TIME_BINS)
 ```
 
 ![Feature Extraction Visualization](feature_extraction_demo.png)

@@ -13,10 +13,8 @@ import polars as pl
 import databento as db
 from dataclasses import dataclass
 
-from .constants import (
-    LOOKFORWARD_OFFSET, LOOKFORWARD_INPUT, 
-    LOOKBACK_ROWS, LOOKFORWARD_ROWS, INPUT_ROWS, JUMP_SIZE
-)
+from .config import create_represent_config
+from .constants import JUMP_SIZE
 
 
 @dataclass
@@ -40,36 +38,38 @@ class GlobalThresholdCalculator:
     def __init__(
         self,
         currency: str = "AUDUSD",
-        nbins: int = 13,
+        nbins: Optional[int] = None,
         sample_fraction: float = 0.5,
         max_samples_per_file: int = 10000,
         verbose: bool = True,
     ):
         """
-        Initialize global threshold calculator.
+        Initialize global threshold calculator using RepresentConfig.
         
         Args:
             currency: Currency pair for configuration
-            nbins: Number of classification bins
+            nbins: Number of classification bins (if None, uses config default)
             sample_fraction: Fraction of files to use for threshold calculation
             max_samples_per_file: Maximum samples to extract per file (for performance)
             verbose: Whether to print progress information
         """
         self.currency = currency
-        self.nbins = nbins
         self.sample_fraction = sample_fraction
         self.max_samples_per_file = max_samples_per_file
         self.verbose = verbose
+        
+        # Load RepresentConfig for this currency
+        self.config = create_represent_config(currency)
+        self.nbins = nbins if nbins is not None else self.config.nbins
         
         if self.verbose:
             print("🌐 GlobalThresholdCalculator initialized")
             print(f"   💱 Currency: {self.currency}")
             print(f"   📊 Bins: {self.nbins}")
-            print(f"   📈 Lookforward offset: {LOOKFORWARD_OFFSET}")
-            print(f"   📉 Lookforward window: {LOOKFORWARD_INPUT}")
-            print(f"   📏 Total lookforward: {LOOKFORWARD_ROWS}")
-            print(f"   📊 Lookback rows: {LOOKBACK_ROWS}")
-            print(f"   📏 Input rows: {INPUT_ROWS}")
+            print(f"   📈 Lookforward offset: {self.config.lookforward_offset}")
+            print(f"   📉 Lookforward window: {self.config.lookforward_input}")
+            print(f"   📏 Total lookforward rows: {self.config.lookforward_input + self.config.lookforward_offset}")
+            print(f"   📊 Lookback rows: {self.config.lookback_rows}")
             print(f"   🔢 Sample fraction: {self.sample_fraction}")
             print(f"   📏 Max samples per file: {self.max_samples_per_file}")
 
@@ -92,7 +92,7 @@ class GlobalThresholdCalculator:
             df = pl.from_pandas(data.to_df())
             
             # Check if we have sufficient data for the methodology
-            min_required_rows = INPUT_ROWS + LOOKBACK_ROWS + LOOKFORWARD_ROWS
+            min_required_rows = self.config.lookback_rows + self.config.lookforward_input + self.config.lookforward_offset
             if len(df) < min_required_rows:
                 if self.verbose:
                     print(f"      ⚠️  Insufficient data: {len(df)} < {min_required_rows} rows")
@@ -126,13 +126,14 @@ class GlobalThresholdCalculator:
             price_movements = []
             
             # Iterate through valid sample positions using JUMP_SIZE steps
-            for stop_row in range(INPUT_ROWS, len(mid_prices) - LOOKFORWARD_ROWS, JUMP_SIZE):
+            total_lookforward = self.config.lookforward_input + self.config.lookforward_offset
+            for stop_row in range(self.config.lookback_rows, len(mid_prices) - total_lookforward, JUMP_SIZE):
                 # Define time windows according to the correct methodology
-                lookback_start = stop_row - LOOKBACK_ROWS
+                lookback_start = stop_row - self.config.lookback_rows
                 lookback_end = stop_row
                 
-                target_start_row = stop_row + 1 + LOOKFORWARD_OFFSET
-                target_stop_row = stop_row + LOOKFORWARD_ROWS
+                target_start_row = stop_row + 1 + self.config.lookforward_offset
+                target_stop_row = stop_row + self.config.lookforward_input
                 
                 # Calculate lookback mean (historical average)
                 lookback_mean = np.mean(mid_prices[lookback_start:lookback_end])
