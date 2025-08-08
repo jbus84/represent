@@ -8,11 +8,15 @@ import numpy as np
 import pandas as pd
 
 from represent import process_market_data, create_processor
-from represent.constants import OUTPUT_SHAPE
+from represent.config import create_represent_config
 
 
 class TestDataFormatCompatibility:
     """Test compatibility with different data formats and sources."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     @pytest.mark.e2e
     def test_databento_format_compatibility(self, sample_real_data):
@@ -32,7 +36,7 @@ class TestDataFormatCompatibility:
             # Process the data
             result = process_market_data(sample_real_data)
 
-            assert result.shape == OUTPUT_SHAPE
+            assert result.shape == self.config.output_shape
             assert np.all(np.isfinite(result))
         else:
             pytest.skip("No databento-specific columns found")
@@ -45,7 +49,7 @@ class TestDataFormatCompatibility:
 
         # Test with the data as-is
         result = process_market_data(sample_real_data)
-        assert result.shape == OUTPUT_SHAPE
+        assert result.shape == self.config.output_shape
 
         # If we have the expected columns, test renaming scenarios
         expected_ask_cols = [f"ask_px_{str(i).zfill(2)}" for i in range(10)]
@@ -70,7 +74,7 @@ class TestDataFormatCompatibility:
 
         # Should handle any number of levels gracefully
         result = process_market_data(sample_real_data)
-        assert result.shape == OUTPUT_SHAPE
+        assert result.shape == self.config.output_shape
         assert np.all(np.isfinite(result))
 
     @pytest.mark.e2e
@@ -88,11 +92,15 @@ class TestDataFormatCompatibility:
 
         # Output should always be float32
         assert result.dtype == np.float32
-        assert result.shape == OUTPUT_SHAPE
+        assert result.shape == self.config.output_shape
 
 
 class TestRealDataQuality:
     """Test data quality aspects with real market data."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     @pytest.mark.e2e
     def test_null_value_handling(self, sample_real_data):
@@ -109,12 +117,12 @@ class TestRealDataQuality:
 
             # Should handle nulls gracefully
             result = process_market_data(sample_real_data)
-            assert result.shape == OUTPUT_SHAPE
+            assert result.shape == self.config.output_shape
             assert np.all(np.isfinite(result))
         else:
             print("No null values found in real data")
             result = process_market_data(sample_real_data)
-            assert result.shape == OUTPUT_SHAPE
+            assert result.shape == self.config.output_shape
 
     @pytest.mark.e2e
     def test_price_reasonableness(self, sample_real_data):
@@ -145,7 +153,7 @@ class TestRealDataQuality:
 
         # Process the data
         result = process_market_data(sample_real_data)
-        assert result.shape == OUTPUT_SHAPE
+        assert result.shape == self.config.output_shape
 
     @pytest.mark.e2e
     def test_volume_reasonableness(self, sample_real_data):
@@ -171,7 +179,7 @@ class TestRealDataQuality:
 
         # Process the data
         result = process_market_data(sample_real_data)
-        assert result.shape == OUTPUT_SHAPE
+        assert result.shape == self.config.output_shape
 
     @pytest.mark.e2e
     def test_timestamp_consistency(self, sample_real_data):
@@ -212,11 +220,15 @@ class TestRealDataQuality:
 
         # Process the data
         result = process_market_data(sample_real_data)
-        assert result.shape == OUTPUT_SHAPE
+        assert result.shape == self.config.output_shape
 
 
 class TestRealDataIntegration:
     """Integration tests with real data and different processing scenarios."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     @pytest.mark.e2e
     @pytest.mark.slow
@@ -233,7 +245,7 @@ class TestRealDataIntegration:
         result2 = processor.process(sample_real_data)
 
         # Results should be identical
-        assert result1.shape == result2.shape == OUTPUT_SHAPE
+        assert result1.shape == result2.shape == self.config.output_shape
         assert np.allclose(result1, result2, rtol=1e-6), "API methods give different results"
 
         print(f"Successfully processed {len(sample_real_data)} real records")
@@ -256,7 +268,7 @@ class TestRealDataIntegration:
         for i in range(1, len(results)):
             assert np.allclose(results[0], results[i], rtol=1e-10), f"Result {i} differs from first"
 
-        assert results[0].shape == OUTPUT_SHAPE
+        assert results[0].shape == self.config.output_shape
 
     @pytest.mark.e2e
     def test_concurrent_processing_simulation(self, sample_real_data):
@@ -279,4 +291,4 @@ class TestRealDataIntegration:
                 f"Processor {i} gives different result"
             )
 
-        assert results[0].shape == OUTPUT_SHAPE
+        assert results[0].shape == self.config.output_shape

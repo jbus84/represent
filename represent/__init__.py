@@ -57,7 +57,6 @@ from .classification_config_generator import (
 from .pipeline import process_market_data, create_processor, MarketDepthProcessor
 from .constants import (
     PRICE_LEVELS,
-    TIME_BINS,
     ASK_PRICE_COLUMNS,
     BID_PRICE_COLUMNS,
     ASK_VOL_COLUMNS,
@@ -100,9 +99,8 @@ __all__ = [
     "RepresentConfig",
     "create_represent_config",
     "list_available_currencies",
-    # Constants
+    # Constants (TIME_BINS moved to RepresentConfig.time_bins)
     "PRICE_LEVELS",
-    "TIME_BINS",
     "ASK_PRICE_COLUMNS",
     "BID_PRICE_COLUMNS",
     "ASK_VOL_COLUMNS",

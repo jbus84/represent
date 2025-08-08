@@ -15,7 +15,6 @@ import torch
 
 from represent.constants import (
     PRICE_LEVELS,
-    TIME_BINS,
     ASK_PRICE_COLUMNS,
     BID_PRICE_COLUMNS,
 )
@@ -101,7 +100,7 @@ class TestMarketDepthDataset:
 
         # Verify output format
         assert isinstance(representation, torch.Tensor)
-        assert representation.shape == (PRICE_LEVELS, TIME_BINS)
+        assert representation.shape == (PRICE_LEVELS, 500)
         assert representation.dtype == torch.float32
 
         # Performance requirement: <10ms (relaxed for prototype)
@@ -134,7 +133,7 @@ class TestMarketDepthDataset:
             input_tensor, target_tensor = batch_result
             assert isinstance(input_tensor, torch.Tensor)
             assert isinstance(target_tensor, torch.Tensor)
-            assert input_tensor.shape == (PRICE_LEVELS, TIME_BINS)
+            assert input_tensor.shape == (PRICE_LEVELS, 500)
             assert target_tensor.dtype == torch.long
 
             batch_count += 1
@@ -165,7 +164,7 @@ class TestMarketDepthDataset:
             total_time += end_time - start_time
 
             # Verify correctness
-            assert representation.shape == (PRICE_LEVELS, TIME_BINS)
+            assert representation.shape == (PRICE_LEVELS, 500)
 
         average_time_ms = (total_time / num_iterations) * 1000
 
@@ -362,7 +361,7 @@ class TestMarketDepthDataset:
 
             # Verify input tensor
             assert isinstance(input_tensor, torch.Tensor)
-            assert input_tensor.shape == (PRICE_LEVELS, TIME_BINS)
+            assert input_tensor.shape == (PRICE_LEVELS, 500)
 
             # Verify targets tensor (classification labels)
             assert isinstance(targets, torch.Tensor)
@@ -401,7 +400,7 @@ class TestMarketDepthDataset:
 
             input_tensor, targets = batch_result
             assert isinstance(input_tensor, torch.Tensor)
-            assert input_tensor.shape == (PRICE_LEVELS, TIME_BINS)
+            assert input_tensor.shape == (PRICE_LEVELS, 500)
             assert isinstance(targets, torch.Tensor)
             assert targets.dtype == torch.long
 
@@ -629,7 +628,7 @@ class TestBackgroundBatchProducer:
 
             # Verify batch properties
             assert isinstance(batch, torch.Tensor)
-            assert batch.shape == (PRICE_LEVELS, TIME_BINS)
+            assert batch.shape == (PRICE_LEVELS, 500)
             assert batch.dtype == torch.float32
 
             # Check that producer is working
@@ -692,7 +691,7 @@ class TestBackgroundBatchProducer:
             # Verify all batches are valid
             for batch in batches:
                 assert isinstance(batch, torch.Tensor)
-                assert batch.shape == (PRICE_LEVELS, TIME_BINS)
+                assert batch.shape == (PRICE_LEVELS, 500)
 
         finally:
             producer.stop()
@@ -740,7 +739,7 @@ class TestHighPerformanceDataLoader:
             assert isinstance(features, torch.Tensor)
             assert isinstance(targets, torch.Tensor)
             assert features.shape[0] == 4  # batch size
-            assert features.shape[1:] == (PRICE_LEVELS, TIME_BINS)
+            assert features.shape[1:] == (PRICE_LEVELS, 500)
             assert targets.shape[0] == 4  # batch size
 
             batches.append((features, targets))
@@ -787,8 +786,8 @@ class TestHighPerformanceDataLoader:
         batch_iter = iter(dataloader)
         features, targets = next(batch_iter)
 
-        # Should have shape (batch_size, 2, PRICE_LEVELS, TIME_BINS) for 2 features
-        expected_shape = (4, 2, PRICE_LEVELS, TIME_BINS)
+        # Should have shape (batch_size, 2, PRICE_LEVELS, 500) for 2 features
+        expected_shape = (4, 2, PRICE_LEVELS, 500)
         assert features.shape == expected_shape
         assert targets.shape == (4, 1)
 
@@ -902,7 +901,7 @@ class TestBackgroundProcessingIntegration:
             batch_start = time.perf_counter()
 
             # Process batch - take first sample from batch for model input
-            single_sample = features[0]  # Shape: (PRICE_LEVELS, TIME_BINS)
+            single_sample = features[0]  # Shape: (PRICE_LEVELS, 500)
 
             batch_end = time.perf_counter()
             batch_time = (batch_end - batch_start) * 1000

@@ -3,28 +3,13 @@ Configuration models for market depth processing.
 Supports currency-specific configurations with default values and dynamic generation.
 """
 
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from pathlib import Path
 import logging
 
 from pydantic import BaseModel, Field, field_validator, computed_field
 
 logger = logging.getLogger(__name__)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 class RepresentConfig(BaseModel):
@@ -145,12 +130,18 @@ class RepresentConfig(BaseModel):
     @computed_field
     def time_bins(self) -> int:
         """Auto-computed time bins based on samples and ticks_per_bin."""
-        return min(500, max(250, self.samples // self.ticks_per_bin))
+        return self.samples // self.ticks_per_bin
     
     @computed_field
     def min_symbol_samples(self) -> int:
         """Auto-computed minimum samples per symbol."""
-        return max(1000, self.samples // 25)
+        return self.samples // 25
+    
+    @computed_field
+    def output_shape(self) -> Tuple[int, int]:
+        """Auto-computed output shape (PRICE_LEVELS, time_bins)."""
+        time_bins_value = self.samples // self.ticks_per_bin
+        return (402, time_bins_value)  # 402 = 200 bid + 200 ask + 2 mid
     
 
 

@@ -10,16 +10,20 @@ import polars as pl
 from represent.pipeline import MarketDepthProcessor, process_market_data, create_processor
 from represent.constants import (
     PRICE_LEVELS,
-    TIME_BINS,
     DEFAULT_FEATURES,
     ASK_COUNT_COLUMNS,
     BID_COUNT_COLUMNS,
 )
+from represent.config import create_represent_config
 from tests.unit.fixtures.sample_data import generate_realistic_market_data
 
 
 class TestExtendedFeatures:
     """Test extended features functionality."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     def test_single_feature_volume(self):
         """Test single volume feature extraction."""
@@ -29,7 +33,7 @@ class TestExtendedFeatures:
         result = processor.process(data)
 
         # Single feature should return 2D array
-        assert result.shape == (PRICE_LEVELS, TIME_BINS)
+        assert result.shape == (PRICE_LEVELS, self.config.time_bins)
         assert result.dtype == np.float32
 
     def test_single_feature_trade_counts(self):
@@ -45,7 +49,7 @@ class TestExtendedFeatures:
         result = processor.process(data)
 
         # Single feature should return 2D array
-        assert result.shape == (PRICE_LEVELS, TIME_BINS)
+        assert result.shape == (PRICE_LEVELS, self.config.time_bins)
         assert result.dtype == np.float32
 
     def test_single_feature_variance(self):
@@ -58,7 +62,7 @@ class TestExtendedFeatures:
         result = processor.process(data)
 
         # Single feature should return 2D array
-        assert result.shape == (PRICE_LEVELS, TIME_BINS)
+        assert result.shape == (PRICE_LEVELS, self.config.time_bins)
         assert result.dtype == np.float32
 
     def test_multiple_features_2d(self):
@@ -74,7 +78,7 @@ class TestExtendedFeatures:
         result = processor.process(data)
 
         # Multiple features should return 3D array
-        assert result.shape == (2, PRICE_LEVELS, TIME_BINS)
+        assert result.shape == (2, PRICE_LEVELS, self.config.time_bins)
         assert result.dtype == np.float32
 
     def test_multiple_features_3d(self):
@@ -92,7 +96,7 @@ class TestExtendedFeatures:
         result = processor.process(data)
 
         # Multiple features should return 3D array
-        assert result.shape == (3, PRICE_LEVELS, TIME_BINS)
+        assert result.shape == (3, PRICE_LEVELS, self.config.time_bins)
         assert result.dtype == np.float32
 
     def test_feature_ordering_consistency(self):
@@ -114,7 +118,7 @@ class TestExtendedFeatures:
         result2 = processor2.process(data)
 
         # Results should have same shape and same feature ordering (sorted by index)
-        assert result1.shape == result2.shape == (3, PRICE_LEVELS, TIME_BINS)
+        assert result1.shape == result2.shape == (3, PRICE_LEVELS, self.config.time_bins)
 
         # Features should be ordered consistently: volume=0, variance=1, trade_counts=2
         assert processor1.features == ["volume", "variance", "trade_counts"]
@@ -129,7 +133,7 @@ class TestExtendedFeatures:
         result = processor.process(data)
 
         assert processor.features == DEFAULT_FEATURES
-        assert result.shape == (PRICE_LEVELS, TIME_BINS)
+        assert result.shape == (PRICE_LEVELS, self.config.time_bins)
 
     def test_invalid_features(self):
         """Test error handling for invalid features."""
@@ -151,7 +155,7 @@ class TestExtendedFeatures:
 
         # Test single feature
         result_single = process_market_data(data, features=["volume"])
-        assert result_single.shape == (PRICE_LEVELS, TIME_BINS)
+        assert result_single.shape == (PRICE_LEVELS, self.config.time_bins)
 
         # Test multiple features
         for col in ASK_COUNT_COLUMNS + BID_COUNT_COLUMNS:
@@ -159,11 +163,11 @@ class TestExtendedFeatures:
                 data = data.with_columns(pl.lit(1.0).alias(col))
 
         result_multi = process_market_data(data, features=["volume", "trade_counts"])
-        assert result_multi.shape == (2, PRICE_LEVELS, TIME_BINS)
+        assert result_multi.shape == (2, PRICE_LEVELS, self.config.time_bins)
 
         # Test default behavior (backward compatibility)
         result_default = process_market_data(data)
-        assert result_default.shape == (PRICE_LEVELS, TIME_BINS)
+        assert result_default.shape == (PRICE_LEVELS, self.config.time_bins)
 
     def test_create_processor_factory_with_features(self):
         """Test create_processor factory with features parameter."""
@@ -184,7 +188,7 @@ class TestExtendedFeatures:
         result = processor.process(data)
 
         # Should return proper shape
-        assert result.shape == (PRICE_LEVELS, TIME_BINS)
+        assert result.shape == (PRICE_LEVELS, self.config.time_bins)
         # Result should contain meaningful variance data (not all zeros)
         assert not np.allclose(result, 0.0, atol=1e-6)
         # Should be in normalized range [-1, 1]
@@ -204,7 +208,7 @@ class TestExtendedFeatures:
         result = processor.process(data)
 
         # Verify we have the expected shape and valid results
-        assert result.shape == (2, PRICE_LEVELS, TIME_BINS)
+        assert result.shape == (2, PRICE_LEVELS, self.config.time_bins)
 
         volume_result = result[0]  # First feature (volume)
         counts_result = result[1]  # Second feature (trade_counts)
@@ -224,6 +228,10 @@ class TestExtendedFeatures:
 
 class TestFeaturePerformance:
     """Test performance aspects of extended features."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     def test_single_vs_multiple_feature_performance(self):
         """Test that multiple features don't significantly degrade performance."""
@@ -249,8 +257,8 @@ class TestFeaturePerformance:
         multi_time = time.perf_counter() - start_time
 
         # Verify results
-        assert result_single.shape == (PRICE_LEVELS, TIME_BINS)
-        assert result_multi.shape == (2, PRICE_LEVELS, TIME_BINS)
+        assert result_single.shape == (PRICE_LEVELS, self.config.time_bins)
+        assert result_multi.shape == (2, PRICE_LEVELS, self.config.time_bins)
 
         # Multiple features should not be more than 3x slower
         assert multi_time < single_time * 3.0, (
@@ -280,7 +288,7 @@ class TestFeaturePerformance:
             result = processor.process(data)
             end_time = time.perf_counter()
             times.append((end_time - start_time) * 1000)  # Convert to ms
-            assert result.shape == (3, PRICE_LEVELS, TIME_BINS)
+            assert result.shape == (3, PRICE_LEVELS, self.config.time_bins)
 
         avg_time = sum(times) / len(times)
 
@@ -290,6 +298,10 @@ class TestFeaturePerformance:
 
 class TestBackwardCompatibility:
     """Test backward compatibility with existing code."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     def test_existing_api_unchanged(self):
         """Test that existing API calls work without modification."""
@@ -298,10 +310,10 @@ class TestBackwardCompatibility:
         # These should work exactly as before
         processor = MarketDepthProcessor()
         result = processor.process(data)
-        assert result.shape == (PRICE_LEVELS, TIME_BINS)
+        assert result.shape == (PRICE_LEVELS, self.config.time_bins)
 
         result2 = process_market_data(data)
-        assert result2.shape == (PRICE_LEVELS, TIME_BINS)
+        assert result2.shape == (PRICE_LEVELS, self.config.time_bins)
 
         # Results should be identical to preserve backward compatibility
         assert np.allclose(result, result2)
@@ -318,4 +330,4 @@ class TestBackwardCompatibility:
         result_explicit = processor_explicit.process(data)
 
         assert np.allclose(result_default, result_explicit)
-        assert result_default.shape == result_explicit.shape == (PRICE_LEVELS, TIME_BINS)
+        assert result_default.shape == result_explicit.shape == (PRICE_LEVELS, self.config.time_bins)

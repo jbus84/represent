@@ -41,8 +41,7 @@ from represent import (  # noqa: E402
     calculate_global_thresholds,
     process_dbn_to_classified_parquets,
     create_represent_config,
-    PRICE_LEVELS,
-    TIME_BINS
+    PRICE_LEVELS
 )
 from represent.pipeline import process_market_data  # noqa: E402
 
@@ -379,7 +378,7 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
             
             # Use process_market_data - this is the core represent API for feature extraction
             
-            # Get multi-feature tensor (n_features, PRICE_LEVELS, TIME_BINS) - already normalized by process_market_data
+            # Get multi-feature tensor (n_features, PRICE_LEVELS, config.time_bins) - already normalized by process_market_data
             multi_feature_tensor = process_market_data(symbol_data, features=config.features)
             
             print(f"   ✅ Multi-feature tensor: {multi_feature_tensor.shape}")
@@ -423,15 +422,16 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
     
     def _create_dummy_features(self) -> Dict[str, Any]:
         """Create dummy feature data as fallback."""
+        config = create_represent_config(self.currency)
         feature_results = {}
         for feature in self.features:
             # Create realistic-looking dummy arrays
             if feature == "volume":
-                array = np.random.exponential(0.3, (PRICE_LEVELS, TIME_BINS))
+                array = np.random.exponential(0.3, (PRICE_LEVELS, config.time_bins))
             elif feature == "variance":
-                array = np.random.gamma(2, 0.1, (PRICE_LEVELS, TIME_BINS))
+                array = np.random.gamma(2, 0.1, (PRICE_LEVELS, config.time_bins))
             else:  # trade_counts
-                array = np.random.poisson(0.2, (PRICE_LEVELS, TIME_BINS)).astype(float)
+                array = np.random.poisson(0.2, (PRICE_LEVELS, config.time_bins)).astype(float)
             
             # Normalize
             array = (array - array.min()) / (array.max() - array.min() + 1e-8)
@@ -1273,11 +1273,11 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
                 for feature in self.features:
                     # Create realistic feature arrays
                     if feature == "volume":
-                        feature_array = np.random.exponential(0.3, (PRICE_LEVELS, TIME_BINS))
+                        feature_array = np.random.exponential(0.3, (PRICE_LEVELS, config.time_bins))
                     elif feature == "variance":
-                        feature_array = np.random.gamma(2, 0.1, (PRICE_LEVELS, TIME_BINS))
+                        feature_array = np.random.gamma(2, 0.1, (PRICE_LEVELS, config.time_bins))
                     else:  # trade_counts
-                        feature_array = np.random.poisson(0.2, (PRICE_LEVELS, TIME_BINS)).astype(float)
+                        feature_array = np.random.poisson(0.2, (PRICE_LEVELS, config.time_bins)).astype(float)
                     
                     # Normalize to [0, 1]
                     feature_array = (feature_array - feature_array.min()) / (feature_array.max() - feature_array.min() + 1e-8)
@@ -1291,10 +1291,10 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
             
             # Create tensor format
             if len(self.features) == 1:
-                feature_tensor_shape = (batch_size, PRICE_LEVELS, TIME_BINS)
+                feature_tensor_shape = (batch_size, PRICE_LEVELS, config.time_bins)
                 feature_tensor = np.array([s['features'][self.features[0]] for s in samples])
             else:
-                feature_tensor_shape = (batch_size, len(self.features), PRICE_LEVELS, TIME_BINS)
+                feature_tensor_shape = (batch_size, len(self.features), PRICE_LEVELS, config.time_bins)
                 feature_tensor = np.array([
                     np.stack([s['features'][f] for f in self.features])
                     for s in samples
@@ -1386,9 +1386,9 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
         feature_stats = {}
         for feat_idx, feature in enumerate(self.features):
             if len(self.features) == 1:
-                feature_data = feature_tensor  # Shape: (batch, PRICE_LEVELS, TIME_BINS)
+                feature_data = feature_tensor  # Shape: (batch, PRICE_LEVELS, config.time_bins)
             else:
-                feature_data = feature_tensor[:, feat_idx, :, :]  # Shape: (batch, PRICE_LEVELS, TIME_BINS)
+                feature_data = feature_tensor[:, feat_idx, :, :]  # Shape: (batch, PRICE_LEVELS, config.time_bins)
             
             feature_stats[feature] = {
                 'mean': np.mean(feature_data),
@@ -1729,8 +1729,8 @@ features = processor.extract_features(
 )
 
 # Output shapes:
-# Single feature: (PRICE_LEVELS, TIME_BINS)
-# Multi-feature: (3, PRICE_LEVELS, TIME_BINS)
+# Single feature: (PRICE_LEVELS, config.time_bins)
+# Multi-feature: (3, PRICE_LEVELS, config.time_bins)
                 </div>
             </div>
 """
@@ -2066,8 +2066,8 @@ features = processor.extract_features(
 )
 
 # Output shapes:
-# Single feature: (PRICE_LEVELS, TIME_BINS)
-# Multi-feature: (3, PRICE_LEVELS, TIME_BINS)
+# Single feature: (PRICE_LEVELS, config.time_bins)
+# Multi-feature: (3, PRICE_LEVELS, config.time_bins)
 ```
 
 ![Feature Extraction Visualization](feature_extraction_demo.png)

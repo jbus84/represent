@@ -9,7 +9,7 @@ import polars as pl
 import time
 
 from represent import process_market_data, create_processor
-from represent.constants import OUTPUT_SHAPE
+from represent.config import create_represent_config
 
 
 def create_realistic_synthetic_data(n_samples: int = 50000, seed: int = 42) -> pl.DataFrame:
@@ -76,6 +76,10 @@ def create_realistic_synthetic_data(n_samples: int = 50000, seed: int = 42) -> p
 
 class TestSyntheticE2E:
     """End-to-end tests using synthetic realistic data."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     @pytest.mark.e2e
     def test_full_pipeline_synthetic_data(self):
@@ -87,7 +91,7 @@ class TestSyntheticE2E:
         result = process_market_data(data)
 
         # Validate output
-        assert result.shape == OUTPUT_SHAPE, f"Expected shape {OUTPUT_SHAPE}, got {result.shape}"
+        assert result.shape == (402, self.config.time_bins), f"Expected shape {(402, self.config.time_bins)}, got {result.shape}"
         assert result.dtype == np.float32, f"Expected float32, got {result.dtype}"
         assert np.all(np.isfinite(result)), "Output contains non-finite values"
 
@@ -115,7 +119,7 @@ class TestSyntheticE2E:
 
         # All results should have correct shape and be finite
         for i, result in enumerate(results):
-            assert result.shape == OUTPUT_SHAPE, f"Dataset {i} has wrong shape"
+            assert result.shape == (402, self.config.time_bins), f"Dataset {i} has wrong shape"
             assert np.all(np.isfinite(result)), f"Dataset {i} contains non-finite values"
 
         # Results should be different (different seeds)
@@ -141,7 +145,7 @@ class TestSyntheticE2E:
         throughput = len(data) / duration
 
         # Validate output
-        assert result.shape == OUTPUT_SHAPE
+        assert result.shape == (402, self.config.time_bins)
         assert np.all(np.isfinite(result))
 
         # Performance targets
@@ -168,7 +172,7 @@ class TestSyntheticE2E:
             result = process_market_data(data)
 
             # Validate output
-            assert result.shape == OUTPUT_SHAPE, f"Wrong shape for {condition['name']} market"
+            assert result.shape == (402, self.config.time_bins), f"Wrong shape for {condition['name']} market"
             assert np.all(np.isfinite(result)), f"Non-finite values in {condition['name']} market"
 
             print(f"Successfully processed {condition['name']} market conditions")
@@ -207,7 +211,7 @@ class TestSyntheticE2E:
 
         # Process the validated data
         result = process_market_data(data)
-        assert result.shape == OUTPUT_SHAPE
+        assert result.shape == (402, self.config.time_bins)
 
     @pytest.mark.e2e
     @pytest.mark.slow
@@ -224,7 +228,7 @@ class TestSyntheticE2E:
         throughput = 50000 / duration
 
         # Validate output
-        assert result.shape == OUTPUT_SHAPE
+        assert result.shape == (402, self.config.time_bins)
         assert np.all(np.isfinite(result))
 
         # Performance should still be good
@@ -249,12 +253,16 @@ class TestSyntheticE2E:
         )
 
         result = process_market_data(extreme_data)
-        assert result.shape == OUTPUT_SHAPE
+        assert result.shape == (402, self.config.time_bins)
         assert np.all(np.isfinite(result))
 
 
 class TestSyntheticDataCompatibility:
     """Test compatibility features with synthetic data."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     @pytest.mark.e2e
     def test_api_consistency_synthetic(self):
@@ -270,7 +278,7 @@ class TestSyntheticDataCompatibility:
 
         # Results should be identical
         assert np.allclose(result1, result2, rtol=1e-10), "API methods give different results"
-        assert result1.shape == result2.shape == OUTPUT_SHAPE
+        assert result1.shape == result2.shape == (402, self.config.time_bins)
 
     @pytest.mark.e2e
     def test_deterministic_processing_synthetic(self):
@@ -302,7 +310,7 @@ class TestSyntheticDataCompatibility:
         for i in range(5):
             data = create_realistic_synthetic_data(n_samples=50000, seed=42 + i)
             result = process_market_data(data)
-            assert result.shape == OUTPUT_SHAPE
+            assert result.shape == (402, self.config.time_bins)
 
         final_memory = process.memory_info().rss / 1024 / 1024  # MB
         memory_growth = final_memory - baseline_memory

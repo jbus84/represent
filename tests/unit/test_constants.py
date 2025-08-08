@@ -3,7 +3,7 @@ Tests for represent.constants module.
 """
 
 from represent.constants import (
-    PRICE_LEVELS, TIME_BINS,
+    PRICE_LEVELS,
     DEFAULT_FEATURES, FEATURE_INDEX_MAP, MAX_FEATURES, get_output_shape, FeatureType
 )
 from represent.config import create_represent_config
@@ -15,7 +15,10 @@ class TestConstants:
     def test_basic_constants(self):
         """Test basic constant values."""
         assert PRICE_LEVELS == 402
-        assert TIME_BINS == 500
+        # TIME_BINS moved to RepresentConfig.time_bins
+        config = create_represent_config()
+        # time_bins = samples // ticks_per_bin = 25000 // 100 = 250
+        assert config.time_bins == 250
         
     def test_config_constants(self):
         """Test constants now available through RepresentConfig."""
@@ -48,27 +51,29 @@ class TestConstants:
     
     def test_get_output_shape(self):
         """Test output shape calculation."""
-        # Single feature
-        shape = get_output_shape(["volume"])
-        assert shape == (PRICE_LEVELS, TIME_BINS)  # (402, 500)
+        # Single feature - now needs time_bins parameter
+        config = create_represent_config()
+        shape = get_output_shape(["volume"], time_bins=config.time_bins)
+        assert shape == (PRICE_LEVELS, config.time_bins)  # (402, 250)
         
         # Multiple features
-        shape = get_output_shape(["volume", "variance"])
-        assert shape == (2, PRICE_LEVELS, TIME_BINS)  # (2, 402, 500)
+        shape = get_output_shape(["volume", "variance"], time_bins=config.time_bins)
+        assert shape == (2, PRICE_LEVELS, config.time_bins)  # (2, 402, 250)
         
         # All features
         all_features = [f.value for f in FeatureType]
-        shape = get_output_shape(all_features)
-        assert shape == (MAX_FEATURES, PRICE_LEVELS, TIME_BINS)  # (3, 402, 500)
+        shape = get_output_shape(all_features, time_bins=config.time_bins)
+        assert shape == (MAX_FEATURES, PRICE_LEVELS, config.time_bins)  # (3, 402, 250)
         
     def test_get_output_shape_edge_cases(self):
         """Test output shape edge cases."""
         # Empty list
-        shape = get_output_shape([])
-        assert shape == (0, PRICE_LEVELS, TIME_BINS)  # (0, 402, 500)
+        config = create_represent_config()
+        shape = get_output_shape([], time_bins=config.time_bins)
+        assert shape == (0, PRICE_LEVELS, config.time_bins)  # (0, 402, 250)
         
         # Single feature vs multiple features
-        single_shape = get_output_shape(["volume"])
-        multi_shape = get_output_shape(["volume", "variance"])
-        assert single_shape == (PRICE_LEVELS, TIME_BINS)  # 2D for single feature: (402, 500)
-        assert multi_shape == (2, PRICE_LEVELS, TIME_BINS)  # 3D for multiple features: (2, 402, 500)
+        single_shape = get_output_shape(["volume"], time_bins=config.time_bins)
+        multi_shape = get_output_shape(["volume", "variance"], time_bins=config.time_bins)
+        assert single_shape == (PRICE_LEVELS, config.time_bins)  # 2D for single feature: (402, 250)
+        assert multi_shape == (2, PRICE_LEVELS, config.time_bins)  # 3D for multiple features: (2, 402, 250)

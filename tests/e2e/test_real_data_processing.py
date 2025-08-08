@@ -9,11 +9,15 @@ import polars as pl
 import time
 
 from represent import process_market_data, create_processor, MarketDepthProcessor
-from represent.constants import OUTPUT_SHAPE
+from represent.config import create_represent_config
 
 
 class TestRealDataProcessing:
     """Test processing with real market data."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     @pytest.mark.e2e
     def test_process_real_market_data_basic(self, sample_real_data):
@@ -25,7 +29,7 @@ class TestRealDataProcessing:
         result = process_market_data(sample_real_data)
 
         # Validate output shape and type
-        assert result.shape == OUTPUT_SHAPE, f"Expected shape {OUTPUT_SHAPE}, got {result.shape}"
+        assert result.shape == self.config.output_shape, f"Expected shape {self.config.output_shape}, got {result.shape}"
         assert result.dtype == np.float32, f"Expected float32, got {result.dtype}"
 
         # Validate output is finite and not all zeros
@@ -50,7 +54,7 @@ class TestRealDataProcessing:
         result = processor.process(sample_real_data)
 
         # Validate output
-        assert result.shape == OUTPUT_SHAPE
+        assert result.shape == self.config.output_shape
         assert result.dtype == np.float32
         assert np.all(np.isfinite(result))
 
@@ -80,7 +84,7 @@ class TestRealDataProcessing:
         assert len(results) > 0, "No chunks were processed"
 
         for i, result in enumerate(results):
-            assert result.shape == OUTPUT_SHAPE, f"Chunk {i} has wrong shape"
+            assert result.shape == self.config.output_shape, f"Chunk {i} has wrong shape"
             assert result.dtype == np.float32, f"Chunk {i} has wrong dtype"
             assert np.all(np.isfinite(result)), f"Chunk {i} contains non-finite values"
 
@@ -100,7 +104,7 @@ class TestRealDataProcessing:
         records_per_second = len(sample_real_data) / processing_time
 
         # Validate output
-        assert result.shape == OUTPUT_SHAPE
+        assert result.shape == self.config.output_shape
         assert result.dtype == np.float32
         assert np.all(np.isfinite(result))
 
@@ -114,6 +118,10 @@ class TestRealDataProcessing:
 
 class TestRealDataValidation:
     """Test data validation with real market data."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     @pytest.mark.e2e
     def test_real_data_structure(self, sample_real_data):
@@ -223,6 +231,10 @@ class TestRealDataValidation:
 
 class TestRealDataPerformance:
     """Performance tests with real market data."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     @pytest.mark.e2e
     @pytest.mark.performance
@@ -242,7 +254,7 @@ class TestRealDataPerformance:
         latency_ms = (end_time - start_time) * 1000
 
         # Validate output
-        assert result.shape == OUTPUT_SHAPE
+        assert result.shape == self.config.output_shape
 
         # Performance target (should be fast)
         assert latency_ms < 1000, (
@@ -272,7 +284,7 @@ class TestRealDataPerformance:
         throughput_rps = len(sample_real_data) / best_duration
 
         # Validate output
-        assert result.shape == OUTPUT_SHAPE
+        assert result.shape == self.config.output_shape
 
         # Performance target
         assert throughput_rps > 50000, f"Throughput too low: {throughput_rps:.0f} rps"
@@ -303,7 +315,7 @@ class TestRealDataPerformance:
         memory_used = peak_memory - baseline_memory
 
         # Validate output
-        assert result.shape == OUTPUT_SHAPE
+        assert result.shape == self.config.output_shape
 
         # Memory target (should be reasonable)
         assert memory_used < 1000, f"Memory usage too high: {memory_used:.2f}MB"
@@ -313,6 +325,10 @@ class TestRealDataPerformance:
 
 class TestRealDataEdgeCases:
     """Test edge cases with real market data."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     @pytest.mark.e2e
     def test_partial_real_data(self, sample_real_data):
@@ -323,7 +339,7 @@ class TestRealDataEdgeCases:
         # Test with the standard 50K sample (pipeline requirement)
         result = process_market_data(sample_real_data)
 
-        assert result.shape == OUTPUT_SHAPE
+        assert result.shape == self.config.output_shape
         assert np.all(np.isfinite(result))
 
     @pytest.mark.e2e
@@ -339,7 +355,7 @@ class TestRealDataEdgeCases:
 
             result = process_market_data(gapped_data)
 
-            assert result.shape == OUTPUT_SHAPE
+            assert result.shape == self.config.output_shape
             assert np.all(np.isfinite(result))
         else:
             pytest.skip(f"Need at least 500K records for gap testing, have {len(real_market_data)}")

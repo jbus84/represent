@@ -6,10 +6,15 @@ import pytest
 import numpy as np
 import polars as pl
 from represent import MarketDepthProcessor, create_processor, process_market_data, FeatureType
+from represent.config import create_represent_config
 
 
 class TestPipelineCoverage:
     """Test pipeline module to improve coverage."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     @pytest.fixture
     def sample_data(self):
@@ -111,7 +116,7 @@ class TestPipelineCoverage:
         processor = MarketDepthProcessor(features=["variance"])
         result = processor.process(sample_data)
 
-        assert result.shape == (402, 500)
+        assert result.shape == (402, self.config.time_bins)
         assert np.isfinite(result).all()
 
     def test_trade_counts_feature_processing(self, sample_data):
@@ -119,7 +124,7 @@ class TestPipelineCoverage:
         processor = MarketDepthProcessor(features=["trade_counts"])
         result = processor.process(sample_data)
 
-        assert result.shape == (402, 500)
+        assert result.shape == (402, self.config.time_bins)
         assert np.isfinite(result).all()
 
     def test_side_data_processing_with_empty_data(self):
@@ -152,7 +157,7 @@ class TestPipelineCoverage:
         df = pl.DataFrame(empty_data)
         result = processor.process(df)
 
-        assert result.shape == (402, 500)
+        assert result.shape == (402, self.config.time_bins)
         # With all zeros, result should be all zeros
         assert np.allclose(result, 0.0)
 
@@ -169,7 +174,7 @@ class TestPipelineCoverage:
             processor = MarketDepthProcessor(features=features)
             result = processor.process(sample_data)
 
-            assert result.shape == (2, 402, 500)
+            assert result.shape == (2, 402, self.config.time_bins)
             assert np.isfinite(result).all()
 
         # Test single features
@@ -177,7 +182,7 @@ class TestPipelineCoverage:
             processor = MarketDepthProcessor(features=[feature])
             result = processor.process(sample_data)
 
-            assert result.shape == (402, 500)
+            assert result.shape == (402, self.config.time_bins)
             assert np.isfinite(result).all()
 
     def test_factory_functions(self, sample_data):
@@ -194,13 +199,13 @@ class TestPipelineCoverage:
 
         # Test process_market_data function
         result1 = process_market_data(sample_data)
-        assert result1.shape == (402, 500)
+        assert result1.shape == (402, self.config.time_bins)
 
         result2 = process_market_data(sample_data, features=["volume", "variance"])
-        assert result2.shape == (2, 402, 500)
+        assert result2.shape == (2, 402, self.config.time_bins)
 
         result3 = process_market_data(sample_data, features=[FeatureType.TRADE_COUNTS])
-        assert result3.shape == (402, 500)
+        assert result3.shape == (402, self.config.time_bins)
 
     def test_edge_cases_in_processing(self, sample_data):
         """Test edge cases in data processing."""
@@ -214,7 +219,7 @@ class TestPipelineCoverage:
         )
 
         result = processor.process(flat_data)
-        assert result.shape == (402, 500)
+        assert result.shape == (402, self.config.time_bins)
         assert np.isfinite(result).all()
 
     def test_processor_state_isolation(self, sample_data):
@@ -229,9 +234,9 @@ class TestPipelineCoverage:
         result3 = processor3.process(sample_data)
 
         # Verify shapes and independence
-        assert result1.shape == (402, 500)
-        assert result2.shape == (402, 500)
-        assert result3.shape == (2, 402, 500)
+        assert result1.shape == (402, self.config.time_bins)
+        assert result2.shape == (402, self.config.time_bins)
+        assert result3.shape == (2, 402, self.config.time_bins)
 
         # Results should be different (different features) or at least valid
         # Note: with random data, different features might produce similar normalized results

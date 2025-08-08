@@ -61,11 +61,11 @@ class TestRepresentConfig:
         """Test auto-computed fields."""
         config = RepresentConfig(samples=10000, ticks_per_bin=50)
         
-        # time_bins should be computed
-        assert config.time_bins == min(500, max(250, 10000 // 50))
+        # time_bins should be computed as samples // ticks_per_bin
+        assert config.time_bins == 10000 // 50  # = 200
         
-        # min_symbol_samples should be computed
-        assert config.min_symbol_samples == max(1000, 10000 // 25)
+        # min_symbol_samples should be computed as samples // 25
+        assert config.min_symbol_samples == 10000 // 25  # = 400
         
     def test_feature_validation(self):
         """Test feature validation."""

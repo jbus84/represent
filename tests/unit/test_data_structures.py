@@ -31,10 +31,17 @@ class TestVolumeGrid:
     """Test VolumeGrid data structure."""
     
     def test_volume_grid_creation(self):
-        """Test VolumeGrid can be created."""
+        """Test VolumeGrid can be created with default and custom time_bins."""
+        # Test default time_bins (500 for backward compatibility)
         grid = VolumeGrid()
         assert hasattr(grid, '_grid')
-        assert grid._grid.shape == (402, 500)  # PRICE_LEVELS, TIME_BINS
+        assert grid._grid.shape == (402, 500)  # PRICE_LEVELS, default TIME_BINS
+        assert grid.time_bins == 500
+        
+        # Test custom time_bins
+        custom_grid = VolumeGrid(time_bins=300)
+        assert custom_grid._grid.shape == (402, 300)  # PRICE_LEVELS, custom TIME_BINS
+        assert custom_grid.time_bins == 300
         
     def test_volume_grid_operations(self):
         """Test volume grid operations."""
@@ -47,15 +54,28 @@ class TestVolumeGrid:
         # Test grid properties
         assert grid._grid.shape == (402, 500)
         
+        # Test custom time_bins grid operations
+        custom_grid = VolumeGrid(time_bins=300)
+        custom_grid.clear()
+        assert np.all(custom_grid._grid == 0.0)
+        assert custom_grid._grid.shape == (402, 300)
+        
 
 class TestOutputBuffer:
     """Test OutputBuffer data structure."""
     
     def test_output_buffer_creation(self):
-        """Test OutputBuffer can be created."""
+        """Test OutputBuffer can be created with default and custom time_bins."""
+        # Test default time_bins (500 for backward compatibility)
         buffer = OutputBuffer()
         assert hasattr(buffer, '_buffer')
         assert buffer._buffer.shape == (402, 500)
+        assert buffer.time_bins == 500
+        
+        # Test custom time_bins
+        custom_buffer = OutputBuffer(time_bins=300)
+        assert custom_buffer._buffer.shape == (402, 300)
+        assert custom_buffer.time_bins == 300
         
     def test_output_buffer_operations(self):
         """Test output buffer operations."""
@@ -75,6 +95,13 @@ class TestOutputBuffer:
         # Test output preparation
         result = buffer.prepare_output(ask_grid, bid_grid)
         assert result.shape == (402, 500)
+        
+        # Test with custom time_bins buffer
+        custom_buffer = OutputBuffer(time_bins=300)
+        custom_ask_grid = np.random.random((402, 300))
+        custom_bid_grid = np.random.random((402, 300))
+        custom_result = custom_buffer.prepare_output(custom_ask_grid, custom_bid_grid)
+        assert custom_result.shape == (402, 300)
 
     def test_correct_signed_normalization(self):
         """

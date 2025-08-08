@@ -13,7 +13,8 @@ import polars as pl
 import torch
 from torch.utils.data import Dataset, DataLoader
 
-from .constants import PRICE_LEVELS, TIME_BINS
+from .constants import PRICE_LEVELS
+from .config import create_represent_config
 
 
 class LazyParquetDataset(Dataset):
@@ -39,6 +40,7 @@ class LazyParquetDataset(Dataset):
         shape_column: Optional[str] = "feature_shape",
         cache_size: int = 1000,
         prefetch_batches: int = 5,
+        currency: str = "AUDUSD",
     ):
         """
         Initialize lazy parquet dataset.
@@ -63,6 +65,9 @@ class LazyParquetDataset(Dataset):
         self.shape_column = shape_column
         self.cache_size = cache_size
         self.prefetch_batches = prefetch_batches
+        
+        # Create config for accessing time_bins
+        self.config = create_represent_config(currency)
 
         if not self.parquet_path.exists():
             raise FileNotFoundError(f"Parquet file not found: {self.parquet_path}")
@@ -144,16 +149,17 @@ class LazyParquetDataset(Dataset):
         features_data = sample_data[self.features_column][0]
 
         # Get tensor shape - optimize shape parsing
+        time_bins: int = getattr(self.config, 'time_bins')  # Use getattr to help type checker
         if self.shape_column and self.shape_column in sample_data.columns:
             shape_str = sample_data[self.shape_column][0]
             # Faster shape parsing than eval()
-            if shape_str == "(402, 500)":
-                shape = (PRICE_LEVELS, TIME_BINS)
+            if shape_str == f"(402, {time_bins})":
+                shape = (PRICE_LEVELS, time_bins)
             else:
                 shape = eval(shape_str)  # Fallback for other shapes
         else:
             # Default shape for market depth features
-            shape = (PRICE_LEVELS, TIME_BINS)
+            shape = (PRICE_LEVELS, time_bins)
 
         # Handle different data formats with optimized hex decoding
         if isinstance(features_data, str):

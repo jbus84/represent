@@ -17,7 +17,6 @@ from .constants import (
     ASK_ANCHOR_COLUMN,
     BID_ANCHOR_COLUMN,
     PRICE_LEVELS,
-    TIME_BINS,
     VOLUME_DTYPE,
     FEATURE_TYPES,
     DEFAULT_FEATURES,
@@ -85,22 +84,25 @@ class MarketDepthProcessor:
         self.features = sorted(self.features, key=lambda f: FEATURE_INDEX_MAP[f])
         self.output_shape = get_output_shape(self.features)
 
+        # Get computed value once to avoid type checker issues
+        time_bins: int = getattr(self.config, 'time_bins')  # Use getattr to help type checker
+
         # Pre-allocate all data structures to avoid runtime allocations
         # One grid per feature type
-        self._ask_grids = {feature: VolumeGrid() for feature in self.features}
-        self._bid_grids = {feature: VolumeGrid() for feature in self.features}
+        self._ask_grids = {feature: VolumeGrid(time_bins=time_bins) for feature in self.features}
+        self._bid_grids = {feature: VolumeGrid(time_bins=time_bins) for feature in self.features}
         # One output buffer per feature to avoid sharing
-        self._output_buffers = {feature: OutputBuffer() for feature in self.features}
+        self._output_buffers = {feature: OutputBuffer(time_bins=time_bins) for feature in self.features}
 
         # Pre-allocate temporary arrays for processing (per feature)
         self._temp_ask_volumes: dict[str, np.ndarray] = {}
         self._temp_bid_volumes: dict[str, np.ndarray] = {}
         for feature in self.features:
             self._temp_ask_volumes[feature] = np.empty(
-                (PRICE_LEVELS, TIME_BINS), dtype=VOLUME_DTYPE
+                (PRICE_LEVELS, time_bins), dtype=VOLUME_DTYPE
             )
             self._temp_bid_volumes[feature] = np.empty(
-                (PRICE_LEVELS, TIME_BINS), dtype=VOLUME_DTYPE
+                (PRICE_LEVELS, time_bins), dtype=VOLUME_DTYPE
             )
 
         # Cache for price lookup table (will be created when needed)
@@ -150,7 +152,8 @@ class MarketDepthProcessor:
             return df.with_columns(self._time_bin_expression)
 
         # For other sizes, create dynamic time bins
-        ticks_per_bin = max(1, input_length // TIME_BINS)  # Ensure at least 1 tick per bin
+        time_bins: int = getattr(self.config, 'time_bins')
+        ticks_per_bin = max(1, input_length // time_bins)  # Ensure at least 1 tick per bin
         time_bin_expr = (pl.int_range(0, input_length) // ticks_per_bin).alias("tick_bin")
         return df.with_columns(time_bin_expr)
 

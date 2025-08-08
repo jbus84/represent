@@ -11,9 +11,10 @@ from enum import Enum
 # - MICRO_PIP_SIZE → config.micro_pip_size
 # - TICKS_PER_BIN → config.ticks_per_bin
 # - SAMPLES → use config.samples for processing batch size, or calculate expected size dynamically
+# - TIME_BINS → config.time_bins (computed from samples and ticks_per_bin)
+# - OUTPUT_SHAPE → config.output_shape (computed from PRICE_LEVELS and time_bins)
 # Use create_represent_config() to access these values.
 PRICE_LEVELS: Final[int] = 402  # 200 bid + 200 ask + 2 mid
-TIME_BINS: Final[int] = 500
 
 
 # Column definitions for 10-level market data
@@ -31,7 +32,7 @@ BID_ANCHOR_COLUMN: Final[str] = "bid_px_00"
 PRICE_RANGE: Final[int] = 200  # Price levels on each side of mid
 
 # NOTE: MICRO_PIP_MULTIPLIER moved to RepresentConfig - use (1.0 / config.micro_pip_size)
-OUTPUT_SHAPE: Final[tuple[int, int]] = (PRICE_LEVELS, TIME_BINS)
+# NOTE: OUTPUT_SHAPE moved to RepresentConfig - use config.output_shape
 
 # NumPy data types for optimal performance
 PRICE_DTYPE: Final[np.dtype] = np.dtype(np.int64)  # For price calculations
@@ -79,9 +80,14 @@ FEATURE_INDEX_MAP: Final[dict[str, int]] = {
 
 
 # Extended output shapes
-def get_output_shape(features: Union[list[str], list[FeatureType]]) -> tuple[int, ...]:
-    """Get output shape based on feature selection."""
+def get_output_shape(features: Union[list[str], list[FeatureType]], time_bins: int = 500) -> tuple[int, ...]:
+    """Get output shape based on feature selection.
+    
+    Args:
+        features: List of features
+        time_bins: Number of time bins (defaults to 500 for backward compatibility)
+    """
     if len(features) == 1:
-        return OUTPUT_SHAPE  # (402, 500)
+        return (PRICE_LEVELS, time_bins)  # (402, time_bins)
     else:
-        return (len(features), PRICE_LEVELS, TIME_BINS)  # (N, 402, 500)
+        return (len(features), PRICE_LEVELS, time_bins)  # (N, 402, time_bins)
