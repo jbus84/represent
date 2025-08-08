@@ -69,14 +69,14 @@ Comparison of classification distributions with and without force_uniform to dem
 ### Results Summary
 
 #### With Force Uniform
-- **Total Samples**: 25,613
-- **Std Deviation**: 7.12%
-- **Quality**: NEEDS IMPROVEMENT
+- **Total Samples**: 3,298
+- **Std Deviation**: 0.02%
+- **Quality**: EXCELLENT
 
 #### Without Force Uniform
-- **Total Samples**: 47,571
-- **Std Deviation**: 11.57%
-- **Quality**: NEEDS IMPROVEMENT
+- **Total Samples**: 3,298
+- **Std Deviation**: 1.83%
+- **Quality**: EXCELLENT
 
 ### Why Force Uniform Matters
 
@@ -97,10 +97,10 @@ Comprehensive benchmarking of DataLoader configurations to identify optimal sett
 
 | Configuration | Batch Size | Workers | Throughput (sps) | Memory (MB) | Efficiency |
 |---------------|------------|---------|------------------|-------------|------------|
-| Small Batch | 16 | 2 | 615 | 248 | 248.1 |
-| Medium Batch | 32 | 4 | 762 | 296 | 257.4 |
-| Large Batch | 64 | 6 | 865 | 352 | 245.7 |
-| XL Batch | 128 | 8 | 928 | 424 | 218.8 |
+| Small Batch | 16 | 2 | 33879 | 8 | 33879.2 |
+| Medium Batch | 32 | 4 | 80454 | 16 | 80454.2 |
+| Large Batch | 64 | 6 | 150274 | 32 | 150274.2 |
+| XL Batch | 128 | 8 | 156032 | 64 | 156031.6 |
 
 ### Performance Targets
 - **Throughput**: >1000 samples/second for real-time training
@@ -211,4 +211,4 @@ dataloader = create_parquet_dataloader(
 
 ---
 
-*Report generated on 2025-08-07 17:45:58*
+*Report generated on 2025-08-08 07:07:15*

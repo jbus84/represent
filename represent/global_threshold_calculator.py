@@ -13,7 +13,10 @@ import polars as pl
 import databento as db
 from dataclasses import dataclass
 
-from .constants import MICRO_PIP_SIZE
+from .constants import (
+    LOOKFORWARD_OFFSET, LOOKFORWARD_INPUT, 
+    LOOKBACK_ROWS, LOOKFORWARD_ROWS, INPUT_ROWS, JUMP_SIZE
+)
 
 
 @dataclass
@@ -38,8 +41,6 @@ class GlobalThresholdCalculator:
         self,
         currency: str = "AUDUSD",
         nbins: int = 13,
-        lookforward_rows: int = 5000,  # Total lookforward (will be split into offset + window)
-        lookforward_offset: int = 500,  # Gap before prediction window starts
         sample_fraction: float = 0.5,
         max_samples_per_file: int = 10000,
         verbose: bool = True,
@@ -50,41 +51,37 @@ class GlobalThresholdCalculator:
         Args:
             currency: Currency pair for configuration
             nbins: Number of classification bins
-            lookforward_rows: Future rows required for price movement calculation
             sample_fraction: Fraction of files to use for threshold calculation
             max_samples_per_file: Maximum samples to extract per file (for performance)
             verbose: Whether to print progress information
         """
         self.currency = currency
         self.nbins = nbins
-        self.lookforward_rows = lookforward_rows
-        self.lookforward_offset = lookforward_offset
         self.sample_fraction = sample_fraction
         self.max_samples_per_file = max_samples_per_file
         self.verbose = verbose
-        
-        # Calculate the statistical window size
-        self.statistical_window = self.lookforward_rows - self.lookforward_offset
         
         if self.verbose:
             print("🌐 GlobalThresholdCalculator initialized")
             print(f"   💱 Currency: {self.currency}")
             print(f"   📊 Bins: {self.nbins}")
-            print(f"   📈 Lookforward offset: {self.lookforward_offset}")
-            print(f"   📉 Statistical window: {self.statistical_window}")
-            print(f"   📏 Total lookforward: {self.lookforward_rows}")
+            print(f"   📈 Lookforward offset: {LOOKFORWARD_OFFSET}")
+            print(f"   📉 Lookforward window: {LOOKFORWARD_INPUT}")
+            print(f"   📏 Total lookforward: {LOOKFORWARD_ROWS}")
+            print(f"   📊 Lookback rows: {LOOKBACK_ROWS}")
+            print(f"   📏 Input rows: {INPUT_ROWS}")
             print(f"   🔢 Sample fraction: {self.sample_fraction}")
             print(f"   📏 Max samples per file: {self.max_samples_per_file}")
 
     def load_dbn_file_sample(self, dbn_path: Union[str, Path]) -> Optional[np.ndarray]:
         """
-        Load a sample of price movements from a DBN file.
+        Load a sample of price movements from a DBN file using correct lookback vs lookforward methodology.
         
         Args:
             dbn_path: Path to DBN file
             
         Returns:
-            Array of price movements in micro pips, or None if file can't be processed
+            Array of percentage price movements, or None if file can't be processed
         """
         try:
             if self.verbose:
@@ -94,9 +91,11 @@ class GlobalThresholdCalculator:
             data = db.read_dbn(str(dbn_path))
             df = pl.from_pandas(data.to_df())
             
-            if len(df) < self.lookforward_rows * 2:
+            # Check if we have sufficient data for the methodology
+            min_required_rows = INPUT_ROWS + LOOKBACK_ROWS + LOOKFORWARD_ROWS
+            if len(df) < min_required_rows:
                 if self.verbose:
-                    print(f"      ⚠️  Insufficient data: {len(df)} rows")
+                    print(f"      ⚠️  Insufficient data: {len(df)} < {min_required_rows} rows")
                 return None
             
             # Filter out invalid/corrupted prices first
@@ -116,52 +115,51 @@ class GlobalThresholdCalculator:
                 return None
             
             # Calculate mid prices from bid/ask
-            mid_price = (
-                (pl.col('ask_px_00') + pl.col('bid_px_00')) / 2
-            ).alias('mid_price')
-            
-            df = df.with_columns(mid_price)
-            
-            # Calculate future mid price using simple point-to-point approach
-            # Use the total lookforward distance but avoid the bias from averaging
-            total_lookforward = self.lookforward_rows  # This includes offset + window
-            
-            if len(df) < total_lookforward:
-                if self.verbose:
-                    print(f"      ⚠️  Insufficient data for lookforward: {len(df)} < {total_lookforward}")
-                return None
-            
-            # Use simple shift approach but with proper total distance
-            future_mid_price = (
-                pl.col('mid_price')
-                .shift(-total_lookforward)  # Use total lookforward distance
-                .alias('future_mid_price')
+            df = df.with_columns(
+                ((pl.col('ask_px_00') + pl.col('bid_px_00')) / 2).alias('mid_price')
             )
             
-            df = df.with_columns(future_mid_price)
+            # Extract mid prices as numpy array for efficient processing
+            mid_prices = df['mid_price'].to_numpy()
             
-            # Calculate price movement in micro pips
-            price_movement = (
-                (pl.col('future_mid_price') - pl.col('mid_price')) / MICRO_PIP_SIZE
-            ).alias('price_movement')
+            # Calculate price movements using correct lookback vs lookforward methodology
+            price_movements = []
             
-            df = df.with_columns(price_movement)
+            # Iterate through valid sample positions using JUMP_SIZE steps
+            for stop_row in range(INPUT_ROWS, len(mid_prices) - LOOKFORWARD_ROWS, JUMP_SIZE):
+                # Define time windows according to the correct methodology
+                lookback_start = stop_row - LOOKBACK_ROWS
+                lookback_end = stop_row
+                
+                target_start_row = stop_row + 1 + LOOKFORWARD_OFFSET
+                target_stop_row = stop_row + LOOKFORWARD_ROWS
+                
+                # Calculate lookback mean (historical average)
+                lookback_mean = np.mean(mid_prices[lookback_start:lookback_end])
+                
+                # Calculate lookforward mean (future average)
+                lookforward_mean = np.mean(mid_prices[target_start_row:target_stop_row])
+                
+                # Calculate percentage change: (future - past) / past
+                if lookback_mean > 0:  # Avoid division by zero
+                    mean_change = (lookforward_mean - lookback_mean) / lookback_mean
+                    price_movements.append(mean_change)
             
-            # Filter out rows with null price movements and extreme outliers
-            # For AUDUSD, typical movements should be within ±1000 micro-pips
-            # Anything beyond ±5000 is likely corrupted data or calculation error
-            valid_df = df.filter(
-                pl.col('price_movement').is_not_null() &
-                (pl.col('price_movement').abs() < 5000)  # Filter extreme movements
-            )
-            
-            if len(valid_df) == 0:
+            if not price_movements:
                 if self.verbose:
-                    print("      ⚠️  No valid price movements after filtering")
+                    print("      ⚠️  No valid price movements calculated")
                 return None
             
-            # Extract price movements as numpy array
-            price_movements = valid_df['price_movement'].to_numpy()
+            price_movements = np.array(price_movements)
+            
+            # Filter extreme percentage movements (e.g., beyond ±10% which is unrealistic for AUDUSD)
+            valid_mask = np.abs(price_movements) < 0.1  # 10% threshold
+            price_movements = price_movements[valid_mask]
+            
+            if len(price_movements) == 0:
+                if self.verbose:
+                    print("      ⚠️  No valid price movements after filtering extremes")
+                return None
             
             # Sample if too many data points
             if len(price_movements) > self.max_samples_per_file:
@@ -174,7 +172,7 @@ class GlobalThresholdCalculator:
                 price_movements = price_movements[indices]
             
             if self.verbose:
-                print(f"      ✅ Extracted {len(price_movements):,} price movements")
+                print(f"      ✅ Extracted {len(price_movements):,} percentage price movements")
             
             return price_movements
             
@@ -276,21 +274,21 @@ class GlobalThresholdCalculator:
         if self.verbose:
             print("\n📈 PRICE MOVEMENT STATISTICS")
             print("=" * 30)
-            print(f"Mean: {price_stats['mean']:.2f} micro pips")
-            print(f"Std:  {price_stats['std']:.2f} micro pips")
-            print(f"Min:  {price_stats['min']:.2f} micro pips")
-            print(f"Max:  {price_stats['max']:.2f} micro pips")
-            print(f"Median: {price_stats['median']:.2f} micro pips")
+            print(f"Mean: {price_stats['mean']:.6f} ({price_stats['mean']*100:.4f}%)")
+            print(f"Std:  {price_stats['std']:.6f} ({price_stats['std']*100:.4f}%)")
+            print(f"Min:  {price_stats['min']:.6f} ({price_stats['min']*100:.4f}%)")
+            print(f"Max:  {price_stats['max']:.6f} ({price_stats['max']*100:.4f}%)")
+            print(f"Median: {price_stats['median']:.6f} ({price_stats['median']*100:.4f}%)")
             
             print("\n🎯 GLOBAL QUANTILE BOUNDARIES")
             print("=" * 30)
             for i, boundary in enumerate(quantile_boundaries):
                 if i == 0:
-                    print(f"Bin {i:2d}: <= {boundary:8.2f} micro pips")
+                    print(f"Bin {i:2d}: <= {boundary:8.6f} ({boundary*100:+7.4f}%)")
                 elif i == len(quantile_boundaries) - 1:
                     continue  # Skip the last boundary as it's just the max
                 else:
-                    print(f"Bin {i:2d}: <= {boundary:8.2f} micro pips")
+                    print(f"Bin {i:2d}: <= {boundary:8.6f} ({boundary*100:+7.4f}%)")
         
         global_thresholds = GlobalThresholds(
             quantile_boundaries=quantile_boundaries,
@@ -311,29 +309,26 @@ def calculate_global_thresholds(
     data_directory: Union[str, Path],
     currency: str = "AUDUSD",
     nbins: int = 13,
-    lookforward_rows: int = 5000,
-    lookforward_offset: int = 500,
     sample_fraction: float = 0.5,
     file_pattern: str = "*.dbn*",
     verbose: bool = True,
 ) -> GlobalThresholds:
     """
-    Convenience function to calculate global thresholds.
+    Convenience function to calculate global thresholds using lookback vs lookforward methodology.
     
     Args:
         data_directory: Directory containing DBN files
         currency: Currency pair for configuration
         nbins: Number of classification bins
-        lookforward_rows: Future rows required for price movement calculation
         sample_fraction: Fraction of files to use for threshold calculation
         file_pattern: Pattern to match DBN files
         verbose: Whether to print progress information
         
     Returns:
-        GlobalThresholds object with quantile boundaries and metadata
+        GlobalThresholds object with percentage-based quantile boundaries and metadata
         
     Example:
-        # Calculate thresholds from first 50% of files
+        # Calculate percentage-based thresholds from first 50% of files
         thresholds = calculate_global_thresholds(
             "/Users/danielfisher/data/databento/AUDUSD-micro",
             currency="AUDUSD",
@@ -349,8 +344,6 @@ def calculate_global_thresholds(
     calculator = GlobalThresholdCalculator(
         currency=currency,
         nbins=nbins,
-        lookforward_rows=lookforward_rows,
-        lookforward_offset=lookforward_offset,
         sample_fraction=sample_fraction,
         verbose=verbose,
     )

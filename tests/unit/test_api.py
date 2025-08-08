@@ -14,8 +14,9 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 try:
-    from represent.api import RepresentAPI, create_training_dataloader
-    from represent.config import load_currency_config
+    from represent.api import RepresentAPI
+    from represent.config import create_represent_config
+    from represent.lazy_dataloader import create_parquet_dataloader as create_training_dataloader
 
     API_AVAILABLE = True
 except ImportError as e:
@@ -67,8 +68,8 @@ class TestRepresentAPI:
         for currency in ["AUDUSD", "GBPUSD", "EURJPY"]:
             config = api.get_currency_config(currency)
             assert config is not None
-            assert config.currency_pair == currency
-            assert config.classification is not None
+            assert config.currency == currency
+            assert config.nbins > 0
 
 
 
@@ -137,9 +138,9 @@ class TestDirectAPIImports:
     def test_currency_config_loading(self):
         """Test direct currency config loading."""
         try:
-            config = load_currency_config("AUDUSD")
-            assert config.currency_pair == "AUDUSD"
-            assert config.classification is not None
+            config = create_represent_config("AUDUSD")
+            assert config.currency == "AUDUSD"
+            assert config.nbins > 0
         except Exception:
             pytest.skip("Currency config loading not available")
 
@@ -149,7 +150,7 @@ class TestDirectAPIImports:
 
         for currency in currencies:
             try:
-                config = load_currency_config(currency)
-                assert config.currency_pair == currency
+                config = create_represent_config(currency)
+                assert config.currency == currency
             except Exception:
                 pytest.skip(f"Currency config for {currency} not available")

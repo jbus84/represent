@@ -12,16 +12,13 @@ Uses a consistent dataset and visualization style throughout.
 """
 
 import sys
-import os
 from pathlib import Path
 import time
 import numpy as np
 import polars as pl
 import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
 import json
-import torch
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -40,15 +37,12 @@ RDBU_COLORS = {
 # Add represent package to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from represent import (
+from represent import (  # noqa: E402
     calculate_global_thresholds,
     process_dbn_to_classified_parquets,
-    create_parquet_dataloader,
-    RepresentConfig,
-    PRICE_LEVELS,
-    TIME_BINS
+    RepresentConfig
 )
-from represent.pipeline import process_market_data
+from represent.pipeline import process_market_data  # noqa: E402
 
 
 class ComprehensiveDemo:
@@ -152,9 +146,9 @@ class ComprehensiveDemo:
         x = np.arange(nbins)
         width = 0.35
         
-        bars3a = ax3.bar(x - width/2, normalized_centers, width, 
+        bars3a = ax3.bar(x - width/2, normalized_centers, width,  # noqa: F841 
                         label='Bin Centers (normalized)', color=RDBU_COLORS['blue'], alpha=0.7)
-        bars3b = ax3.bar(x + width/2, normalized_counts, width,
+        ax3.bar(x + width/2, normalized_counts, width,
                         label='Bin Counts (normalized)', color=RDBU_COLORS['red'], alpha=0.7)
         
         ax3.set_xlabel('Classification Bin')
@@ -215,10 +209,10 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
                 data_directory=dbn_directory,
                 currency=self.currency,
                 nbins=self.nbins,
-                lookforward_rows=5500,  # Total lookforward: offset (500) + window (5000)
-                lookforward_offset=500,  # Gap before statistical window starts
                 sample_fraction=0.3  # Use smaller fraction for demo speed
             )
+            # Store for use in classification demo
+            self._global_thresholds = global_thresholds
             threshold_time = time.time() - start_time
             
             print(f"      ✅ Global thresholds calculated in {threshold_time:.1f}s")
@@ -229,7 +223,7 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
             print(f"      📏 Std deviation: {global_thresholds.price_movement_stats['std']:.2f} micro-pips")
             
             # Create visualization of global bins
-            print(f"   📊 Creating global bin visualization...")
+            print("   📊 Creating global bin visualization...")
             self._create_global_bins_visualization(global_thresholds)
             
             # Step 2: Process DBN files to classified parquets using global thresholds
@@ -250,8 +244,6 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
                     output_dir=output_dir,
                     currency=self.currency,
                     features=self.features,
-                    input_rows=5000,
-                    lookforward_rows=5000,  # Match global threshold calculation
                     min_symbol_samples=1000,
                     force_uniform=True,  # Ensure uniform class distribution
                     nbins=self.nbins,
@@ -291,7 +283,7 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
             print(f"      ⭐ Quality assessment: {quality_assessment}")
             
             # Show symbol breakdown
-            print(f"      📋 Symbol breakdown:")
+            print("      📋 Symbol breakdown:")
             for symbol, count in sorted(all_symbol_counts.items()):
                 print(f"         • {symbol}: {count:,} samples")
             
@@ -322,7 +314,7 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
             # Update class results for report generation
             self.results['dbn_processing'] = results
             
-            print(f"\n   🎉 DBN Processing Demo Complete!")
+            print("\n   🎉 DBN Processing Demo Complete!")
             print(f"   📁 Classified parquet files saved to: {output_dir}")
             return results
             
@@ -377,7 +369,7 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
             # Process one symbol's data using the correct represent API
             symbol_data = df.filter(df['symbol'] == 'M6AM4').head(5000)  # Use sufficient samples
             if len(symbol_data) < 500:
-                print(f"      ⚠️  Insufficient data, using first symbol with more data")
+                print("      ⚠️  Insufficient data, using first symbol with more data")
                 symbol_data = df.head(5000)
             
             print("   ⚡ Processing multi-feature data...")
@@ -525,7 +517,7 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
         """Create comprehensive feature visualization."""
         print("   📊 Creating feature visualization...")
         
-        fig = plt.figure(figsize=(20, 12))
+        plt.figure(figsize=(20, 12))
         
         # Individual feature plots with bdbl color scheme
         rdbu_cmaps = ['RdBu_r', 'RdBu_r', 'RdBu_r']  # Red-Blue divergent colormap for all features
@@ -599,23 +591,31 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
         plt.close()
     
     def demonstrate_classification_distributions(self, data_file: Path) -> Dict[str, Any]:
-        """Demonstrate classification with and without force_uniform using real classified parquet files."""
+        """Demonstrate classification with and without force_uniform by processing raw data twice."""
         print("\n📈 Classification Distribution Demo")
         print("-" * 50)
         
-        # Use the real classified parquet files generated from DBN processing
-        dbn_processed_dir = self.output_dir / "dbn_processed_parquets"
-        classified_files = list(dbn_processed_dir.glob("*_classified.parquet"))
+        # Get the first DBN file from our DBN data directory for this demo
+        dbn_directory = Path("/Users/danielfisher/data/databento/AUDUSD-micro")
+        dbn_files = list(dbn_directory.glob("*.dbn*"))
         
-        if not classified_files:
-            print("   ⚠️  No classified parquet files found. Skipping classification distribution demo.")
+        if not dbn_files:
+            print("   ⚠️  No DBN files found for classification demo.")
             return {}
         
-        print(f"   📊 Found {len(classified_files)} classified parquet files:")
-        for f in classified_files:
-            print(f"      • {f.name}")
+        # Use just the first file for quick comparison
+        test_dbn_file = dbn_files[0]
+        print(f"   📊 Using test file: {test_dbn_file.name}")
         
-        # Test both approaches using the actual classified files
+        # Use the global thresholds calculated earlier if available
+        global_thresholds = None
+        if hasattr(self, '_global_thresholds'):
+            global_thresholds = self._global_thresholds
+            print("   🌐 Using pre-calculated global thresholds")
+        else:
+            print("   ⚠️  No global thresholds available, using per-symbol calculation")
+        
+        # Test both approaches by actually processing the same data with different settings
         approaches = {
             'with_uniform': {'force_uniform': True, 'title': 'With Force Uniform'},
             'without_uniform': {'force_uniform': False, 'title': 'Without Force Uniform'}
@@ -624,44 +624,36 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
         classification_results = {}
         
         for approach_name, config in approaches.items():
-            print(f"   🔄 Analyzing classification {config['title']}...")
+            print(f"   🔄 Processing with {config['title']}...")
             
             try:
-                # Combine data from all classified files
+                # Create temporary output directory for this approach
+                temp_output = self.output_dir / f"temp_classification_{approach_name}"
+                temp_output.mkdir(exist_ok=True)
+                
+                # Process the same DBN file with different force_uniform settings
+                process_dbn_to_classified_parquets(
+                    dbn_path=test_dbn_file,
+                    output_dir=temp_output,
+                    currency=self.currency,
+                    features=['volume'],  # Single feature for speed
+                    force_uniform=config['force_uniform'],
+                    global_thresholds=global_thresholds,
+                    verbose=False  # Reduce output noise
+                )
+                
+                # Collect labels from all processed files
                 all_labels = []
                 total_samples = 0
                 
+                classified_files = list(temp_output.glob("*_classified.parquet"))
                 for parquet_file in classified_files:
                     df = pl.read_parquet(parquet_file)
                     labels = df.select('classification_label').to_numpy().flatten()
                     all_labels.extend(labels)
                     total_samples += len(df)
-                    print(f"      • {parquet_file.name}: {len(df):,} samples")
                 
-                labels = np.array(all_labels)
-                
-                # Note: The classified files already contain the appropriate classification
-                # based on the force_uniform setting used during processing.
-                # For demonstration, we'll analyze both the actual classified data
-                # and create a comparison with natural distribution.
-                
-                # Since we already have pre-classified data, we'll use it directly
-                # and create a comparison between the actual data and simulated natural distribution
-                
-                if config['force_uniform']:
-                    # Use the actual classified data (was processed with force_uniform=True)
-                    final_labels = labels
-                else:
-                    # For comparison without force_uniform, simulate natural market distribution
-                    # by creating a more skewed distribution pattern
-                    n_bins = 13
-                    # Create a natural distribution that's more concentrated in center bins
-                    # Typical market behavior shows more neutral movements than extreme ones
-                    probabilities = np.array([0.29, 0.067, 0.047, 0.0, 0.0, 0.0, 0.082, 0.0, 0.0, 0.0, 0.05, 0.085, 0.378])
-                    probabilities = probabilities / probabilities.sum()  # Normalize
-                    
-                    # Generate labels following this distribution
-                    final_labels = np.random.choice(n_bins, size=len(labels), p=probabilities)
+                final_labels = np.array(all_labels)
                 # Get actual classification distribution
                 unique_labels, counts = np.unique(final_labels, return_counts=True)
                 
@@ -740,7 +732,7 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
         """Create classification distribution visualization matching reference style."""
         print("   📊 Creating classification distribution visualization...")
         
-        fig = plt.figure(figsize=(20, 12))
+        plt.figure(figsize=(20, 12))
         
         # Main comparison plot
         ax1 = plt.subplot(2, 3, 1)
@@ -1025,7 +1017,7 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
                     print(f"      ✅ {samples_per_second:.0f} samples/sec (simulated), {total_memory:.0f} MB memory")
             else:
                 # Fallback simulation when no classified files
-                print(f"      ⚠️  Using simulation (no test data available)")
+                print("      ⚠️  Using simulation (no test data available)")
                 batch_load_time = 0.01 + (config['batch_size'] / 1000)
                 samples_processed = 1000
                 total_time = batch_load_time * (samples_processed / config['batch_size'])
@@ -1058,7 +1050,7 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
         """Create DataLoader performance visualization."""
         print("   📊 Creating performance visualization...")
         
-        fig = plt.figure(figsize=(16, 10))
+        plt.figure(figsize=(16, 10))
         
         config_names = list(performance_results.keys())
         
@@ -1194,7 +1186,7 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
             symbol_data = df.filter(df['symbol'] == 'M6AU4')  # Use the same symbol that worked
             
             if len(symbol_data) < config.lookback_rows + config.lookforward_input:
-                print(f"      ⚠️  Insufficient data, using all available data")
+                print("      ⚠️  Insufficient data, using all available data")
                 
             # Generate multiple samples for batch demonstration
             batch_size = 3  # Reduce to match visualization
@@ -1332,7 +1324,7 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
         """Create ML sample generation visualization."""
         print("   📊 Creating ML sample visualization...")
         
-        fig = plt.figure(figsize=(20, 14))
+        plt.figure(figsize=(20, 14))
         
         # Sample visualization grid with bdbl colors
         samples = sample_results['samples']
@@ -1370,13 +1362,13 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
         tensor_info += f"Memory Usage: {sample_results['tensor_memory_mb']:.2f} MB\n\n"
         
         tensor_info += "PyTorch Integration:\n"
-        tensor_info += f"import torch\n"
-        tensor_info += f"features = torch.tensor(feature_data)\n"
-        tensor_info += f"labels = torch.tensor(label_data)\n\n"
+        tensor_info += "import torch\n"
+        tensor_info += "features = torch.tensor(feature_data)\n"
+        tensor_info += "labels = torch.tensor(label_data)\n\n"
         
-        tensor_info += f"Model Input Shape:\n"
+        tensor_info += "Model Input Shape:\n"
         if len(self.features) == 1:
-            tensor_info += f"  Conv2d(1, 32, 3)  # Single feature\n"
+            tensor_info += "  Conv2d(1, 32, 3)  # Single feature\n"
         else:
             tensor_info += f"  Conv2d({len(self.features)}, 32, 3)  # Multi-feature\n"
         
@@ -1411,8 +1403,8 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
         x = np.arange(len(feature_names))
         width = 0.35
         
-        bars1 = ax_stats.bar(x - width/2, means, width, label='Mean', alpha=0.7)
-        bars2 = ax_stats.bar(x + width/2, stds, width, label='Std Dev', alpha=0.7)
+        ax_stats.bar(x - width/2, means, width, label='Mean', alpha=0.7)
+        ax_stats.bar(x + width/2, stds, width, label='Std Dev', alpha=0.7)
         
         ax_stats.set_xlabel('Features')
         ax_stats.set_ylabel('Normalized Values')
@@ -1503,7 +1495,7 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
     
     def _generate_html_report(self) -> str:
         """Generate comprehensive HTML report."""
-        html = f"""
+        html = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1511,121 +1503,121 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Represent Package - Comprehensive Demo Report</title>
     <style>
-        body {{
+        body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             line-height: 1.6;
             margin: 0;
             padding: 20px;
             background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
             min-height: 100vh;
-        }}
-        .container {{
+        }
+        .container {
             max-width: 1400px;
             margin: 0 auto;
             background: white;
             border-radius: 12px;
             box-shadow: 0 8px 32px rgba(0,0,0,0.1);
             overflow: hidden;
-        }}
-        .header {{
+        }
+        .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             padding: 40px;
             text-align: center;
-        }}
-        .header h1 {{
+        }
+        .header h1 {
             margin: 0;
             font-size: 2.5rem;
             font-weight: 300;
-        }}
-        .header p {{
+        }
+        .header p {
             margin: 10px 0 0 0;
             opacity: 0.9;
             font-size: 1.1rem;
-        }}
-        .nav {{
+        }
+        .nav {
             background: #f8f9fa;
             padding: 20px 40px;
             border-bottom: 1px solid #e9ecef;
-        }}
-        .nav ul {{
+        }
+        .nav ul {
             list-style: none;
             padding: 0;
             margin: 0;
             display: flex;
             gap: 30px;
-        }}
-        .nav a {{
+        }
+        .nav a {
             text-decoration: none;
             color: #495057;
             font-weight: 500;
             transition: color 0.3s;
-        }}
-        .nav a:hover {{
+        }
+        .nav a:hover {
             color: #667eea;
-        }}
-        .content {{
+        }
+        .content {
             padding: 40px;
-        }}
-        .section {{
+        }
+        .section {
             margin-bottom: 60px;
-        }}
-        .section h2 {{
+        }
+        .section h2 {
             color: #2c3e50;
             font-size: 2rem;
             margin-bottom: 30px;
             padding-bottom: 10px;
             border-bottom: 3px solid #667eea;
-        }}
-        .feature-grid {{
+        }
+        .feature-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 30px;
             margin: 30px 0;
-        }}
-        .feature-card {{
+        }
+        .feature-card {
             background: #f8f9fa;
             border-radius: 8px;
             padding: 25px;
             border-left: 4px solid #667eea;
-        }}
-        .feature-card h3 {{
+        }
+        .feature-card h3 {
             margin: 0 0 15px 0;
             color: #2c3e50;
-        }}
-        .stat-grid {{
+        }
+        .stat-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
             margin: 20px 0;
-        }}
-        .stat-card {{
+        }
+        .stat-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             padding: 20px;
             border-radius: 8px;
             text-align: center;
-        }}
-        .stat-card h4 {{
+        }
+        .stat-card h4 {
             margin: 0 0 10px 0;
             font-size: 2rem;
             font-weight: 300;
-        }}
-        .stat-card p {{
+        }
+        .stat-card p {
             margin: 0;
             opacity: 0.9;
-        }}
-        .image-container {{
+        }
+        .image-container {
             margin: 30px 0;
             text-align: center;
-        }}
-        .image-container img {{
+        }
+        .image-container img {
             max-width: 100%;
             height: auto;
             border-radius: 8px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-        }}
-        .code-block {{
+        }
+        .code-block {
             background: #2d3748;
             color: #e2e8f0;
             padding: 20px;
@@ -1634,37 +1626,37 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
             font-size: 14px;
             overflow-x: auto;
             margin: 20px 0;
-        }}
-        .highlight {{
+        }
+        .highlight {
             background: #fff3cd;
             border: 1px solid #ffeaa7;
             border-radius: 8px;
             padding: 20px;
             margin: 20px 0;
-        }}
-        .highlight h4 {{
+        }
+        .highlight h4 {
             margin: 0 0 10px 0;
             color: #856404;
-        }}
-        table {{
+        }
+        table {
             width: 100%;
             border-collapse: collapse;
             margin: 20px 0;
             background: white;
-        }}
-        th, td {{
+        }
+        th, td {
             padding: 12px;
             text-align: left;
             border-bottom: 1px solid #dee2e6;
-        }}
-        th {{
+        }
+        th {
             background: #f8f9fa;
             font-weight: 600;
             color: #495057;
-        }}
-        .performance-good {{ background: #d4edda; color: #155724; }}
-        .performance-warning {{ background: #fff3cd; color: #856404; }}
-        .performance-danger {{ background: #f8d7da; color: #721c24; }}
+        }
+        .performance-good { background: #d4edda; color: #155724; }
+        .performance-warning { background: #fff3cd; color: #856404; }
+        .performance-danger { background: #f8d7da; color: #721c24; }
     </style>
 </head>
 <body>
@@ -1690,7 +1682,7 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
         # Feature Extraction Section
         if 'feature_extraction' in self.results:
             feature_data = self.results['feature_extraction']
-            html += f"""
+            html += """
             <div class="section" id="features">
                 <h2>🎨 Multi-Feature Extraction</h2>
                 <p>Demonstration of extracting and visualizing different market depth features with proper normalization and RGB combination.</p>
@@ -1744,7 +1736,7 @@ features = processor.extract_features(
         # Classification Section
         if 'classification' in self.results:
             classification_data = self.results['classification']
-            html += f"""
+            html += """
             <div class="section" id="classification">
                 <h2>📈 Classification Distribution Analysis</h2>
                 <p>Comparison of classification distributions with and without force_uniform to demonstrate the importance of balanced training data.</p>
@@ -1812,7 +1804,7 @@ features = processor.extract_features(
         # DataLoader Performance Section
         if 'dataloader_performance' in self.results:
             perf_data = self.results['dataloader_performance']
-            html += f"""
+            html += """
             <div class="section" id="performance">
                 <h2>⚡ DataLoader Performance Analysis</h2>
                 <p>Comprehensive benchmarking of DataLoader configurations to identify optimal settings for ML training.</p>
@@ -2265,7 +2257,7 @@ def main():
     
     try:
         # First demonstrate DBN to classified parquet processing
-        dbn_processing_results = demo.demonstrate_dbn_to_classified_parquet()
+        demo.demonstrate_dbn_to_classified_parquet()
         
         # Get real dataset for remaining demos
         data_file = demo.get_real_dataset()
@@ -2279,7 +2271,7 @@ def main():
         # Generate comprehensive report
         report_path = demo.generate_comprehensive_report()
         
-        print(f"\n🎉 Comprehensive Demo Complete!")
+        print("\n🎉 Comprehensive Demo Complete!")
         print(f"📁 All outputs saved to: {output_dir}")
         print(f"🌐 View HTML report: file://{Path(report_path).absolute()}")
         

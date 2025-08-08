@@ -14,6 +14,14 @@ SAMPLES: Final[int] = 50000  # 500 * TICKS_PER_BIN
 PRICE_LEVELS: Final[int] = 402  # 200 bid + 200 ask + 2 mid
 TIME_BINS: Final[int] = 500
 
+# Price movement calculation constants (lookback vs lookforward methodology)
+LOOKFORWARD_OFFSET: Final[int] = 500    # Gap before statistical window starts
+LOOKFORWARD_INPUT: Final[int] = 5000    # Statistical window size
+LOOKBACK_ROWS: Final[int] = 5000        # Historical window for lookback mean
+LOOKFORWARD_ROWS: Final[int] = LOOKFORWARD_OFFSET + LOOKFORWARD_INPUT  # Total: 5500
+INPUT_ROWS: Final[int] = 5000           # Market depth input window
+JUMP_SIZE: Final[int] = 100             # Step size between samples
+
 # Column definitions for 10-level market data
 ASK_PRICE_COLUMNS: Final[list[str]] = [f"ask_px_{str(i).zfill(2)}" for i in range(10)]
 ASK_VOL_COLUMNS: Final[list[str]] = [f"ask_sz_{str(i).zfill(2)}" for i in range(10)]

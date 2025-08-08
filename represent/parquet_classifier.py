@@ -21,17 +21,18 @@ import databento as db
 from dataclasses import dataclass
 
 from .config import create_represent_config
-from .constants import MICRO_PIP_SIZE
+from .constants import (
+    LOOKFORWARD_OFFSET, LOOKFORWARD_INPUT, LOOKBACK_ROWS, 
+    LOOKFORWARD_ROWS, INPUT_ROWS, JUMP_SIZE
+)
 from .global_threshold_calculator import GlobalThresholds
 
 
 @dataclass
 class ClassificationConfig:
-    """Configuration for classification processing."""
+    """Configuration for classification processing using lookback vs lookforward methodology."""
     currency: str = "AUDUSD"
     features: Optional[List[str]] = None
-    input_rows: int = 5000
-    lookforward_rows: int = 500
     min_symbol_samples: int = 1000
     force_uniform: bool = True
     nbins: int = 13
@@ -54,8 +55,6 @@ class ParquetClassifier:
         self,
         currency: str = "AUDUSD",
         features: Optional[List[str]] = None,
-        input_rows: int = 5000,
-        lookforward_rows: int = 500,
         min_symbol_samples: int = 1000,
         force_uniform: bool = True,
         nbins: int = 13,
@@ -64,13 +63,11 @@ class ParquetClassifier:
     ):
         
         """
-        Initialize streamlined classifier.
+        Initialize streamlined classifier using lookback vs lookforward methodology.
 
         Args:
             currency: Currency pair for configuration
             features: Features to extract (volume, variance, trade_counts)
-            input_rows: Historical rows required for feature generation
-            lookforward_rows: Future rows required for classification targets
             min_symbol_samples: Minimum samples required per symbol
             force_uniform: Whether to enforce uniform class distribution
             nbins: Number of classification bins
@@ -80,8 +77,6 @@ class ParquetClassifier:
         self.config = ClassificationConfig(
             currency=currency,
             features=features or ["volume"],
-            input_rows=input_rows,
-            lookforward_rows=lookforward_rows,
             min_symbol_samples=min_symbol_samples,
             force_uniform=force_uniform,
             nbins=nbins,
@@ -95,8 +90,11 @@ class ParquetClassifier:
             print("🚀 ParquetClassifier initialized")
             print(f"   💱 Currency: {self.config.currency}")
             print(f"   📊 Features: {self.config.features}")
-            print(f"   📈 Input rows: {self.config.input_rows}")
-            print(f"   📉 Lookforward rows: {self.config.lookforward_rows}")
+            print(f"   📈 Lookback rows: {LOOKBACK_ROWS}")
+            print(f"   📉 Lookforward offset: {LOOKFORWARD_OFFSET}")
+            print(f"   📏 Lookforward window: {LOOKFORWARD_INPUT}")
+            print(f"   📏 Total lookforward: {LOOKFORWARD_ROWS}")
+            print(f"   📊 Input rows: {INPUT_ROWS}")
             print(f"   🎯 Min samples per symbol: {self.config.min_symbol_samples}")
             print(f"   ⚖️  Force uniform: {self.config.force_uniform}")
             if self.config.global_thresholds:
@@ -147,8 +145,8 @@ class ParquetClassifier:
         if self.verbose:
             print("🔍 Filtering symbols by threshold...")
         
-        # Calculate minimum required samples
-        min_required = self.config.input_rows + self.config.lookforward_rows
+        # Calculate minimum required samples using new methodology constants
+        min_required = INPUT_ROWS + LOOKBACK_ROWS + LOOKFORWARD_ROWS
         
         # Count samples per symbol
         symbol_counts = df.group_by('symbol').len().sort('len', descending=True)
@@ -179,43 +177,53 @@ class ParquetClassifier:
 
     def calculate_price_movements(self, symbol_df: pl.DataFrame) -> pl.DataFrame:
         """
-        Calculate price movements for classification.
+        Calculate percentage price movements using lookback vs lookforward methodology.
 
         Args:
             symbol_df: DataFrame for a single symbol
 
         Returns:
-            DataFrame with price_movement column added
+            DataFrame with price_movement column added (percentage changes)
         """
         # Sort by timestamp to ensure proper order
         symbol_df = symbol_df.sort('ts_event')
         
         # Calculate mid prices from bid/ask
-        # Use first level bid/ask prices
-        mid_price = (
-            (pl.col('ask_px_00') + pl.col('bid_px_00')) / 2
-        ).alias('mid_price')
-        
-        # Add mid price column
-        symbol_df = symbol_df.with_columns(mid_price)
-        
-        # Calculate future mid price (lookforward_rows ahead)
-        future_mid_price = (
-            pl.col('mid_price')
-            .shift(-self.config.lookforward_rows)
-            .alias('future_mid_price')
+        symbol_df = symbol_df.with_columns(
+            ((pl.col('ask_px_00') + pl.col('bid_px_00')) / 2).alias('mid_price')
         )
         
-        # Add future price column
-        symbol_df = symbol_df.with_columns(future_mid_price)
+        # Extract mid prices as numpy array for efficient calculation
+        mid_prices = symbol_df['mid_price'].to_numpy()
         
-        # Calculate price movement in micro pips
-        price_movement = (
-            (pl.col('future_mid_price') - pl.col('mid_price')) / MICRO_PIP_SIZE
-        ).alias('price_movement')
+        # Initialize price movements array with NaN
+        price_movements = np.full(len(symbol_df), np.nan, dtype=np.float64)
         
-        # Add price movement column
-        symbol_df = symbol_df.with_columns(price_movement)
+        # Calculate price movements using correct lookback vs lookforward methodology
+        # Use JUMP_SIZE sampling for performance and to avoid overly similar adjacent values
+        for stop_row in range(LOOKBACK_ROWS, len(mid_prices) - LOOKFORWARD_ROWS, JUMP_SIZE):
+            # Define time windows according to the correct methodology
+            lookback_start = stop_row - LOOKBACK_ROWS
+            lookback_end = stop_row
+            
+            target_start_row = stop_row + 1 + LOOKFORWARD_OFFSET
+            target_stop_row = stop_row + LOOKFORWARD_ROWS
+            
+            # Calculate lookback mean (historical average)
+            lookback_mean = np.mean(mid_prices[lookback_start:lookback_end])
+            
+            # Calculate lookforward mean (future average)
+            lookforward_mean = np.mean(mid_prices[target_start_row:target_stop_row])
+            
+            # Calculate percentage change: (future - past) / past
+            if lookback_mean > 0:  # Avoid division by zero
+                mean_change = (lookforward_mean - lookback_mean) / lookback_mean
+                price_movements[stop_row] = mean_change
+        
+        # Add price movement column back to DataFrame
+        symbol_df = symbol_df.with_columns(
+            pl.Series('price_movement', price_movements).cast(pl.Float64)
+        )
         
         return symbol_df
 
@@ -229,8 +237,11 @@ class ParquetClassifier:
         Returns:
             DataFrame with classification_label column added
         """
-        # Filter out rows with null price movements (not enough future data)
-        valid_df = symbol_df.filter(pl.col('price_movement').is_not_null())
+        # Filter out rows with null/NaN price movements (not enough future data)
+        valid_df = symbol_df.filter(
+            pl.col('price_movement').is_not_null() & 
+            pl.col('price_movement').is_finite()  # Exclude NaN and Inf
+        )
         
         if len(valid_df) == 0:
             # No valid rows, return empty DataFrame with classification column
@@ -241,18 +252,9 @@ class ParquetClassifier:
         # Extract price movements as numpy array
         price_movements = valid_df['price_movement'].to_numpy()
         
-        if self.config.global_thresholds is not None:
-            # Use pre-calculated global thresholds for consistent classification
-            quantile_boundaries = self.config.global_thresholds.quantile_boundaries
-            
-            # Apply global threshold-based classification
-            classification_labels = np.digitize(price_movements, quantile_boundaries[1:-1])
-            
-            # Ensure labels are in range [0, nbins-1]
-            classification_labels = np.clip(classification_labels, 0, self.config.nbins - 1)
-            
-        elif self.config.force_uniform:
-            # Fallback: per-symbol quantile calculation (not recommended for consistency)
+        if self.config.force_uniform:
+            # Force uniform distribution: Use quantile-based classification regardless of global thresholds
+            # This ensures each bin gets approximately equal number of samples
             quantiles = np.linspace(0, 1, self.config.nbins + 1)
             quantile_boundaries = np.quantile(price_movements, quantiles)
             
@@ -264,16 +266,26 @@ class ParquetClassifier:
                 min_val, max_val = price_movements.min(), price_movements.max()
                 quantile_boundaries = np.linspace(min_val, max_val, self.config.nbins + 1)
             
-            # Apply quantile-based classification
+            # Apply quantile-based classification for uniform distribution
+            classification_labels = np.digitize(price_movements, quantile_boundaries[1:-1])
+            
+            # Ensure labels are in range [0, nbins-1]
+            classification_labels = np.clip(classification_labels, 0, self.config.nbins - 1)
+            
+        elif self.config.global_thresholds is not None:
+            # Use pre-calculated global thresholds for natural distribution
+            quantile_boundaries = self.config.global_thresholds.quantile_boundaries
+            
+            # Apply global threshold-based classification
             classification_labels = np.digitize(price_movements, quantile_boundaries[1:-1])
             
             # Ensure labels are in range [0, nbins-1]
             classification_labels = np.clip(classification_labels, 0, self.config.nbins - 1)
             
         else:
-            # Fixed thresholds fallback
-            up_threshold = 5.0  # micro pips
-            down_threshold = -5.0  # micro pips
+            # Fixed thresholds fallback (percentage-based)
+            up_threshold = 0.0001  # 0.01% increase
+            down_threshold = -0.0001  # 0.01% decrease
             
             classification_labels = np.where(
                 price_movements > up_threshold, 2,
@@ -292,35 +304,20 @@ class ParquetClassifier:
 
     def filter_processable_rows(self, symbol_df: pl.DataFrame) -> pl.DataFrame:
         """
-        Filter rows that have sufficient historical and future data.
+        Filter rows that have sufficient historical and future data for lookback vs lookforward methodology.
 
         Args:
             symbol_df: DataFrame for a single symbol
 
         Returns:
-            DataFrame with only processable rows
+            DataFrame with only processable rows (those with valid price_movement calculations)
         """
         # Sort by timestamp
         symbol_df = symbol_df.sort('ts_event')
         
-        # We need at least input_rows of history and lookforward_rows of future
-        # So keep rows from input_rows to (total_rows - lookforward_rows)
-        total_rows = len(symbol_df)
-        
-        if total_rows < self.config.input_rows + self.config.lookforward_rows:
-            # Not enough data for any rows
-            return symbol_df.head(0)  # Return empty DataFrame with same schema
-        
-        # Calculate valid row range
-        start_idx = self.config.input_rows
-        end_idx = total_rows - self.config.lookforward_rows
-        
-        if start_idx >= end_idx:
-            # No valid rows
-            return symbol_df.head(0)
-        
-        # Filter to processable rows
-        processable_df = symbol_df.slice(start_idx, end_idx - start_idx)
+        # Filter to rows where price_movement was calculated (not null)
+        # The calculation only assigns values to rows that have sufficient lookback and lookforward data
+        processable_df = symbol_df.filter(pl.col('price_movement').is_not_null())
         
         return processable_df
 
@@ -452,8 +449,11 @@ class ParquetClassifier:
             'config': {
                 'currency': self.config.currency,
                 'features': self.config.features,
-                'input_rows': self.config.input_rows,
-                'lookforward_rows': self.config.lookforward_rows,
+                'lookback_rows': LOOKBACK_ROWS,
+                'lookforward_offset': LOOKFORWARD_OFFSET,
+                'lookforward_input': LOOKFORWARD_INPUT,
+                'lookforward_rows': LOOKFORWARD_ROWS,
+                'input_rows': INPUT_ROWS,
                 'min_symbol_samples': self.config.min_symbol_samples,
                 'force_uniform': self.config.force_uniform,
                 'nbins': self.config.nbins,
@@ -553,8 +553,6 @@ def process_dbn_to_classified_parquets(
     output_dir: Union[str, Path],
     currency: str = "AUDUSD",
     features: Optional[List[str]] = None,
-    input_rows: int = 5000,
-    lookforward_rows: int = 500,
     min_symbol_samples: int = 1000,
     force_uniform: bool = True,
     nbins: int = 13,
@@ -562,15 +560,13 @@ def process_dbn_to_classified_parquets(
     verbose: bool = True,
 ) -> Dict[str, Any]:
     """
-    Convenience function to process DBN file directly to classified parquet files.
+    Convenience function to process DBN file directly to classified parquet files using lookback vs lookforward methodology.
 
     Args:
         dbn_path: Path to input DBN file
         output_dir: Directory for output classified parquet files
         currency: Currency pair for configuration
         features: Features to extract
-        input_rows: Historical rows required for feature generation
-        lookforward_rows: Future rows required for classification targets
         min_symbol_samples: Minimum samples required per symbol
         force_uniform: Whether to enforce uniform class distribution
         nbins: Number of classification bins
@@ -583,8 +579,6 @@ def process_dbn_to_classified_parquets(
     classifier = ParquetClassifier(
         currency=currency,
         features=features,
-        input_rows=input_rows,
-        lookforward_rows=lookforward_rows,
         min_symbol_samples=min_symbol_samples,
         force_uniform=force_uniform,
         nbins=nbins,

@@ -1,4 +1,46 @@
 {
+  "dbn_processing": {
+    "dbn_files_processed": 3,
+    "dbn_file_names": [
+      "glbx-mdp3-20240403.mbp-10.dbn.zst",
+      "glbx-mdp3-20240404.mbp-10.dbn.zst",
+      "glbx-mdp3-20240405.mbp-10.dbn.zst"
+    ],
+    "global_thresholds": {
+      "files_analyzed": 78,
+      "sample_size": 248736,
+      "nbins": 13,
+      "price_movement_stats": {
+        "mean": 7.424454592681047e-06,
+        "std": 0.0005669913738870063,
+        "min": -0.00664048895781917,
+        "max": 0.007333906400138134,
+        "median": 9.132784337700851e-06
+      },
+      "calculation_time_seconds": 152.44336795806885
+    },
+    "processing_results": {
+      "total_samples": 8020,
+      "parquet_files_generated": 6,
+      "symbols_processed": 2,
+      "symbol_counts": {
+        "M6AU4": 1077,
+        "M6AM4": 6943
+      },
+      "uniformity_deviation": 7.5,
+      "quality_assessment": "Needs Improvement",
+      "processing_time_seconds": 5.386929035186768
+    },
+    "output_directory": "examples/comprehensive_demo_output/dbn_processed_parquets",
+    "parquet_files": [
+      "examples/comprehensive_demo_output/dbn_processed_parquets/AUDUSD_M6AU4_classified.parquet",
+      "examples/comprehensive_demo_output/dbn_processed_parquets/AUDUSD_M6AM4_classified.parquet",
+      "examples/comprehensive_demo_output/dbn_processed_parquets/AUDUSD_M6AM4_classified.parquet",
+      "examples/comprehensive_demo_output/dbn_processed_parquets/AUDUSD_M6AU4_classified.parquet",
+      "examples/comprehensive_demo_output/dbn_processed_parquets/AUDUSD_M6AU4_classified.parquet",
+      "examples/comprehensive_demo_output/dbn_processed_parquets/AUDUSD_M6AM4_classified.parquet"
+    ]
+  },
   "feature_extraction": {
     "volume": {
       "shape": [
@@ -31,37 +73,37 @@
   "classification": {
     "with_uniform": {
       "class_counts": [
-        3659.0,
-        3659.0,
-        0.0,
-        3659.0,
-        0.0,
-        3659.0,
-        0.0,
-        3659.0,
-        3659.0,
-        0.0,
-        0.0,
-        3659.0,
-        0.0
+        255.0,
+        253.0,
+        253.0,
+        254.0,
+        254.0,
+        253.0,
+        254.0,
+        253.0,
+        254.0,
+        254.0,
+        253.0,
+        253.0,
+        255.0
       ],
       "class_percentages": [
-        14.285714285714285,
-        14.285714285714285,
-        0.0,
-        14.285714285714285,
-        0.0,
-        14.285714285714285,
-        0.0,
-        14.285714285714285,
-        14.285714285714285,
-        0.0,
-        0.0,
-        14.285714285714285,
-        0.0
+        7.731958762886598,
+        7.671315949060037,
+        7.671315949060037,
+        7.701637355973317,
+        7.701637355973317,
+        7.671315949060037,
+        7.701637355973317,
+        7.671315949060037,
+        7.701637355973317,
+        7.701637355973317,
+        7.671315949060037,
+        7.671315949060037,
+        7.731958762886598
       ],
-      "total_samples": 25613,
-      "uniformity_deviation": 7.1216930751734715,
+      "total_samples": 3298,
+      "uniformity_deviation": 0.021880000745549345,
       "config": {
         "force_uniform": true,
         "title": "With Force Uniform"
@@ -69,37 +111,37 @@
     },
     "without_uniform": {
       "class_counts": [
-        13827.0,
-        3199.0,
-        2223.0,
-        0.0,
-        0.0,
-        0.0,
-        3885.0,
-        0.0,
-        0.0,
-        0.0,
-        2379.0,
-        4049.0,
-        18009.0
+        271.0,
+        414.0,
+        243.0,
+        166.0,
+        240.0,
+        177.0,
+        279.0,
+        252.0,
+        245.0,
+        216.0,
+        215.0,
+        263.0,
+        317.0
       ],
       "class_percentages": [
-        29.066027621870465,
-        6.724685207374241,
-        4.673015072207858,
-        0.0,
-        0.0,
-        0.0,
-        8.16674024090307,
-        0.0,
-        0.0,
-        0.0,
-        5.000945954468058,
-        8.511488091484308,
-        37.857097811692
+        8.21710127349909,
+        12.553062462098241,
+        7.368101879927229,
+        5.033353547604609,
+        7.277137659187387,
+        5.366889023650697,
+        8.459672528805337,
+        7.640994542146756,
+        7.42874469375379,
+        6.549423893268648,
+        6.519102486355368,
+        7.974530018192843,
+        9.611885991510007
       ],
-      "total_samples": 47571,
-      "uniformity_deviation": 11.569096914244357,
+      "total_samples": 3298,
+      "uniformity_deviation": 1.8348213355803482,
       "config": {
         "force_uniform": false,
         "title": "Without Force Uniform"
@@ -110,38 +152,38 @@
     "Small Batch": {
       "batch_size": 16,
       "num_workers": 2,
-      "samples_per_second": 615.3846153846152,
-      "memory_usage_mb": 248.0,
-      "total_time": 1.6250000000000002,
-      "samples_processed": 1000,
-      "efficiency_score": 248.13895781637711
+      "samples_per_second": 33879.1655804136,
+      "memory_usage_mb": 8.0,
+      "total_time": 0.009445332980249077,
+      "samples_processed": 320,
+      "efficiency_score": 33879.1655804136
     },
     "Medium Batch": {
       "batch_size": 32,
       "num_workers": 4,
-      "samples_per_second": 761.9047619047619,
-      "memory_usage_mb": 296.0,
-      "total_time": 1.3125,
-      "samples_processed": 1000,
-      "efficiency_score": 257.40025740025743
+      "samples_per_second": 80454.22414352244,
+      "memory_usage_mb": 16.0,
+      "total_time": 0.007954834029078484,
+      "samples_processed": 640,
+      "efficiency_score": 80454.22414352244
     },
     "Large Batch": {
       "batch_size": 64,
       "num_workers": 6,
-      "samples_per_second": 864.8648648648649,
-      "memory_usage_mb": 352.0,
-      "total_time": 1.15625,
+      "samples_per_second": 150274.24983013107,
+      "memory_usage_mb": 32.0,
+      "total_time": 0.006654500029981136,
       "samples_processed": 1000,
-      "efficiency_score": 245.70024570024572
+      "efficiency_score": 150274.24983013107
     },
     "XL Batch": {
       "batch_size": 128,
       "num_workers": 8,
-      "samples_per_second": 927.536231884058,
-      "memory_usage_mb": 424.0,
-      "total_time": 1.078125,
+      "samples_per_second": 156031.57907031316,
+      "memory_usage_mb": 64.0,
+      "total_time": 0.00640895904507488,
       "samples_processed": 1000,
-      "efficiency_score": 218.75854525567405
+      "efficiency_score": 156031.57907031316
     }
   },
   "ml_samples": {
