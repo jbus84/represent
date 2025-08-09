@@ -19,7 +19,7 @@ Both approaches support:
 - Multi-feature extraction (volume, variance, trade_counts)
 """
 
-__version__ = "1.10.0"
+__version__ = "1.11.0"
 
 # V4.0.0 - Multi-approach Architecture API
 

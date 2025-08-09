@@ -2,6 +2,64 @@
 
 <!-- version list -->
 
+## v1.11.0 (2025-08-09)
+
+### Bug Fixes
+
+- **config**: Ensure we use configuration now constants where possible
+  ([`cf9584a`](https://github.com/jbus84/represent/commit/cf9584ae8453f9bc1eab4d5cf7e9f9f0618f13cd))
+
+- **configt**: Clean is up
+  ([`ca6b98f`](https://github.com/jbus84/represent/commit/ca6b98fec0f432b9009eb563e69dafc7ae9cd922))
+
+- **constants**: Remove ununsed
+  ([`1b7318a`](https://github.com/jbus84/represent/commit/1b7318a802490a0d9e2a8302ad3d6c1bbac80ee6))
+
+- **missing-files**: Add missing files
+  ([`c2b94e6`](https://github.com/jbus84/represent/commit/c2b94e607915b798683db424f064c74528d016e7))
+
+- **normalisation**: Ensure normalisation is applied as exepcted
+  ([`3e22fe0`](https://github.com/jbus84/represent/commit/3e22fe0caf09a895789a222134a9d074d6be71fb))
+
+### Documentation
+
+- **readme**: Updte for config
+  ([`426c832`](https://github.com/jbus84/represent/commit/426c832ffd12e2260872ddfbf365bd424632adf3))
+
+### Features
+
+- Updated examples
+  ([`2fe4129`](https://github.com/jbus84/represent/commit/2fe41299e504da91e6ac2d97ed132029b322c28f))
+
+- **config**: Move more stuff to config
+  ([`3fcbafa`](https://github.com/jbus84/represent/commit/3fcbafa997ef38d79d1fca42f15fabe765a2dbee))
+
+- **config**: Use config everywhre
+  ([`c24b410`](https://github.com/jbus84/represent/commit/c24b410b7ff8760e1bcf840091f5013a0d38dad4))
+
+- **configs**: Fix configuration
+  ([`d88eab6`](https://github.com/jbus84/represent/commit/d88eab68d791728741e73a299176d152c46338e6))
+
+- **constants**: Jump constant rejig
+  ([`26b00d2`](https://github.com/jbus84/represent/commit/26b00d21d2bf6b91438fa51b3fd17dc51b607129))
+
+- **examples**: Commit before changing all examples
+  ([`db83954`](https://github.com/jbus84/represent/commit/db83954af901e1cd3c44cc2fb790cbb2fd2e586b))
+
+### Refactoring
+
+- **examples**: Update for conig
+  ([`0dd6deb`](https://github.com/jbus84/represent/commit/0dd6deb5634dd9fac45f34e1d3a0b37ba0e176d4))
+
+### Testing
+
+- Update tests
+  ([`99d103f`](https://github.com/jbus84/represent/commit/99d103f62c98378fe6828b7a9eaa0de73b6f43ba))
+
+- **examples**: Update examples
+  ([`d064993`](https://github.com/jbus84/represent/commit/d064993686eeb2ee61fb439b2c1410121b59ad14))
+
+
 ## v1.10.0 (2025-08-05)
 
 ### Bug Fixes
