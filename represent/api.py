@@ -12,10 +12,12 @@ from .unlabeled_converter import convert_dbn_to_parquet, batch_convert_dbn_files
 from .parquet_classifier import classify_parquet_file, batch_classify_parquet_files
 from .lazy_dataloader import LazyParquetDataset, LazyParquetDataLoader
 from .lazy_dataloader import create_parquet_dataloader
-from .config import load_currency_config
+from .config import RepresentConfig
 from .classification_config_generator import (
     generate_classification_config_from_parquet
 )
+from .parquet_classifier import ParquetClassifier, process_dbn_to_classified_parquets
+from .global_threshold_calculator import GlobalThresholds, calculate_global_thresholds
 
 
 class RepresentAPI:
@@ -36,6 +38,7 @@ class RepresentAPI:
 
     def create_dataloader(
         self,
+        config: RepresentConfig,
         parquet_path: Union[str, Path],
         batch_size: int = 32,
         shuffle: bool = True,
@@ -47,6 +50,7 @@ class RepresentAPI:
         Create a PyTorch-compatible dataloader from labeled parquet file.
 
         Args:
+            config: RepresentConfig with currency-specific configuration
             parquet_path: Path to labeled parquet file
             batch_size: Batch size for training
             shuffle: Whether to shuffle samples
@@ -59,7 +63,8 @@ class RepresentAPI:
 
         Examples:
             api = RepresentAPI()
-            dataloader = api.create_dataloader('labeled_data.parquet', batch_size=64)
+            config = create_represent_config("AUDUSD")
+            dataloader = api.create_dataloader(config, 'labeled_data.parquet', batch_size=64)
 
             for features, labels in dataloader:
                 # features: (64, 402, 500) market depth tensors
@@ -67,6 +72,7 @@ class RepresentAPI:
                 pass
         """
         return create_parquet_dataloader(
+            config=config,
             parquet_path=parquet_path,
             batch_size=batch_size,
             shuffle=shuffle,
@@ -77,6 +83,7 @@ class RepresentAPI:
 
     def load_dataset(
         self,
+        config: RepresentConfig,
         parquet_path: Union[str, Path],
         batch_size: int = 32,
         shuffle: bool = True,
@@ -87,6 +94,7 @@ class RepresentAPI:
         Load a dataset from labeled parquet file.
 
         Args:
+            config: RepresentConfig with currency-specific configuration
             parquet_path: Path to labeled parquet file
             batch_size: Batch size for compatibility
             shuffle: Whether to shuffle sample indices
@@ -97,6 +105,7 @@ class RepresentAPI:
             LazyParquetDataset instance
         """
         return LazyParquetDataset(
+            config=config,
             parquet_path=parquet_path,
             batch_size=batch_size,
             shuffle=shuffle,
@@ -104,38 +113,23 @@ class RepresentAPI:
             cache_size=cache_size,
         )
 
-    def get_currency_config(self, currency: str):
-        """
-        Get configuration for a specific currency pair.
-
-        Args:
-            currency: Currency pair identifier
-
-        Returns:
-            CurrencyConfig object
-        """
-        return load_currency_config(currency)
 
 
 
     def convert_dbn_to_unlabeled_parquet(
         self,
+        config: RepresentConfig,
         dbn_path: Union[str, Path],
         output_dir: Union[str, Path],
-        currency: str = "AUDUSD",
-        features: Optional[List[str]] = None,
-        min_symbol_samples: int = 1000,
         **kwargs,
     ) -> Dict[str, Any]:
         """
         Stage 1: Convert DBN file to unlabeled symbol-grouped parquet datasets.
 
         Args:
+            config: RepresentConfig with currency-specific configuration
             dbn_path: Path to input DBN file
             output_dir: Directory for output parquet files
-            currency: Currency pair for naming convention
-            features: Features to extract ['volume', 'variance', 'trade_counts']
-            min_symbol_samples: Minimum samples required per symbol
             **kwargs: Additional arguments for converter
 
         Returns:
@@ -143,30 +137,27 @@ class RepresentAPI:
 
         Examples:
             api = RepresentAPI()
+            config = create_represent_config("AUDUSD", features=['volume', 'variance'])
             
             # Convert to symbol-grouped parquet files
             stats = api.convert_dbn_to_unlabeled_parquet(
+                config,
                 'data.dbn', 
-                '/data/unlabeled/', 
-                currency='AUDUSD',
-                features=['volume', 'variance']
+                '/data/unlabeled/'
             )
         """
         return convert_dbn_to_parquet(
+            config=config,
             dbn_path=dbn_path,
             output_dir=output_dir,
-            currency=currency,
-            features=features,
-            min_symbol_samples=min_symbol_samples,
             **kwargs,
         )
 
     def batch_convert_dbn_to_unlabeled_parquet(
         self,
+        config: RepresentConfig,
         input_directory: Union[str, Path],
         output_directory: Union[str, Path],
-        currency: str = "AUDUSD",
-        features: Optional[List[str]] = None,
         pattern: str = "*.dbn*",
         **kwargs,
     ) -> List[Dict[str, Any]]:
@@ -174,10 +165,9 @@ class RepresentAPI:
         Stage 1: Batch convert multiple DBN files to unlabeled parquet datasets.
 
         Args:
+            config: RepresentConfig with currency-specific configuration
             input_directory: Directory containing DBN files
             output_directory: Directory for output parquet files
-            currency: Currency pair for naming convention
-            features: Features to extract
             pattern: File pattern to match
             **kwargs: Additional arguments for converter
 
@@ -185,19 +175,18 @@ class RepresentAPI:
             List of conversion statistics for each file
         """
         return batch_convert_unlabeled(
+            config=config,
             input_directory=input_directory,
             output_directory=output_directory,
-            currency=currency,
-            features=features,
             pattern=pattern,
             **kwargs,
         )
 
     def classify_symbol_parquet(
         self,
+        config: RepresentConfig,
         parquet_path: Union[str, Path],
         output_path: Optional[Union[str, Path]] = None,
-        currency: str = "AUDUSD",
         force_uniform: bool = True,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -205,9 +194,9 @@ class RepresentAPI:
         Stage 2: Apply uniform classification to unlabeled symbol parquet file.
 
         Args:
+            config: RepresentConfig with currency-specific configuration
             parquet_path: Path to unlabeled parquet file
             output_path: Path for classified output file
-            currency: Currency pair for configuration
             force_uniform: Apply optimization for uniform distribution
             **kwargs: Additional arguments for classifier
 
@@ -216,27 +205,28 @@ class RepresentAPI:
 
         Examples:
             api = RepresentAPI()
+            config = create_represent_config("AUDUSD")
             
             # Classify single symbol parquet file
             stats = api.classify_symbol_parquet(
+                config,
                 '/data/unlabeled/AUDUSD_M6AM4.parquet',
-                '/data/classified/AUDUSD_M6AM4_classified.parquet',
-                currency='AUDUSD'
+                '/data/classified/AUDUSD_M6AM4_classified.parquet'
             )
         """
         return classify_parquet_file(
+            config=config,
             parquet_path=parquet_path,
             output_path=output_path,
-            currency=currency,
             force_uniform=force_uniform,
             **kwargs,
         )
 
     def batch_classify_symbol_parquets(
         self,
+        config: RepresentConfig,
         input_directory: Union[str, Path],
         output_directory: Union[str, Path],
-        currency: str = "AUDUSD",
         pattern: str = "*_*.parquet",
         **kwargs,
     ) -> List[Dict[str, Any]]:
@@ -244,9 +234,9 @@ class RepresentAPI:
         Stage 2: Batch apply classification to multiple symbol parquet files.
 
         Args:
+            config: RepresentConfig with currency-specific configuration
             input_directory: Directory containing unlabeled parquet files
             output_directory: Directory for classified parquet files
-            currency: Currency pair for configuration
             pattern: File pattern to match
             **kwargs: Additional arguments for classifier
 
@@ -255,24 +245,26 @@ class RepresentAPI:
 
         Examples:
             api = RepresentAPI()
+            config = create_represent_config("AUDUSD")
             
             # Classify all symbol parquet files in directory
             results = api.batch_classify_symbol_parquets(
+                config,
                 '/data/unlabeled/',
-                '/data/classified/',
-                currency='AUDUSD'
+                '/data/classified/'
             )
         """
         return batch_classify_parquet_files(
+            config=config,
             input_directory=input_directory,
             output_directory=output_directory,
-            currency=currency,
             pattern=pattern,
             **kwargs,
         )
 
     def create_ml_dataloader(
         self,
+        config: RepresentConfig,
         parquet_path: Union[str, Path],
         batch_size: int = 32,
         shuffle: bool = True,
@@ -284,6 +276,7 @@ class RepresentAPI:
         Stage 3: Create ML training dataloader from classified parquet file.
 
         Args:
+            config: RepresentConfig with currency-specific configuration
             parquet_path: Path to classified parquet file
             batch_size: Batch size for training
             shuffle: Whether to shuffle samples
@@ -296,7 +289,9 @@ class RepresentAPI:
 
         Examples:
             api = RepresentAPI()
+            config = create_represent_config("AUDUSD")
             dataloader = api.create_ml_dataloader(
+                config,
                 '/data/classified/AUDUSD_M6AM4_classified.parquet', 
                 batch_size=64
             )
@@ -307,6 +302,7 @@ class RepresentAPI:
                 pass
         """
         return create_parquet_dataloader(
+            config=config,
             parquet_path=parquet_path,
             batch_size=batch_size,
             shuffle=shuffle,
@@ -317,11 +313,9 @@ class RepresentAPI:
 
     def run_complete_pipeline(
         self,
+        config: RepresentConfig,
         dbn_path: Union[str, Path],
         output_base_dir: Union[str, Path],
-        currency: str = "AUDUSD",
-        features: Optional[List[str]] = None,
-        min_symbol_samples: int = 1000,
         force_uniform: bool = True,
         verbose: bool = True,
     ) -> Dict[str, Any]:
@@ -329,11 +323,9 @@ class RepresentAPI:
         Run the complete 3-stage pipeline from DBN to ML-ready dataset.
 
         Args:
+            config: RepresentConfig with currency-specific configuration
             dbn_path: Path to input DBN file
             output_base_dir: Base directory for all outputs
-            currency: Currency pair for configuration
-            features: Features to extract
-            min_symbol_samples: Minimum samples per symbol
             force_uniform: Apply uniform distribution optimization
             verbose: Print progress information
 
@@ -342,13 +334,13 @@ class RepresentAPI:
 
         Examples:
             api = RepresentAPI()
+            config = create_represent_config("AUDUSD", features=['volume', 'variance'])
             
             # Run complete pipeline
             results = api.run_complete_pipeline(
+                config,
                 'data.dbn',
-                '/data/pipeline_output/',
-                currency='AUDUSD',
-                features=['volume', 'variance']
+                '/data/pipeline_output/'
             )
         """
         output_base = Path(output_base_dir)
@@ -358,19 +350,17 @@ class RepresentAPI:
         if verbose:
             print("🚀 Running Complete 3-Stage Pipeline")
             print(f"   📁 Output base: {output_base}")
-            print(f"   💱 Currency: {currency}")
-            print(f"   📊 Features: {features or ['volume']}")
+            print(f"   💱 Currency: {config.currency}")
+            print(f"   📊 Features: {config.features}")
 
         # Stage 1: DBN to unlabeled parquet
         if verbose:
             print("\n🔄 Stage 1: DBN → Unlabeled Parquet...")
         
         stage_1_stats = self.convert_dbn_to_unlabeled_parquet(
+            config=config,
             dbn_path=dbn_path,
             output_dir=unlabeled_dir,
-            currency=currency,
-            features=features,
-            min_symbol_samples=min_symbol_samples,
         )
 
         # Stage 2: Classify parquet files
@@ -378,9 +368,9 @@ class RepresentAPI:
             print("\n🔄 Stage 2: Post-Processing Classification...")
         
         stage_2_stats = self.batch_classify_symbol_parquets(
+            config=config,
             input_directory=unlabeled_dir,
             output_directory=classified_dir,
-            currency=currency,
             force_uniform=force_uniform,
         )
 
@@ -388,8 +378,8 @@ class RepresentAPI:
             "pipeline_version": "v2.0.0 - 3-Stage Architecture",
             "input_file": str(dbn_path),
             "output_base_directory": str(output_base),
-            "currency": currency,
-            "features": features or ["volume"],
+            "currency": config.currency,
+            "features": config.features,
             "stage_1_stats": stage_1_stats,
             "stage_2_stats": stage_2_stats,
             "unlabeled_directory": str(unlabeled_dir),
@@ -403,11 +393,97 @@ class RepresentAPI:
             print("\n✅ Complete Pipeline Finished!")
             print(f"   📊 Symbols processed: {pipeline_results['total_symbols']}")
             print(f"   📊 Total samples: {pipeline_results['total_samples']:,}")
-            print(f"   📊 Classified files: {pipeline_results['classified_files']}")
             print(f"   📁 Classified data: {classified_dir}")
             print("   🚀 Ready for ML training!")
 
         return pipeline_results
+
+    def process_dbn_to_classified_parquets(
+        self,
+        config: RepresentConfig,
+        dbn_path: Union[str, Path],
+        output_dir: Union[str, Path],
+        force_uniform: bool = True,
+        verbose: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Streamlined approach: Process DBN file directly to classified parquet files.
+        
+        This is the new streamlined method that eliminates intermediate files by
+        processing DBN data directly to classified parquet files, one per symbol.
+        
+        Args:
+            config: RepresentConfig with currency-specific configuration
+            dbn_path: Path to input DBN file
+            output_dir: Directory for output classified parquet files
+            force_uniform: Whether to enforce uniform class distribution
+            verbose: Whether to print progress information
+            
+        Returns:
+            Processing statistics dictionary
+            
+        Examples:
+            api = RepresentAPI()
+            config = create_represent_config("AUDUSD", features=['volume', 'variance'])
+            
+            # Streamlined processing: DBN → Classified Parquet (one step)
+            results = api.process_dbn_to_classified_parquets(
+                config,
+                'market_data.dbn',
+                '/data/classified/',
+                force_uniform=True
+            )
+            
+            # Files are immediately ready for ML training
+            print(f"Generated {results['symbols_processed']} classified files")
+        """
+        return process_dbn_to_classified_parquets(
+            config=config,
+            dbn_path=dbn_path,
+            output_dir=output_dir,
+            force_uniform=force_uniform,
+            verbose=verbose,
+        )
+
+    def create_parquet_classifier(
+        self,
+        config: RepresentConfig,
+        force_uniform: bool = True,
+        verbose: bool = True,
+    ) -> ParquetClassifier:
+        """
+        Create a DBN-to-parquet classifier instance.
+        
+        Args:
+            config: RepresentConfig with currency-specific configuration
+            force_uniform: Whether to enforce uniform class distribution
+            verbose: Whether to print progress information
+            
+        Returns:
+            ParquetClassifier instance
+            
+        Examples:
+            api = RepresentAPI()
+            config = create_represent_config("AUDUSD", features=['volume'])
+            
+            # Create classifier with custom settings
+            classifier = api.create_parquet_classifier(
+                config,
+                force_uniform=True
+            )
+            
+            # Process multiple files
+            for dbn_file in dbn_files:
+                results = classifier.process_dbn_to_classified_parquets(
+                    dbn_file, 
+                    '/data/classified/'
+                )
+        """
+        return ParquetClassifier(
+            config=config,
+            force_uniform=force_uniform,
+            verbose=verbose,
+        )
 
     def list_available_currencies(self) -> List[str]:
         """
@@ -420,10 +496,8 @@ class RepresentAPI:
 
     def generate_classification_config(
         self,
+        config: RepresentConfig,
         parquet_files: Union[str, Path, List[Union[str, Path]]],
-        currency: str,
-        nbins: int = 13,
-        target_samples: int = 1000,
         validation_split: float = 0.3,
         **kwargs
     ) -> Dict[str, Any]:
@@ -434,10 +508,8 @@ class RepresentAPI:
         quantile-based analysis, eliminating the need for static config files.
 
         Args:
+            config: RepresentConfig with currency-specific configuration
             parquet_files: Parquet file(s) containing price data
-            currency: Currency pair name (e.g., "AUDUSD")
-            nbins: Number of classification bins (default: 13)
-            target_samples: Minimum samples required for reliable config
             validation_split: Fraction of data for validation (0.0-1.0)
             **kwargs: Additional parameters for config generation
 
@@ -446,29 +518,77 @@ class RepresentAPI:
 
         Example:
             >>> api = RepresentAPI()
+            >>> config = create_represent_config("AUDUSD")
             >>> result = api.generate_classification_config(
-            ...     parquet_files="/path/to/audusd_data.parquet",
-            ...     currency="AUDUSD"
+            ...     config,
+            ...     parquet_files="/path/to/audusd_data.parquet"
             ... )
             >>> print(f"Quality: {result['metrics']['validation_metrics']['quality']}")
-            >>> config = result['config']
         """
-        config, metrics = generate_classification_config_from_parquet(
+        generated_config, metrics = generate_classification_config_from_parquet(
+            config=config,
             parquet_files=parquet_files,
-            currency=currency,
-            nbins=nbins,
-            target_samples=target_samples,
             validation_split=validation_split,
             **kwargs
         )
         
         return {
-            'config': config,
+            'config': generated_config,
             'metrics': metrics,
-            'currency': currency,
+            'currency': config.currency,
             'generation_method': 'quantile_based_dynamic'
         }
 
+    def calculate_global_thresholds(
+        self,
+        config: RepresentConfig,
+        data_directory: Union[str, Path],
+        sample_fraction: float = 0.5,
+        file_pattern: str = "*.dbn*",
+        verbose: bool = True,
+    ) -> GlobalThresholds:
+        """
+        Calculate global classification thresholds from a sample of DBN files.
+        
+        This ensures consistent classification thresholds across all symbols and files,
+        preventing the problems of per-file quantile calculation.
+        
+        Args:
+            config: RepresentConfig with currency-specific configuration
+            data_directory: Directory containing DBN files
+            sample_fraction: Fraction of files to use for threshold calculation
+            file_pattern: Pattern to match DBN files
+            verbose: Whether to print progress information
+            
+        Returns:
+            GlobalThresholds object with quantile boundaries and metadata
+            
+        Example:
+            api = RepresentAPI()
+            config = create_represent_config("AUDUSD")
+            
+            # Calculate global thresholds from first 50% of files
+            thresholds = api.calculate_global_thresholds(
+                config,
+                "/Users/danielfisher/data/databento/AUDUSD-micro",
+                sample_fraction=0.5
+            )
+            
+            # Use thresholds for consistent classification
+            results = api.process_dbn_to_classified_parquets(
+                config,
+                "data.dbn",
+                "/data/classified/",
+                global_thresholds=thresholds
+            )
+        """
+        return calculate_global_thresholds(
+            config=config,
+            data_directory=data_directory,
+            sample_fraction=sample_fraction,
+            file_pattern=file_pattern,
+            verbose=verbose,
+        )
 
     def get_package_info(self) -> Dict[str, Any]:
         """
@@ -481,12 +601,20 @@ class RepresentAPI:
 
         return {
             "version": __version__,
-            "architecture": "DBN → Unlabeled Parquet → Classification → PyTorch (v2.0.0+)",
+            "architecture": "Multi-approach: Classic 3-stage + Streamlined 2-stage (v4.0.0+)",
             "available_currencies": self.list_available_currencies(),
             "supported_features": ["volume", "variance", "trade_counts"],
             "tensor_shape": "(402, 500) - market depth representation",
-            "pipeline_stages": ["Raw Data Processing", "Post-Processing Classification", "ML Training"],
-            "dynamic_features": ["Quantile-based Config Generation", "Automatic Threshold Optimization"],
+            "pipeline_approaches": {
+                "classic_3_stage": ["DBN → Unlabeled Parquet", "Post-Processing Classification", "ML Training"],
+                "streamlined_2_stage": ["DBN → Classified Parquet (Direct)", "ML Training"]
+            },
+            "dynamic_features": [
+                "Quantile-based Config Generation", 
+                "Automatic Threshold Optimization",
+                "Streamlined Direct Processing",
+                "On-demand Feature Generation"
+            ],
         }
 
 
@@ -495,11 +623,11 @@ api = RepresentAPI()
 
 
 # Convenience functions that use the default API instance
-def create_training_dataloader(*args, **kwargs):
+def create_training_dataloader(config: RepresentConfig, *args, **kwargs):
     """Convenience function for creating training dataloader."""
-    return api.create_dataloader(*args, **kwargs)
+    return api.create_dataloader(config, *args, **kwargs)
 
 
-def load_training_dataset(*args, **kwargs):
+def load_training_dataset(config: RepresentConfig, *args, **kwargs):
     """Convenience function for loading training dataset."""
-    return api.load_dataset(*args, **kwargs)
+    return api.load_dataset(config, *args, **kwargs)

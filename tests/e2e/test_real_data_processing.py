@@ -9,11 +9,15 @@ import polars as pl
 import time
 
 from represent import process_market_data, create_processor, MarketDepthProcessor
-from represent.constants import OUTPUT_SHAPE
+from represent.config import create_represent_config
 
 
 class TestRealDataProcessing:
     """Test processing with real market data."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     @pytest.mark.e2e
     def test_process_real_market_data_basic(self, sample_real_data):
@@ -22,10 +26,10 @@ class TestRealDataProcessing:
             pytest.skip("Real market data not available")
 
         # Process the data
-        result = process_market_data(sample_real_data)
+        result = process_market_data(sample_real_data, config=self.config)
 
         # Validate output shape and type
-        assert result.shape == OUTPUT_SHAPE, f"Expected shape {OUTPUT_SHAPE}, got {result.shape}"
+        assert result.shape == self.config.output_shape, f"Expected shape {self.config.output_shape}, got {result.shape}"
         assert result.dtype == np.float32, f"Expected float32, got {result.dtype}"
 
         # Validate output is finite and not all zeros
@@ -43,14 +47,14 @@ class TestRealDataProcessing:
             pytest.skip("Real market data not available")
 
         # Create processor
-        processor = create_processor()
+        processor = create_processor(config=self.config)
         assert isinstance(processor, MarketDepthProcessor)
 
         # Process data
         result = processor.process(sample_real_data)
 
         # Validate output
-        assert result.shape == OUTPUT_SHAPE
+        assert result.shape == self.config.output_shape
         assert result.dtype == np.float32
         assert np.all(np.isfinite(result))
 
@@ -60,7 +64,7 @@ class TestRealDataProcessing:
         if real_market_data is None:
             pytest.skip("Real market data not available")
 
-        processor = create_processor()
+        processor = create_processor(config=self.config)
 
         # Process multiple 50K chunks (required size)
         chunk_size = 50000
@@ -80,7 +84,7 @@ class TestRealDataProcessing:
         assert len(results) > 0, "No chunks were processed"
 
         for i, result in enumerate(results):
-            assert result.shape == OUTPUT_SHAPE, f"Chunk {i} has wrong shape"
+            assert result.shape == self.config.output_shape, f"Chunk {i} has wrong shape"
             assert result.dtype == np.float32, f"Chunk {i} has wrong dtype"
             assert np.all(np.isfinite(result)), f"Chunk {i} contains non-finite values"
 
@@ -93,14 +97,14 @@ class TestRealDataProcessing:
 
         # Use the standard 50K sample (required by pipeline)
         start_time = time.perf_counter()
-        result = process_market_data(sample_real_data)
+        result = process_market_data(sample_real_data, config=self.config)
         end_time = time.perf_counter()
 
         processing_time = end_time - start_time
         records_per_second = len(sample_real_data) / processing_time
 
         # Validate output
-        assert result.shape == OUTPUT_SHAPE
+        assert result.shape == self.config.output_shape
         assert result.dtype == np.float32
         assert np.all(np.isfinite(result))
 
@@ -114,6 +118,10 @@ class TestRealDataProcessing:
 
 class TestRealDataValidation:
     """Test data validation with real market data."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     @pytest.mark.e2e
     def test_real_data_structure(self, sample_real_data):
@@ -223,6 +231,10 @@ class TestRealDataValidation:
 
 class TestRealDataPerformance:
     """Performance tests with real market data."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     @pytest.mark.e2e
     @pytest.mark.performance
@@ -232,17 +244,17 @@ class TestRealDataPerformance:
             pytest.skip("Real market data not available")
 
         # Warm up
-        process_market_data(sample_real_data)
+        process_market_data(sample_real_data, config=self.config)
 
         # Measure latency
         start_time = time.perf_counter()
-        result = process_market_data(sample_real_data)
+        result = process_market_data(sample_real_data, config=self.config)
         end_time = time.perf_counter()
 
         latency_ms = (end_time - start_time) * 1000
 
         # Validate output
-        assert result.shape == OUTPUT_SHAPE
+        assert result.shape == self.config.output_shape
 
         # Performance target (should be fast)
         assert latency_ms < 1000, (
@@ -264,7 +276,7 @@ class TestRealDataPerformance:
 
         for _ in range(num_runs):
             start_time = time.perf_counter()
-            result = process_market_data(sample_real_data)
+            result = process_market_data(sample_real_data, config=self.config)
             end_time = time.perf_counter()
             durations.append(end_time - start_time)
 
@@ -272,7 +284,7 @@ class TestRealDataPerformance:
         throughput_rps = len(sample_real_data) / best_duration
 
         # Validate output
-        assert result.shape == OUTPUT_SHAPE
+        assert result.shape == self.config.output_shape
 
         # Performance target
         assert throughput_rps > 50000, f"Throughput too low: {throughput_rps:.0f} rps"
@@ -296,14 +308,14 @@ class TestRealDataPerformance:
         baseline_memory = process.memory_info().rss / 1024 / 1024  # MB
 
         # Process data
-        result = process_market_data(sample_real_data)
+        result = process_market_data(sample_real_data, config=self.config)
 
         # Measure peak memory
         peak_memory = process.memory_info().rss / 1024 / 1024  # MB
         memory_used = peak_memory - baseline_memory
 
         # Validate output
-        assert result.shape == OUTPUT_SHAPE
+        assert result.shape == self.config.output_shape
 
         # Memory target (should be reasonable)
         assert memory_used < 1000, f"Memory usage too high: {memory_used:.2f}MB"
@@ -313,6 +325,10 @@ class TestRealDataPerformance:
 
 class TestRealDataEdgeCases:
     """Test edge cases with real market data."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     @pytest.mark.e2e
     def test_partial_real_data(self, sample_real_data):
@@ -321,9 +337,9 @@ class TestRealDataEdgeCases:
             pytest.skip("Real market data not available")
 
         # Test with the standard 50K sample (pipeline requirement)
-        result = process_market_data(sample_real_data)
+        result = process_market_data(sample_real_data, config=self.config)
 
-        assert result.shape == OUTPUT_SHAPE
+        assert result.shape == self.config.output_shape
         assert np.all(np.isfinite(result))
 
     @pytest.mark.e2e
@@ -337,9 +353,9 @@ class TestRealDataEdgeCases:
             # Take every 10th row to create gaps, then take first 50K
             gapped_data = real_market_data.filter(pl.int_range(pl.len()).mod(10) == 0).head(50000)
 
-            result = process_market_data(gapped_data)
+            result = process_market_data(gapped_data, config=self.config)
 
-            assert result.shape == OUTPUT_SHAPE
+            assert result.shape == self.config.output_shape
             assert np.all(np.isfinite(result))
         else:
             pytest.skip(f"Need at least 500K records for gap testing, have {len(real_market_data)}")

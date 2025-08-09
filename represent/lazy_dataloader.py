@@ -13,7 +13,8 @@ import polars as pl
 import torch
 from torch.utils.data import Dataset, DataLoader
 
-from .constants import PRICE_LEVELS, TIME_BINS
+from .constants import PRICE_LEVELS
+from .config import RepresentConfig
 
 
 class LazyParquetDataset(Dataset):
@@ -30,6 +31,7 @@ class LazyParquetDataset(Dataset):
 
     def __init__(
         self,
+        config: RepresentConfig,
         parquet_path: Union[str, Path],
         batch_size: int = 32,
         shuffle: bool = True,
@@ -44,6 +46,7 @@ class LazyParquetDataset(Dataset):
         Initialize lazy parquet dataset.
 
         Args:
+            config: RepresentConfig with currency-specific configuration
             parquet_path: Path to labeled parquet file
             batch_size: Batch size for DataLoader compatibility
             shuffle: Whether to shuffle data indices
@@ -54,6 +57,7 @@ class LazyParquetDataset(Dataset):
             cache_size: Number of samples to cache in memory
             prefetch_batches: Number of batches to prefetch for performance
         """
+        self.config = config
         self.parquet_path = Path(parquet_path)
         self.batch_size = batch_size
         self.shuffle = shuffle
@@ -144,16 +148,17 @@ class LazyParquetDataset(Dataset):
         features_data = sample_data[self.features_column][0]
 
         # Get tensor shape - optimize shape parsing
+        time_bins: int = getattr(self.config, 'time_bins')  # Use getattr to help type checker
         if self.shape_column and self.shape_column in sample_data.columns:
             shape_str = sample_data[self.shape_column][0]
             # Faster shape parsing than eval()
-            if shape_str == "(402, 500)":
-                shape = (PRICE_LEVELS, TIME_BINS)
+            if shape_str == f"(402, {time_bins})":
+                shape = (PRICE_LEVELS, time_bins)
             else:
                 shape = eval(shape_str)  # Fallback for other shapes
         else:
             # Default shape for market depth features
-            shape = (PRICE_LEVELS, TIME_BINS)
+            shape = (PRICE_LEVELS, time_bins)
 
         # Handle different data formats with optimized hex decoding
         if isinstance(features_data, str):
@@ -355,6 +360,7 @@ class LazyParquetDataLoader:
 
     def __init__(
         self,
+        config: RepresentConfig,
         parquet_path: Union[str, Path],
         batch_size: int = 32,
         shuffle: bool = True,
@@ -367,6 +373,7 @@ class LazyParquetDataLoader:
         Initialize lazy parquet dataloader.
 
         Args:
+            config: RepresentConfig with currency-specific configuration
             parquet_path: Path to labeled parquet file
             batch_size: Batch size for training
             shuffle: Whether to shuffle samples
@@ -376,6 +383,7 @@ class LazyParquetDataLoader:
             pin_memory: Pin memory for GPU transfer
         """
         self.dataset = LazyParquetDataset(
+            config=config,
             parquet_path=parquet_path,
             batch_size=batch_size,
             shuffle=shuffle,
@@ -426,6 +434,7 @@ class LazyParquetDataLoader:
 
 
 def create_parquet_dataloader(
+    config: RepresentConfig,
     parquet_path: Union[str, Path],
     batch_size: int = 32,
     shuffle: bool = True,
@@ -437,6 +446,7 @@ def create_parquet_dataloader(
     Convenience function to create a lazy parquet dataloader.
 
     Args:
+        config: RepresentConfig with currency-specific configuration
         parquet_path: Path to labeled parquet file
         batch_size: Batch size for training
         shuffle: Whether to shuffle samples
@@ -448,6 +458,7 @@ def create_parquet_dataloader(
         Configured LazyParquetDataLoader
     """
     return LazyParquetDataLoader(
+        config=config,
         parquet_path=parquet_path,
         batch_size=batch_size,
         shuffle=shuffle,

@@ -7,12 +7,15 @@ import numpy as np
 from typing import Final, Union
 from enum import Enum
 
-# Core processing constants (from notebook analysis)
-MICRO_PIP_SIZE: Final[float] = 0.00001
-TICKS_PER_BIN: Final[int] = 100
-SAMPLES: Final[int] = 50000  # 500 * TICKS_PER_BIN
+# NOTE: Core processing constants have been moved to RepresentConfig:
+# - MICRO_PIP_SIZE → config.micro_pip_size
+# - TICKS_PER_BIN → config.ticks_per_bin
+# - SAMPLES → use config.samples for processing batch size, or calculate expected size dynamically
+# - TIME_BINS → config.time_bins (computed from samples and ticks_per_bin)
+# - OUTPUT_SHAPE → config.output_shape (computed from PRICE_LEVELS and time_bins)
+# Use create_represent_config() to access these values.
 PRICE_LEVELS: Final[int] = 402  # 200 bid + 200 ask + 2 mid
-TIME_BINS: Final[int] = 500
+
 
 # Column definitions for 10-level market data
 ASK_PRICE_COLUMNS: Final[list[str]] = [f"ask_px_{str(i).zfill(2)}" for i in range(10)]
@@ -27,12 +30,9 @@ BID_ANCHOR_COLUMN: Final[str] = "bid_px_00"
 
 # Performance tuning constants
 PRICE_RANGE: Final[int] = 200  # Price levels on each side of mid
-CACHE_LINE_SIZE: Final[int] = 64  # For cache-aligned allocations
-MAX_PRICE_DEVIATION: Final[int] = 1000  # Maximum price deviation in micro-pips
 
-# Pre-computed constants for performance
-MICRO_PIP_MULTIPLIER: Final[float] = 1.0 / MICRO_PIP_SIZE  # 100000.0
-OUTPUT_SHAPE: Final[tuple[int, int]] = (PRICE_LEVELS, TIME_BINS)
+# NOTE: MICRO_PIP_MULTIPLIER moved to RepresentConfig - use (1.0 / config.micro_pip_size)
+# NOTE: OUTPUT_SHAPE moved to RepresentConfig - use config.output_shape
 
 # NumPy data types for optimal performance
 PRICE_DTYPE: Final[np.dtype] = np.dtype(np.int64)  # For price calculations
@@ -75,14 +75,19 @@ FEATURE_INDEX_MAP: Final[dict[str, int]] = {
     FeatureType.TRADE_COUNTS.value: 2,
 }
 
-# Variance column name from DBN files
-VARIANCE_COLUMN: Final[str] = "market_depth_extraction_micro_pips_var"
+# NOTE: Variance feature is calculated dynamically from volume data in pipeline.py
+# No separate variance column is needed - variance is computed via .var() on volume columns
 
 
 # Extended output shapes
-def get_output_shape(features: Union[list[str], list[FeatureType]]) -> tuple[int, ...]:
-    """Get output shape based on feature selection."""
+def get_output_shape(features: Union[list[str], list[FeatureType]], time_bins: int = 500) -> tuple[int, ...]:
+    """Get output shape based on feature selection.
+    
+    Args:
+        features: List of features
+        time_bins: Number of time bins (defaults to 500 for backward compatibility)
+    """
     if len(features) == 1:
-        return OUTPUT_SHAPE  # (402, 500)
+        return (PRICE_LEVELS, time_bins)  # (402, time_bins)
     else:
-        return (len(features), PRICE_LEVELS, TIME_BINS)  # (N, 402, 500)
+        return (len(features), PRICE_LEVELS, time_bins)  # (N, 402, time_bins)

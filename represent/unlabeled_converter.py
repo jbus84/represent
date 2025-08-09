@@ -13,6 +13,7 @@ import databento as db
 import polars as pl
 
 from .pipeline import MarketDepthProcessor
+from .config import RepresentConfig
 
 
 class UnlabeledDBNConverter:
@@ -29,24 +30,22 @@ class UnlabeledDBNConverter:
 
     def __init__(
         self,
-        batch_size: int = 2000,
-        features: Optional[List[str]] = None,
-        min_symbol_samples: int = 1000,
+        config: RepresentConfig,
     ):
         """
-        Initialize unlabeled DBN converter.
+        Initialize unlabeled DBN converter using RepresentConfig.
 
         Args:
-            batch_size: Number of samples per processing batch
-            features: Features to extract ['volume', 'variance', 'trade_counts']
-            min_symbol_samples: Minimum samples required per symbol to create file
+            config: RepresentConfig with currency-specific configuration
         """
-        self.batch_size = batch_size
-        self.features = features or ["volume"]
-        self.min_symbol_samples = min_symbol_samples
+        self.config = config
+        self.batch_size = config.batch_size
+        self.features = config.features
+        self.min_symbol_samples = config.min_symbol_samples
+        self.currency = config.currency
 
         # Initialize market depth processor
-        self.processor = MarketDepthProcessor(features=self.features)
+        self.processor = MarketDepthProcessor(config=self.config, features=self.features)
 
         print("🔧 UnlabeledDBNConverter initialized")
         print(f"   📊 Features: {self.features}")
@@ -99,12 +98,13 @@ class UnlabeledDBNConverter:
         symbol_counts = df.group_by("symbol").len().sort("len", descending=True)
         print(f"   📊 Found {len(symbol_counts)} unique symbols")
 
-        # Filter to symbols with sufficient data
+        # Filter to symbols with sufficient data  
+        min_samples = self.config.samples // 25  # Direct computation to avoid PyRight issue
         valid_symbols = symbol_counts.filter(
-            pl.col("len") >= self.min_symbol_samples
+            pl.col("len") >= min_samples
         )["symbol"].to_list()
 
-        print(f"   📊 {len(valid_symbols)} symbols have ≥{self.min_symbol_samples:,} samples")
+        print(f"   📊 {len(valid_symbols)} symbols have ≥{min_samples:,} samples")
         print(f"   📊 Top symbols: {valid_symbols[:5]}")
 
         # Filter data to valid symbols only
@@ -295,24 +295,20 @@ class UnlabeledDBNConverter:
 
 
 def convert_dbn_to_parquet(
+    config: RepresentConfig,
     dbn_path: Union[str, Path],
     output_dir: Union[str, Path],
-    currency: str = "AUDUSD",
-    features: Optional[List[str]] = None,
     group_by_symbol: bool = True,
-    min_symbol_samples: int = 1000,
     **kwargs,
 ) -> Dict[str, Any]:
     """
     Convenience function to convert a single DBN file to symbol-grouped parquet.
 
     Args:
+        config: RepresentConfig with currency-specific configuration
         dbn_path: Path to input DBN file
         output_dir: Directory for output parquet files
-        currency: Currency pair for naming convention
-        features: Features to extract ['volume', 'variance', 'trade_counts']
         group_by_symbol: Create separate files per symbol
-        min_symbol_samples: Minimum samples required per symbol
         **kwargs: Additional arguments for converter
 
     Returns:
@@ -320,31 +316,27 @@ def convert_dbn_to_parquet(
 
     Examples:
         # Convert to symbol-grouped parquet files
+        config = create_represent_config("AUDUSD")
         stats = convert_dbn_to_parquet(
-            'data.dbn', 
-            '/data/parquet/', 
-            currency='AUDUSD',
-            features=['volume', 'variance']
+            config=config,
+            dbn_path='data.dbn', 
+            output_dir='/data/parquet/', 
         )
     """
-    converter = UnlabeledDBNConverter(
-        features=features or ["volume"],
-        min_symbol_samples=min_symbol_samples
-    )
+    converter = UnlabeledDBNConverter(config=config)
 
     return converter.convert_dbn_to_symbol_parquets(
         dbn_path=dbn_path,
         output_dir=output_dir,
-        currency=currency,
+        currency=config.currency,
         **kwargs
     )
 
 
 def batch_convert_dbn_files(
+    config: RepresentConfig,
     input_directory: Union[str, Path],
     output_directory: Union[str, Path],
-    currency: str = "AUDUSD",
-    features: Optional[List[str]] = None,
     pattern: str = "*.dbn*",
     **kwargs,
 ) -> List[Dict[str, Any]]:
@@ -352,10 +344,9 @@ def batch_convert_dbn_files(
     Convert multiple DBN files to symbol-grouped parquet datasets.
 
     Args:
+        config: RepresentConfig with currency-specific configuration
         input_directory: Directory containing DBN files
         output_directory: Directory for output parquet files
-        currency: Currency pair for naming convention
-        features: Features to extract
         pattern: File pattern to match
         **kwargs: Additional arguments for converter
 
@@ -383,10 +374,9 @@ def batch_convert_dbn_files(
     for dbn_file in dbn_files:
         try:
             stats = convert_dbn_to_parquet(
+                config=config,
                 dbn_path=dbn_file,
                 output_dir=output_dir,
-                currency=currency,
-                features=features,
                 **kwargs,
             )
             results.append(stats)

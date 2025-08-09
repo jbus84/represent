@@ -5,7 +5,7 @@ but these structures are still needed for the core processing pipeline.
 """
 
 import numpy as np
-from .constants import PRICE_LEVELS, TIME_BINS, VOLUME_DTYPE, OUTPUT_DTYPE
+from .constants import PRICE_LEVELS, VOLUME_DTYPE, OUTPUT_DTYPE
 
 
 class PriceLookupTable:
@@ -65,9 +65,14 @@ class PriceLookupTable:
 class VolumeGrid:
     """Pre-allocated 2D grid for volume mapping."""
 
-    def __init__(self):
-        """Initialize grid with pre-allocated memory."""
-        self._grid = np.zeros((PRICE_LEVELS, TIME_BINS), dtype=VOLUME_DTYPE)
+    def __init__(self, time_bins: int = 500):
+        """Initialize grid with pre-allocated memory.
+        
+        Args:
+            time_bins: Number of time bins (defaults to 500 for backward compatibility)
+        """
+        self.time_bins = time_bins
+        self._grid = np.zeros((PRICE_LEVELS, time_bins), dtype=VOLUME_DTYPE)
 
     def clear(self):
         """Reset grid to zero."""
@@ -75,7 +80,7 @@ class VolumeGrid:
 
     def add_volume(self, price_idx: int, time_idx: int, volume: float):
         """Add volume at specific grid position."""
-        if 0 <= price_idx < PRICE_LEVELS and 0 <= time_idx < TIME_BINS:
+        if 0 <= price_idx < PRICE_LEVELS and 0 <= time_idx < self.time_bins:
             self._grid[price_idx, time_idx] += volume
 
     @property
@@ -92,7 +97,7 @@ class VolumeGrid:
         """Set volumes at multiple grid positions."""
         # Filter valid coordinates
         valid_mask = (
-            (y_coords >= 0) & (y_coords < PRICE_LEVELS) & (x_coords >= 0) & (x_coords < TIME_BINS)
+            (y_coords >= 0) & (y_coords < PRICE_LEVELS) & (x_coords >= 0) & (x_coords < self.time_bins)
         )
 
         valid_y = y_coords[valid_mask]
@@ -113,27 +118,39 @@ class VolumeGrid:
 class OutputBuffer:
     """Pre-allocated buffer for final normalized output."""
 
-    def __init__(self):
-        """Initialize output buffer."""
-        self._buffer = np.zeros((PRICE_LEVELS, TIME_BINS), dtype=OUTPUT_DTYPE)
-        self._temp_combined = np.empty((PRICE_LEVELS, TIME_BINS), dtype=VOLUME_DTYPE)
-        self._temp_abs = np.empty((PRICE_LEVELS, TIME_BINS), dtype=VOLUME_DTYPE)
+    def __init__(self, time_bins: int = 500):
+        """Initialize output buffer.
+        
+        Args:
+            time_bins: Number of time bins (defaults to 500 for backward compatibility)
+        """
+        self.time_bins = time_bins
+        self._buffer = np.zeros((PRICE_LEVELS, time_bins), dtype=OUTPUT_DTYPE)
+        self._temp_combined = np.empty((PRICE_LEVELS, time_bins), dtype=VOLUME_DTYPE)
+        self._temp_abs = np.empty((PRICE_LEVELS, time_bins), dtype=VOLUME_DTYPE)
 
     def prepare_output(self, ask_grid: np.ndarray, bid_grid: np.ndarray) -> np.ndarray:
-        """Prepare normalized combined output."""
+        """Prepare normalized combined output using notebook approach."""
         # Calculate combined volume (ask - bid)
         np.subtract(ask_grid, bid_grid, out=self._temp_combined)
-
-        # Take absolute value
+        
+        # Create mask for negative values (bid > ask)
+        neg_mask = self._temp_combined < 0
+        
+        # Take absolute value 
         np.abs(self._temp_combined, out=self._temp_abs)
-
-        # Normalize to [0, 1] range
+        
+        # Normalize: (abs_combined - 0) / (abs_combined.max() - 0)
+        # min is always 0 volume
         max_val = np.max(self._temp_abs)
         if max_val > 0:
             np.divide(self._temp_abs, max_val, out=self._buffer)
         else:
             self._buffer.fill(0)
-
+            
+        # Restore negative sign for values where bid > ask
+        self._buffer[neg_mask] *= -1
+        
         return self._buffer
 
     @property

@@ -14,7 +14,7 @@ from represent.classification_config_generator import (
     generate_classification_config_from_parquet,
     classify_with_generated_config,
 )
-from represent.config import ClassificationConfig
+from represent.config import RepresentConfig, create_represent_config
 
 
 def create_mock_parquet_data(n_samples: int = 100) -> pl.DataFrame:
@@ -36,39 +36,41 @@ def create_mock_parquet_data(n_samples: int = 100) -> pl.DataFrame:
 
 class TestClassificationConfigGenerator:
     """Test ClassificationConfigGenerator core functionality."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     def test_initialization(self):
         """Test generator initialization."""
         generator = ClassificationConfigGenerator(
-            nbins=13,
-            target_samples=1000,
+            config=self.config,
             validation_split=0.3,
             random_seed=42
         )
         
-        assert generator.nbins == 13
-        assert generator.target_samples == 1000
+        assert generator.nbins == self.config.nbins
+        assert generator.target_samples == self.config.target_samples
         assert generator.validation_split == 0.3
         assert generator.random_seed == 42
-        assert generator.target_percent == pytest.approx(100/13, rel=1e-2)
+        assert generator.target_percent == pytest.approx(100/self.config.nbins, rel=1e-2)
 
     def test_initialization_with_custom_config(self):
         """Test initialization with custom configuration."""
         generator = ClassificationConfigGenerator(
-            nbins=5,
-            target_samples=500,
+            config=self.config,
             validation_split=0.2,
             random_seed=123
         )
         
-        assert generator.nbins == 5
-        assert generator.target_samples == 500
+        assert generator.nbins == self.config.nbins
+        assert generator.target_samples == self.config.target_samples
         assert generator.validation_split == 0.2
         assert generator.random_seed == 123
 
     def test_extract_price_changes_from_parquet(self):
         """Test price change extraction from parquet data."""
-        generator = ClassificationConfigGenerator()
+        generator = ClassificationConfigGenerator(config=self.config)
         
         # Create temporary parquet file
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -83,7 +85,7 @@ class TestClassificationConfigGenerator:
 
     def test_calculate_quantile_thresholds(self):
         """Test quantile threshold calculation."""
-        generator = ClassificationConfigGenerator(nbins=5)
+        generator = ClassificationConfigGenerator(config=self.config)
         
         # Generate test data
         price_changes = np.random.normal(0, 0.001, 1000)
@@ -93,12 +95,12 @@ class TestClassificationConfigGenerator:
         assert "all_thresholds" in result
         assert "positive_thresholds" in result
         assert "data_stats" in result
-        assert len(result["all_thresholds"]) == 4  # nbins - 1
+        assert len(result["all_thresholds"]) == self.config.nbins - 1
         assert len(result["positive_thresholds"]) == 6  # Always 6 for compatibility
 
     def test_validate_thresholds(self):
         """Test threshold validation."""
-        generator = ClassificationConfigGenerator(nbins=5)
+        generator = ClassificationConfigGenerator(config=self.config)
         
         thresholds = [-0.002, -0.001, 0.001, 0.002]
         validation_data = np.random.normal(0, 0.001, 500)
@@ -113,7 +115,7 @@ class TestClassificationConfigGenerator:
 
     def test_generate_classification_config(self):
         """Test full config generation."""
-        generator = ClassificationConfigGenerator(nbins=5, target_samples=50)
+        generator = ClassificationConfigGenerator(config=self.config)
         
         # Create temporary parquet file
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -125,14 +127,14 @@ class TestClassificationConfigGenerator:
                 parquet_path, currency="AUDUSD"
             )
             
-            assert isinstance(config, ClassificationConfig)
-            assert config.nbins == 5
+            assert isinstance(config, RepresentConfig)
+            assert config.nbins == self.config.nbins
             assert "threshold_info" in metrics
             assert "generation_metadata" in metrics
 
     def test_split_data_for_validation(self):
         """Test data splitting functionality."""
-        generator = ClassificationConfigGenerator(validation_split=0.3, random_seed=42)
+        generator = ClassificationConfigGenerator(config=self.config, validation_split=0.3, random_seed=42)
         
         # Test the splitting logic by generating config
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -149,6 +151,10 @@ class TestClassificationConfigGenerator:
 
 class TestConvenienceFunctions:
     """Test convenience functions."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     def test_generate_classification_config_from_parquet(self):
         """Test convenience function for config generation."""
@@ -159,29 +165,33 @@ class TestConvenienceFunctions:
             mock_data.write_parquet(parquet_path)
             
             config, metrics = generate_classification_config_from_parquet(
-                parquet_path, currency="AUDUSD", nbins=5
+                config=self.config, parquet_files=parquet_path
             )
             
-            assert isinstance(config, ClassificationConfig)
-            assert config.nbins == 5
+            assert isinstance(config, RepresentConfig)
+            assert config.nbins == self.config.nbins
 
     def test_classify_with_generated_config(self):
         """Test classification with generated thresholds."""
         price_changes = np.array([-0.003, -0.001, 0.0, 0.001, 0.003])
         thresholds = [-0.002, -0.001, 0.001, 0.002]
         
-        labels = classify_with_generated_config(price_changes, thresholds, nbins=5)
+        labels = classify_with_generated_config(price_changes, thresholds, nbins=self.config.nbins)
         
         assert len(labels) == 5
-        assert all(0 <= label < 5 for label in labels)
+        assert all(0 <= label < self.config.nbins for label in labels)
 
 
 class TestErrorHandling:
     """Test error handling scenarios."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     def test_empty_data_handling(self):
         """Test handling of empty datasets."""
-        generator = ClassificationConfigGenerator()
+        generator = ClassificationConfigGenerator(config=self.config)
         
         with tempfile.TemporaryDirectory() as temp_dir:
             parquet_path = Path(temp_dir) / "empty.parquet"
@@ -198,7 +208,7 @@ class TestErrorHandling:
 
     def test_insufficient_data_for_bins(self):
         """Test handling of insufficient data."""
-        generator = ClassificationConfigGenerator(nbins=20, target_samples=1000)
+        generator = ClassificationConfigGenerator(config=self.config)
         
         # Small dataset
         price_changes = np.random.normal(0, 0.001, 10)
@@ -210,12 +220,12 @@ class TestErrorHandling:
     def test_invalid_validation_split(self):
         """Test invalid validation split values."""
         # The current implementation doesn't validate in __init__, so test behavior
-        generator = ClassificationConfigGenerator(validation_split=1.5)
+        generator = ClassificationConfigGenerator(config=self.config, validation_split=1.5)
         assert generator.validation_split == 1.5  # It accepts any value
 
     def test_missing_file_error(self):
         """Test missing file handling."""
-        generator = ClassificationConfigGenerator()
+        generator = ClassificationConfigGenerator(config=self.config)
         
         with pytest.raises((FileNotFoundError, ValueError)):
             generator.extract_price_changes_from_parquet("/nonexistent/file.parquet")
@@ -223,10 +233,14 @@ class TestErrorHandling:
 
 class TestPerformanceOptimizations:
     """Test performance-related functionality."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     def test_large_dataset_performance(self):
         """Test performance with larger datasets."""
-        generator = ClassificationConfigGenerator(target_samples=100)
+        generator = ClassificationConfigGenerator(config=self.config)
         
         # Create larger dataset
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -248,7 +262,7 @@ class TestPerformanceOptimizations:
 
     def test_memory_efficient_processing(self):
         """Test memory efficiency."""
-        generator = ClassificationConfigGenerator()
+        generator = ClassificationConfigGenerator(config=self.config)
         
         # Process multiple small datasets
         results = []

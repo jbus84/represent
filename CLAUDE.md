@@ -8,61 +8,61 @@ This is a **high-performance** Python package called "represent" that creates no
 
 **CRITICAL: This system must be extremely performance-optimized for ML training applications. Every millisecond matters.**
 
-### Clean 3-Stage Architecture (v3.0.0) - DBN→Parquet→Classification→ML Pipeline
+### Streamlined 2-Stage Architecture (v4.0.0) - DBN→Classified-Parquet→ML Pipeline
 
-The package follows a **three-stage pipeline** for maximum flexibility and performance:
+The package follows a **streamlined two-stage pipeline** for maximum performance and uniform distribution:
 
-1. **Stage 1: Raw Data Processing**: Convert DBN files to unlabeled parquet datasets grouped by symbol
-2. **Stage 2: Post-Processing Classification**: Apply symbol-specific classification to parquet data
-3. **Stage 3: ML Training**: Lazy loading from classified parquet for memory-efficient ML training
+1. **Stage 1: Direct DBN-to-Classified-Parquet**: Load DBN file, split by symbol, apply classification, save symbol-specific classified parquet files
+2. **Stage 2: ML Training**: Lazy loading from classified parquet for memory-efficient ML training
+
+**Key Performance Improvements:**
+- **No Intermediate Files**: Direct conversion eliminates I/O overhead
+- **Symbol-Level Processing**: Each symbol processed independently with full history
+- **True Uniform Distribution**: Classification applied with full dataset context
+- **Faster Loading**: Single parquet files per symbol load much faster
+
+**Streamlined Processing Logic:**
+1. **Load DBN File**: Read entire DBN file into polars DataFrame
+2. **Split by Symbol**: Group data by symbol column
+3. **Filter by Thresholds**: Keep symbols with ≥ (input_rows + lookforward_rows) samples
+4. **Apply Classification**: For each symbol, add classification_label column based on price movement
+5. **Filter Rows**: Drop rows without sufficient historical (input_rows) or future (lookforward_rows) data
+6. **Save Symbol Parquets**: Save each symbol's DataFrame as {currency}_{symbol}_classified.parquet
 
 ## Core Workflow
 
-### Stage 1: DBN to Unlabeled Parquet Conversion
+### Stage 1: Direct DBN-to-Classified-Parquet Conversion
 
 ```python
-from represent import convert_dbn_to_parquet
+from represent import ParquetClassifier
 
-# Convert DBN file to unlabeled parquet dataset with symbol grouping
-stats = convert_dbn_to_parquet(
-    dbn_path="market_data.dbn.zst",
-    output_dir="/data/parquet/",           # Directory for symbol-grouped parquet files
+# Process DBN file directly to classified parquet files by symbol
+classifier = ParquetClassifier(
+    currency="AUDUSD",
     features=['volume', 'variance'],       # Multi-feature extraction
-    group_by_symbol=True                   # Create separate files per symbol
-)
-
-# Output: /data/parquet/AUDUSD_M6AM4.parquet, /data/parquet/AUDUSD_M6AM5.parquet, etc.
-```
-
-**Key Features:**
-- **Symbol-Grouped Storage**: Separate parquet files for each symbol
-- **Unlabeled Data**: Raw market depth features without classification
-- **Multi-feature Extraction**: Volume, variance, and trade count features  
-- **Efficient Storage**: Compressed parquet with optimal row groups per symbol
-
-### Stage 2: Post-Processing Classification
-
-```python
-from represent import classify_parquet_file
-
-# Apply dynamic classification with uniform distribution guarantee
-classification_stats = classify_parquet_file(
-    parquet_path="/data/parquet/AUDUSD_M6AM4.parquet",
-    output_path="/data/classified/AUDUSD_M6AM4_classified.parquet",
-    currency="AUDUSD",                     # Currency for default config
+    input_rows=5000,                       # Historical data required for features
+    lookforward_rows=500,                  # Future data required for classification
+    min_symbol_samples=1000,               # Minimum samples per symbol
     force_uniform=True                     # Guarantee uniform class distribution
 )
 
-# Output: /data/classified/AUDUSD_M6AM4_labeled.parquet with classification_label column
+stats = classifier.process_dbn_to_classified_parquets(
+    dbn_path="market_data.dbn.zst",
+    output_dir="/data/classified/",        # Directory for symbol-specific classified files
+)
+
+# Output: /data/classified/AUDUSD_M6AM4_classified.parquet, /data/classified/AUDUSD_M6AM5_classified.parquet, etc.
 ```
 
-**Key Benefits:**
-- **Symbol-Specific Analysis**: Different symbols can have different characteristics
-- **Uniform Distribution**: Apply balanced sampling to achieve equal class representation
-- **Flexible Thresholds**: Easy to experiment with different classification strategies
-- **Common Symbols Only**: Focus on symbols with sufficient data for reliable classification
+**Key Features:**
+- **Single-Pass Processing**: DBN → Classified Parquet in one step
+- **Symbol Isolation**: Each symbol processed independently with full context
+- **Uniform Distribution**: True uniform distribution using full dataset
+- **Row Filtering**: Automatic filtering of rows without sufficient history/future
+- **Preserved Schema**: Original DBN columns + classification_label column
+- **Fast Loading**: Optimized parquet files for ML training
 
-### Stage 3: Lazy ML Training
+### Stage 2: ML Training
 
 ```python  
 from represent import create_parquet_dataloader
@@ -87,10 +87,11 @@ for features, labels in dataloader:
 ```
 
 **Key Benefits:**
-- **Guaranteed Uniform Distribution**: Each class has equal representation
+- **Guaranteed Uniform Distribution**: Each class has equal representation from Stage 1
 - **Symbol Flexibility**: Train on specific symbols or all available symbols
 - **Memory Efficient**: Load only required batches, not entire dataset
-- **Reproducible**: Consistent classification across training runs
+- **Faster Loading**: Single parquet files per symbol load much faster
+- **No Intermediate Processing**: Files are ready for ML training immediately
 
 ## Core Data Structures
 
@@ -252,33 +253,19 @@ uv build
 
 ## Key Components
 
-### DBN to Parquet Converter (`represent/converter.py`)
+### ParquetClassifier (`represent/parquet_classifier.py`)
 
-High-performance converter from DBN files to unlabeled parquet datasets with symbol grouping.
-
-```python
-class DBNToParquetConverter:
-    """
-    Convert DBN files to unlabeled parquet datasets with:
-    - Symbol-based file grouping
-    - Multi-feature extraction (volume, variance, trade_counts)
-    - Efficient batch processing
-    - No classification overhead during conversion
-    """
-```
-
-### Post-Processing Classifier (`represent/classifier.py`)
-
-Symbol-aware classification system for parquet datasets.
+Primary streamlined DBN-to-classified-parquet processor.
 
 ```python
 class ParquetClassifier:
     """
-    Apply classification to parquet datasets with:
-    - Symbol-specific threshold calculation
-    - Uniform distribution guarantee
-    - Common symbols filtering
-    - Flexible classification strategies
+    Process DBN files directly to classified parquet files with:
+    - Single-pass DBN → Classified Parquet processing
+    - Symbol-level processing with full context
+    - True uniform distribution using quantile-based classification
+    - Row filtering for insufficient history/future data
+    - Preserved schema with added classification_label column
     """
 ```
 
@@ -317,20 +304,21 @@ class MarketDepthProcessor:
 ### Main Entry Points
 
 ```python
-# Stage 1: DBN to Parquet Conversion
-from represent import convert_dbn_to_parquet, batch_convert_dbn_files
+# Primary: Streamlined DBN-to-Classified-Parquet Processing
+from represent import ParquetClassifier, process_dbn_to_classified_parquets
+from represent import classify_parquet_file, batch_classify_parquet_files
 
-# Stage 2: Post-Processing Classification
-from represent import apply_classification_to_parquet, ParquetClassifier
-
-# Stage 3: ML Training DataLoader
+# ML Training DataLoader
 from represent import create_parquet_dataloader
 
 # Core Processing  
 from represent import MarketDepthProcessor, process_market_data
 
 # Configuration
-from represent import load_currency_config, ClassificationConfig
+from represent import create_represent_config
+
+# Alternative: Unlabeled conversion approach (if needed)
+from represent import convert_dbn_to_parquet, batch_convert_unlabeled
 ```
 
 ### Dynamic Configuration Generation

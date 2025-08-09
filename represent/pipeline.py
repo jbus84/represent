@@ -8,9 +8,6 @@ import polars as pl
 from typing import Optional, Union
 
 from .constants import (
-    MICRO_PIP_MULTIPLIER,
-    TICKS_PER_BIN,
-    SAMPLES,
     ASK_PRICE_COLUMNS,
     BID_PRICE_COLUMNS,
     ASK_VOL_COLUMNS,
@@ -20,7 +17,6 @@ from .constants import (
     ASK_ANCHOR_COLUMN,
     BID_ANCHOR_COLUMN,
     PRICE_LEVELS,
-    TIME_BINS,
     VOLUME_DTYPE,
     FEATURE_TYPES,
     DEFAULT_FEATURES,
@@ -29,6 +25,7 @@ from .constants import (
     FeatureType,
     get_output_shape,
 )
+from .config import RepresentConfig
 from .data_structures import PriceLookupTable, VolumeGrid, OutputBuffer
 
 
@@ -39,14 +36,24 @@ class MarketDepthProcessor:
     Now supports multiple feature types: volume, variance, and trade_counts.
     """
 
-    def __init__(self, features: Optional[Union[list[str], list[FeatureType]]] = None):
+    def __init__(
+        self, 
+        config: RepresentConfig,
+        features: Optional[Union[list[str], list[FeatureType]]] = None
+    ):
         """Initialize processor with pre-allocated structures.
 
         Args:
+            config: RepresentConfig with currency-specific configuration
             features: List of features to extract. Can be strings or FeatureType enums.
                      Options: 'volume', 'variance', 'trade_counts' or FeatureType enum values
                      Defaults to ['volume'] for backward compatibility.
         """
+        # Use the provided RepresentConfig
+        self.config = config
+        
+        # Pre-compute values for performance
+        self.micro_pip_multiplier = 1.0 / self.config.micro_pip_size
         # Validate and set features
         if features is None:
             self.features: list[str] = DEFAULT_FEATURES.copy()
@@ -77,22 +84,25 @@ class MarketDepthProcessor:
         self.features = sorted(self.features, key=lambda f: FEATURE_INDEX_MAP[f])
         self.output_shape = get_output_shape(self.features)
 
+        # Get computed value once to avoid type checker issues
+        time_bins: int = getattr(self.config, 'time_bins')  # Use getattr to help type checker
+
         # Pre-allocate all data structures to avoid runtime allocations
         # One grid per feature type
-        self._ask_grids = {feature: VolumeGrid() for feature in self.features}
-        self._bid_grids = {feature: VolumeGrid() for feature in self.features}
+        self._ask_grids = {feature: VolumeGrid(time_bins=time_bins) for feature in self.features}
+        self._bid_grids = {feature: VolumeGrid(time_bins=time_bins) for feature in self.features}
         # One output buffer per feature to avoid sharing
-        self._output_buffers = {feature: OutputBuffer() for feature in self.features}
+        self._output_buffers = {feature: OutputBuffer(time_bins=time_bins) for feature in self.features}
 
         # Pre-allocate temporary arrays for processing (per feature)
         self._temp_ask_volumes: dict[str, np.ndarray] = {}
         self._temp_bid_volumes: dict[str, np.ndarray] = {}
         for feature in self.features:
             self._temp_ask_volumes[feature] = np.empty(
-                (PRICE_LEVELS, TIME_BINS), dtype=VOLUME_DTYPE
+                (PRICE_LEVELS, time_bins), dtype=VOLUME_DTYPE
             )
             self._temp_bid_volumes[feature] = np.empty(
-                (PRICE_LEVELS, TIME_BINS), dtype=VOLUME_DTYPE
+                (PRICE_LEVELS, time_bins), dtype=VOLUME_DTYPE
             )
 
         # Cache for price lookup table (will be created when needed)
@@ -111,17 +121,18 @@ class MarketDepthProcessor:
 
         # Pre-compile price conversion expressions
         ask_exprs = [
-            (pl.col(col) * MICRO_PIP_MULTIPLIER).round().cast(pl.Int64).alias(col)
+            (pl.col(col) * self.micro_pip_multiplier).round().cast(pl.Int64).alias(col)
             for col in ASK_PRICE_COLUMNS
         ]
         bid_exprs = [
-            (pl.col(col) * MICRO_PIP_MULTIPLIER).round().cast(pl.Int64).alias(col)
+            (pl.col(col) * self.micro_pip_multiplier).round().cast(pl.Int64).alias(col)
             for col in BID_PRICE_COLUMNS
         ]
         self._price_conversion_expressions = ask_exprs + bid_exprs
 
-        # Pre-compile time bin expression
-        self._time_bin_expression = (pl.int_range(0, SAMPLES) // TICKS_PER_BIN).alias("tick_bin")
+        # Pre-compile time bin expression using config values
+        expected_samples = self.config.samples * 2  # Use 2x config samples as the "standard" size
+        self._time_bin_expression = (pl.int_range(0, expected_samples) // self.config.ticks_per_bin).alias("tick_bin")
 
         self._compiled_expressions_ready = True
 
@@ -135,12 +146,14 @@ class MarketDepthProcessor:
         if input_length is None:
             input_length = len(df)
 
-        # For standard 50K samples, use pre-compiled expression
-        if input_length == SAMPLES:
+        # For standard expected size, use pre-compiled expression
+        expected_samples = self.config.samples * 2  # Same as used in _prepare_expressions
+        if input_length == expected_samples:
             return df.with_columns(self._time_bin_expression)
 
         # For other sizes, create dynamic time bins
-        ticks_per_bin = max(1, input_length // TIME_BINS)  # Ensure at least 1 tick per bin
+        time_bins: int = getattr(self.config, 'time_bins')
+        ticks_per_bin = max(1, input_length // time_bins)  # Ensure at least 1 tick per bin
         time_bin_expr = (pl.int_range(0, input_length) // ticks_per_bin).alias("tick_bin")
         return df.with_columns(time_bin_expr)
 
@@ -338,38 +351,41 @@ class MarketDepthProcessor:
 
 # Factory function for easy instantiation
 def create_processor(
-    features: Optional[Union[list[str], list[FeatureType]]] = None,
+    config: RepresentConfig,
+    features: Optional[Union[list[str], list[FeatureType]]] = None
 ) -> MarketDepthProcessor:
     """Create a new market depth processor instance.
 
     Args:
+        config: RepresentConfig with currency-specific configuration
         features: List of features to extract. Can be strings or FeatureType enums.
                  Options: 'volume', 'variance', 'trade_counts' or FeatureType enum values
                  Defaults to ['volume'] for backward compatibility.
     """
-    return MarketDepthProcessor(features=features)
+    return MarketDepthProcessor(config=config, features=features)
 
 
-# Main API function that matches the reference implementation interface
+# Main API function that uses RepresentConfig
 def process_market_data(
-    df: pl.DataFrame, features: Optional[Union[list[str], list[FeatureType]]] = None
+    df: pl.DataFrame, 
+    config: RepresentConfig,
+    features: Optional[Union[list[str], list[FeatureType]]] = None
 ) -> np.ndarray:
     """
     Process market data and return normalized depth representation.
-
-    This function provides the same interface as the reference implementation
-    but with significant performance optimizations and extended feature support.
+    Now uses RepresentConfig to determine output shape and processing parameters.
 
     Args:
         df: Polars DataFrame with market data
+        config: RepresentConfig with currency-specific configuration and shape parameters
         features: List of features to extract. Can be strings or FeatureType enums.
                  Options: 'volume', 'variance', 'trade_counts' or FeatureType enum values
                  Defaults to ['volume'] for backward compatibility.
 
     Returns:
         numpy array with normalized market depth:
-        - Single feature: shape (402, 500)
-        - Multiple features: shape (N, 402, 500) where N is number of features
+        - Single feature: shape (402, config.time_bins)
+        - Multiple features: shape (N, 402, config.time_bins) where N is number of features
     """
-    processor = create_processor(features=features)
+    processor = create_processor(config=config, features=features)
     return processor.process(df)

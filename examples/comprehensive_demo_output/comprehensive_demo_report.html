@@ -1,0 +1,636 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Represent Package - Comprehensive Demo Report</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            font-weight: 300;
+        }
+        .header p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+        .nav {
+            background: #f8f9fa;
+            padding: 20px 40px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .nav ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            gap: 30px;
+        }
+        .nav a {
+            text-decoration: none;
+            color: #495057;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+        .nav a:hover {
+            color: #667eea;
+        }
+        .content {
+            padding: 40px;
+        }
+        .section {
+            margin-bottom: 60px;
+        }
+        .section h2 {
+            color: #2c3e50;
+            font-size: 2rem;
+            margin-bottom: 30px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin: 30px 0;
+        }
+        .feature-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 25px;
+            border-left: 4px solid #667eea;
+        }
+        .feature-card h3 {
+            margin: 0 0 15px 0;
+            color: #2c3e50;
+        }
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-card h4 {
+            margin: 0 0 10px 0;
+            font-size: 2rem;
+            font-weight: 300;
+        }
+        .stat-card p {
+            margin: 0;
+            opacity: 0.9;
+        }
+        .image-container {
+            margin: 30px 0;
+            text-align: center;
+        }
+        .image-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .code-block {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+        .highlight {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .highlight h4 {
+            margin: 0 0 10px 0;
+            color: #856404;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+        }
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+        .performance-good { background: #d4edda; color: #155724; }
+        .performance-warning { background: #fff3cd; color: #856404; }
+        .performance-danger { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Represent Package</h1>
+            <p>Comprehensive Functionality Demonstration</p>
+        </div>
+        
+        <div class="nav">
+            <ul>
+                <li><a href="#features">Feature Extraction</a></li>
+                <li><a href="#classification">Classification</a></li>
+                <li><a href="#performance">DataLoader Performance</a></li>
+                <li><a href="#ml-samples">ML Sample Generation</a></li>
+                <li><a href="#summary">Summary</a></li>
+            </ul>
+        </div>
+        
+        <div class="content">
+
+            <div class="section" id="features">
+                <h2>🎨 Multi-Feature Extraction</h2>
+                <p>Demonstration of extracting and visualizing different market depth features with proper normalization and RGB combination.</p>
+                
+                <div class="feature-grid">
+
+                    <div class="feature-card">
+                        <h3>Volume Features</h3>
+                        <p><strong>Shape:</strong> (402, 250)</p>
+                        <p><strong>Range:</strong> [-1.000, 0.987]</p>
+                        <p><strong>Mean:</strong> 0.310</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <h3>Variance Features</h3>
+                        <p><strong>Shape:</strong> (402, 250)</p>
+                        <p><strong>Range:</strong> [-0.984, 1.000]</p>
+                        <p><strong>Mean:</strong> 0.205</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <h3>Trade_Counts Features</h3>
+                        <p><strong>Shape:</strong> (402, 250)</p>
+                        <p><strong>Range:</strong> [-0.950, 1.000]</p>
+                        <p><strong>Mean:</strong> 0.349</p>
+                    </div>
+
+                </div>
+                
+                <div class="image-container">
+                    <img src="feature_extraction_demo.png" alt="Feature Extraction Visualization">
+                </div>
+                
+                <div class="highlight">
+                    <h4>🔑 Key Features</h4>
+                    <ul>
+                        <li><strong>Volume Features:</strong> Traditional market depth from order sizes</li>
+                        <li><strong>Variance Features:</strong> Price volatility patterns across levels</li>
+                        <li><strong>Trade Count Features:</strong> Activity patterns from transaction counts</li>
+                        <li><strong>RGB Combination:</strong> Multi-feature visualization with proper normalization</li>
+                    </ul>
+                </div>
+                
+                <div class="code-block">
+# Multi-feature extraction example
+from represent import MarketDepthProcessor
+
+processor = MarketDepthProcessor()
+features = processor.extract_features(
+    data=market_data,
+    features=["volume", "variance", "trade_counts"]
+)
+
+# Output shapes:
+# Single feature: (PRICE_LEVELS, config.time_bins)
+# Multi-feature: (3, PRICE_LEVELS, config.time_bins)
+                </div>
+            </div>
+
+            <div class="section" id="classification">
+                <h2>📈 Classification Distribution Analysis</h2>
+                <p>Comparison of classification distributions with and without force_uniform to demonstrate the importance of balanced training data.</p>
+                
+                <div class="stat-grid">
+
+                    <div class="stat-card">
+                        <h4>3,298</h4>
+                        <p>With Force Uniform Samples</p>
+                    </div>
+                    <div class="stat-card">
+                        <h4>0.02%</h4>
+                        <p>Std Deviation</p>
+                    </div>
+
+                    <div class="stat-card">
+                        <h4>3,298</h4>
+                        <p>Without Force Uniform Samples</p>
+                    </div>
+                    <div class="stat-card">
+                        <h4>2.11%</h4>
+                        <p>Std Deviation</p>
+                    </div>
+
+                </div>
+                
+                <div class="image-container">
+                    <img src="classification_distribution_demo.png" alt="Classification Distribution Analysis">
+                </div>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Approach</th>
+                            <th>Total Samples</th>
+                            <th>Std Deviation</th>
+                            <th>Quality</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+
+                        <tr>
+                            <td><strong>With Force Uniform</strong></td>
+                            <td>3,298</td>
+                            <td>0.02%</td>
+                            <td class="performance-good">EXCELLENT</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Without Force Uniform</strong></td>
+                            <td>3,298</td>
+                            <td>2.11%</td>
+                            <td class="performance-warning">GOOD</td>
+                        </tr>
+
+                    </tbody>
+                </table>
+
+                <h3>🎯 Global Classification Bin Edges</h3>
+                <p>These are the actual quantile boundaries used for uniform classification across all symbols and files.</p>
+                
+                <table style="margin: 20px 0;">
+                    <thead>
+                        <tr>
+                            <th>Bin #</th>
+                            <th>Lower Edge (μ-pips)</th>
+                            <th>Upper Edge (μ-pips)</th>
+                            <th>Range (μ-pips)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+
+                        <tr>
+                            <td><strong>Bin 0</strong></td>
+                            <td>-0.006538</td>
+                            <td>-0.000721</td>
+                            <td>0.005816</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Bin 1</strong></td>
+                            <td>-0.000721</td>
+                            <td>-0.000504</td>
+                            <td>0.000218</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Bin 2</strong></td>
+                            <td>-0.000504</td>
+                            <td>-0.000355</td>
+                            <td>0.000148</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Bin 3</strong></td>
+                            <td>-0.000355</td>
+                            <td>-0.000236</td>
+                            <td>0.000119</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Bin 4</strong></td>
+                            <td>-0.000236</td>
+                            <td>-0.000135</td>
+                            <td>0.000101</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Bin 5</strong></td>
+                            <td>-0.000135</td>
+                            <td>-0.000039</td>
+                            <td>0.000096</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Bin 6</strong></td>
+                            <td>-0.000039</td>
+                            <td>0.000057</td>
+                            <td>0.000096</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Bin 7</strong></td>
+                            <td>0.000057</td>
+                            <td>0.000158</td>
+                            <td>0.000101</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Bin 8</strong></td>
+                            <td>0.000158</td>
+                            <td>0.000261</td>
+                            <td>0.000103</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Bin 9</strong></td>
+                            <td>0.000261</td>
+                            <td>0.000371</td>
+                            <td>0.000110</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Bin 10</strong></td>
+                            <td>0.000371</td>
+                            <td>0.000508</td>
+                            <td>0.000137</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Bin 11</strong></td>
+                            <td>0.000508</td>
+                            <td>0.000711</td>
+                            <td>0.000203</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Bin 12</strong></td>
+                            <td>0.000711</td>
+                            <td>0.007247</td>
+                            <td>0.006536</td>
+                        </tr>
+
+                    </tbody>
+                </table>
+                
+                <div class="feature-card" style="margin: 20px 0;">
+                    <h4>📊 Bin Edge Statistics</h4>
+
+                    <p><strong>Total Boundaries:</strong> 14 (for 13 classification bins)</p>
+                    <p><strong>Range:</strong> -0.006538 to 0.007247 micro-pips</p>
+                    <p><strong>Files Analyzed:</strong> 86 DBN files</p>
+                    <p><strong>Sample Size:</strong> 248,925 price movements</p>
+
+                </div>
+
+                
+                <div class="highlight">
+                    <h4>🎯 Why Force Uniform Matters</h4>
+                    <p><strong>Problem:</strong> Natural price movement distributions are heavily skewed, leading to class imbalance that hurts ML model performance.</p>
+                    <p><strong>Solution:</strong> Force uniform distribution ensures each classification label gets exactly 7.69% of samples (for 13 classes), providing optimal training data balance.</p>
+                </div>
+            </div>
+
+            <div class="section" id="performance">
+                <h2>⚡ DataLoader Performance Analysis</h2>
+                <p>Comprehensive benchmarking of DataLoader configurations to identify optimal settings for ML training.</p>
+                
+                <div class="image-container">
+                    <img src="dataloader_performance_demo.png" alt="DataLoader Performance Analysis">
+                </div>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Configuration</th>
+                            <th>Batch Size</th>
+                            <th>Workers</th>
+                            <th>Throughput</th>
+                            <th>Memory</th>
+                            <th>Efficiency</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+
+                        <tr>
+                            <td><strong>Small Batch</strong></td>
+                            <td>16</td>
+                            <td>2</td>
+                            <td class="performance-good">34470 sps</td>
+                            <td class="performance-good">8 MB</td>
+                            <td>34469.8</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Medium Batch</strong></td>
+                            <td>32</td>
+                            <td>4</td>
+                            <td class="performance-good">93101 sps</td>
+                            <td class="performance-good">16 MB</td>
+                            <td>93101.1</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Large Batch</strong></td>
+                            <td>64</td>
+                            <td>6</td>
+                            <td class="performance-good">155893 sps</td>
+                            <td class="performance-good">32 MB</td>
+                            <td>155892.7</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>XL Batch</strong></td>
+                            <td>128</td>
+                            <td>8</td>
+                            <td class="performance-good">178976 sps</td>
+                            <td class="performance-good">64 MB</td>
+                            <td>178976.3</td>
+                        </tr>
+
+                    </tbody>
+                </table>
+                
+                <div class="highlight">
+                    <h4>🎯 Performance Targets</h4>
+                    <ul>
+                        <li><strong>Throughput:</strong> >1000 samples/second for real-time training</li>
+                        <li><strong>Memory:</strong> <4GB RAM for large dataset compatibility</li>
+                        <li><strong>Efficiency:</strong> Optimal balance of speed and resource usage</li>
+                        <li><strong>Scalability:</strong> Linear scaling with batch size and worker count</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="section" id="ml-samples">
+                <h2>🧠 ML Sample Generation</h2>
+                <p>Demonstration of generating training samples aligned with multi-feature extraction for direct ML model input.</p>
+                
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h3>Tensor Shape</h3>
+                        <p><strong>Features:</strong> (3, 3, 402, 250)</p>
+                        <p><strong>Labels:</strong> (3,)</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>Memory Usage</h3>
+                        <p><strong>Batch Size:</strong> 3</p>
+                        <p><strong>Memory:</strong> 3.45 MB</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>Features Included</h3>
+                        <p><strong>Count:</strong> 3</p>
+                        <p><strong>Types:</strong> volume, variance, trade_counts</p>
+                    </div>
+                </div>
+                
+                <div class="image-container">
+                    <img src="ml_sample_generation_demo.png" alt="ML Sample Generation">
+                </div>
+                
+                <div class="code-block">
+# PyTorch integration example
+import torch
+import torch.nn as nn
+
+# Create model for multi-feature input
+model = nn.Sequential(
+    nn.Conv2d(3, 64, kernel_size=3),
+    nn.ReLU(),
+    nn.AdaptiveAvgPool2d(1),
+    nn.Flatten(),
+    nn.Linear(64, 13)  # 13-class classification
+)
+
+# Training loop
+for features, labels in dataloader:
+    # features: (3, 3, 402, 250)
+    # labels: (3,)
+    
+    outputs = model(features)
+    loss = criterion(outputs, labels)
+    # ... training logic
+                </div>
+                
+                <div class="highlight">
+                    <h4>🔑 Key Advantages</h4>
+                    <ul>
+                        <li><strong>Multi-Feature Ready:</strong> Seamless integration of multiple feature types</li>
+                        <li><strong>Normalized Data:</strong> All features normalized to [0,1] range</li>
+                        <li><strong>Uniform Labels:</strong> Balanced classification distribution</li>
+                        <li><strong>Memory Efficient:</strong> Optimized tensor formats for training</li>
+                        <li><strong>PyTorch Compatible:</strong> Direct integration with deep learning frameworks</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="section" id="summary">
+                <h2>📋 Summary</h2>
+                <p>Comprehensive demonstration of the represent package showcasing all core functionality with consistent dataset and visualization.</p>
+                
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <h4>3</h4>
+                        <p>Feature Types</p>
+                    </div>
+                    <div class="stat-card">
+                        <h4>13</h4>
+                        <p>Classification Bins</p>
+                    </div>
+                    <div class="stat-card">
+                        <h4>4</h4>
+                        <p>Demo Sections</p>
+                    </div>
+                    <div class="stat-card">
+                        <h4>100%</h4>
+                        <p>Success Rate</p>
+                    </div>
+                </div>
+                
+                <div class="highlight">
+                    <h4>🎉 Demonstration Complete!</h4>
+                    <p>This comprehensive demo has successfully showcased:</p>
+                    <ul>
+                        <li>✅ Multi-feature extraction with RGB visualization</li>
+                        <li>✅ Classification distributions with/without force_uniform</li>
+                        <li>✅ DataLoader performance benchmarking</li>
+                        <li>✅ ML-ready sample generation</li>
+                        <li>✅ Consistent dataset and professional visualizations</li>
+                    </ul>
+                </div>
+                
+                <div class="code-block">
+# Complete workflow example
+from represent import (
+    calculate_global_thresholds,
+    process_dbn_to_classified_parquets,
+    create_parquet_dataloader,
+    create_represent_config
+)
+
+# 1. Create configuration
+config = create_represent_config("AUDUSD")
+
+# 2. Calculate global thresholds
+thresholds = calculate_global_thresholds(
+    config=config,
+    data_directory="data/"
+)
+
+# 3. Process to classified parquet
+results = process_dbn_to_classified_parquets(
+    config=config,
+    dbn_path="data.dbn",
+    output_dir="classified/",
+    global_thresholds=thresholds,
+    force_uniform=True
+)
+
+# 4. Create ML dataloader
+dataloader = create_parquet_dataloader(
+    config=config,
+    parquet_path="classified/data.parquet",
+    batch_size=32,
+    features=["volume", "variance", "trade_counts"]
+)
+
+# Ready for ML training!
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
