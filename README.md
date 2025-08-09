@@ -121,12 +121,10 @@ print(f"Global thresholds calculated from {global_thresholds.files_analyzed} fil
 
 # Step 3: Process all files using the same global thresholds
 stats = process_dbn_to_classified_parquets(
+    config=config,                          # Single config parameter with dependency injection
     dbn_path="data/glbx-mdp3-20240403.mbp-10.dbn.zst",
     output_dir="data/classified/",          # Directory for classified symbol files
-    currency=config.currency,
-    features=config.features,               # Uses config features (volume, variance, etc.)
     global_thresholds=global_thresholds,    # 🎯 Consistent thresholds across ALL files!
-    min_symbol_samples=config.min_symbol_samples,  # Uses config minimum
     force_uniform=True                      # Guarantee uniform class distribution
 )
 
@@ -158,9 +156,9 @@ dataloader = create_parquet_dataloader(
     num_workers=4                          # Parallel loading for performance
 )
 
-# Use in PyTorch training loop
+# Use in PyTorch training loop  
 for batch_features, batch_labels in dataloader:
-    # batch_features: torch.Tensor of shape [32, 2, 402, config.time_bins] for 2 features
+    # batch_features: torch.Tensor of shape [32, 2, 402, 250] for 2 features (AUDUSD time_bins=250)
     # batch_labels: torch.Tensor of shape [32] with uniform distribution (7.69% each class)
     model_output = model(batch_features)
     loss = criterion(model_output, batch_labels)
@@ -175,29 +173,28 @@ import torch
 import torch.nn as nn
 
 # Stage 1A: Calculate global thresholds (do this once for your dataset)
+config = create_represent_config("AUDUSD")
 print("🎯 Calculating global thresholds from sample data...")
 global_thresholds = calculate_global_thresholds(
+    config=config,
     data_directory="/path/to/your/audusd/data/",  # e.g., AUDUSD-micro dataset
-    currency="AUDUSD",
     sample_fraction=0.5,  # Use 50% of files for threshold calculation
-    nbins=13
 )
 
 # Stage 1B: Process files with consistent global thresholds
 print("🔄 Stage 1: Processing DBN with global thresholds...")
 processing_stats = process_dbn_to_classified_parquets(
+    config=config,
     dbn_path="data/AUDUSD-20240101.dbn.zst",
     output_dir="data/classified/",
-    currency="AUDUSD",
-    features=['volume', 'variance'],
     global_thresholds=global_thresholds,  # 🎯 Consistent across all files!
-    min_symbol_samples=5000,
     force_uniform=True
 )
 
 # Stage 2: ML training with guaranteed uniform distribution
 print("🔄 Stage 2: Creating ML training dataloader...")
 dataloader = create_parquet_dataloader(
+    config=config,
     parquet_path="data/classified/AUDUSD_M6AM4_classified.parquet",
     batch_size=32,
     shuffle=True,
@@ -219,7 +216,7 @@ criterion = nn.CrossEntropyLoss()
 print("🔄 Training with guaranteed uniform distribution...")
 for epoch in range(5):
     for features, labels in dataloader:
-        # features: (32, 2, 402, 250) for volume+variance with dynamic TIME_BINS
+        # features: (32, 2, 402, 250) for volume+variance with dynamic TIME_BINS=250
         # labels: (32,) with uniform distribution (7.69% each class 0-12)
         outputs = model(features)
         loss = criterion(outputs, labels)
@@ -244,15 +241,13 @@ import json
 # Calculate global thresholds from your AUDUSD dataset
 # This analyzes price movements across multiple files to determine optimal bin boundaries
 data_directory = "/Users/danielfisher/data/databento/AUDUSD-micro"
+config = create_represent_config("AUDUSD")
 
 print("🎯 Step 1: Generating global classification bins...")
 global_thresholds = calculate_global_thresholds(
+    config=config,
     data_directory=data_directory,
-    currency="AUDUSD",
-    nbins=13,                           # Create 13 classification bins (0-12)
     sample_fraction=0.5,               # Use first 50% of files for bin calculation
-    lookforward_rows=500,              # Price movement prediction horizon
-    max_samples_per_file=10000,        # Sample size per file for efficiency
     verbose=True
 )
 
@@ -302,12 +297,10 @@ for i, dbn_file in enumerate(dbn_files[:5]):  # Process first 5 files for demo
     
     # Apply the global bins to classify each row in this file
     results = process_dbn_to_classified_parquets(
+        config=config,
         dbn_path=dbn_file,
         output_dir=output_dir,
-        currency="AUDUSD",
         global_thresholds=global_thresholds,    # 🎯 Same bins for ALL files!
-        features=["volume"],                    # Market depth features to extract
-        min_symbol_samples=1000,               # Minimum rows required per symbol
         force_uniform=True,                    # Ensure uniform class distribution
         verbose=False
     )
@@ -422,13 +415,13 @@ print(f"🚀 Ready for ML training with high-quality, consistent labels!")
 
 Configure any combination of features for different analyses:
 
-- **Volume**: Traditional market depth (order sizes) - shape: `(402, 500)`
-- **Variance**: Market volatility patterns - shape: `(402, 500)`
-- **Trade Counts**: Activity levels from transaction counts - shape: `(402, 500)`
+- **Volume**: Traditional market depth (order sizes) - shape: `(402, time_bins)`
+- **Variance**: Market volatility patterns - shape: `(402, time_bins)`  
+- **Trade Counts**: Activity levels from transaction counts - shape: `(402, time_bins)`
 
 **Multi-Feature Output Shapes:**
-- 1 feature: `(402, 500)` - 2D tensor
-- 2+ features: `(N, 402, 500)` - 3D tensor with feature dimension first
+- 1 feature: `(402, time_bins)` - 2D tensor (time_bins=250 for AUDUSD)
+- 2+ features: `(N, 402, time_bins)` - 3D tensor with feature dimension first
 
 ## 🎲 Dynamic Classification System
 
@@ -500,14 +493,13 @@ from represent import RepresentAPI
 
 # Use the high-level API for complete workflows
 api = RepresentAPI()
+config = create_represent_config("AUDUSD", features=['volume', 'variance'])
 
 # Run streamlined processing
 results = api.process_dbn_to_classified_parquets(
+    config=config,
     dbn_path="data.dbn",
     output_dir="/data/classified/",
-    currency="AUDUSD",
-    features=['volume', 'variance'],
-    min_symbol_samples=5000,
     force_uniform=True
 )
 
@@ -543,6 +535,8 @@ The comprehensive demo showcases:
 - **Without Force Uniform**: Natural (biased) distribution
 - **Quality Metrics**: Uniformity deviation analysis
 - **Visual Comparison**: Side-by-side distribution plots
+- **🎯 Bin Edges Table**: Detailed quantile boundaries with precise micro-pip values
+- **📊 Statistics**: Range, sample sizes, and files analyzed for each threshold
 
 ### **⚡ DataLoader Performance**
 - **Multiple Configurations**: Batch sizes and worker counts
