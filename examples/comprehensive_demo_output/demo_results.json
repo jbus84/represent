@@ -10,6 +10,22 @@
       "files_analyzed": 86,
       "sample_size": 248925,
       "nbins": 13,
+      "quantile_boundaries": [
+        -0.0065375256579177626,
+        -0.0007213572517536844,
+        -0.0005035544127977452,
+        -0.000355194353381899,
+        -0.0002358177783986795,
+        -0.00013476295036568838,
+        -3.881145663337302e-05,
+        5.724980186351746e-05,
+        0.00015807020154267243,
+        0.0002613608364513193,
+        0.0003714827630376858,
+        0.0005083886074489242,
+        0.0007109191886248888,
+        0.0072469741250894846
+      ],
       "price_movement_stats": {
         "mean": 7.212303607944637e-06,
         "std": 0.0005551634011649356,
@@ -17,28 +33,28 @@
         "max": 0.0072469741250894846,
         "median": 9.342097232020637e-06
       },
-      "calculation_time_seconds": 155.80225014686584
+      "calculation_time_seconds": 161.47157502174377
     },
     "processing_results": {
       "total_samples": 8020,
       "parquet_files_generated": 6,
       "symbols_processed": 2,
       "symbol_counts": {
-        "M6AM4": 6943,
-        "M6AU4": 1077
+        "M6AU4": 1077,
+        "M6AM4": 6943
       },
       "uniformity_deviation": 7.5,
       "quality_assessment": "Needs Improvement",
-      "processing_time_seconds": 5.650630950927734
+      "processing_time_seconds": 5.905579090118408
     },
     "output_directory": "examples/comprehensive_demo_output/dbn_processed_parquets",
     "parquet_files": [
-      "examples/comprehensive_demo_output/dbn_processed_parquets/AUDUSD_M6AM4_classified.parquet",
       "examples/comprehensive_demo_output/dbn_processed_parquets/AUDUSD_M6AU4_classified.parquet",
       "examples/comprehensive_demo_output/dbn_processed_parquets/AUDUSD_M6AM4_classified.parquet",
       "examples/comprehensive_demo_output/dbn_processed_parquets/AUDUSD_M6AU4_classified.parquet",
-      "examples/comprehensive_demo_output/dbn_processed_parquets/AUDUSD_M6AU4_classified.parquet",
-      "examples/comprehensive_demo_output/dbn_processed_parquets/AUDUSD_M6AM4_classified.parquet"
+      "examples/comprehensive_demo_output/dbn_processed_parquets/AUDUSD_M6AM4_classified.parquet",
+      "examples/comprehensive_demo_output/dbn_processed_parquets/AUDUSD_M6AM4_classified.parquet",
+      "examples/comprehensive_demo_output/dbn_processed_parquets/AUDUSD_M6AU4_classified.parquet"
     ]
   },
   "feature_extraction": {
@@ -152,38 +168,38 @@
     "Small Batch": {
       "batch_size": 16,
       "num_workers": 2,
-      "samples_per_second": 30307.573376905064,
+      "samples_per_second": 34469.7580800961,
       "memory_usage_mb": 8.0,
-      "total_time": 0.010558417066931725,
+      "total_time": 0.009283500025048852,
       "samples_processed": 320,
-      "efficiency_score": 30307.573376905064
+      "efficiency_score": 34469.7580800961
     },
     "Medium Batch": {
       "batch_size": 32,
       "num_workers": 4,
-      "samples_per_second": 85155.92537752487,
+      "samples_per_second": 93101.0653643347,
       "memory_usage_mb": 16.0,
-      "total_time": 0.007515624980442226,
+      "total_time": 0.006874250015243888,
       "samples_processed": 640,
-      "efficiency_score": 85155.92537752487
+      "efficiency_score": 93101.0653643347
     },
     "Large Batch": {
       "batch_size": 64,
       "num_workers": 6,
-      "samples_per_second": 163123.24934567898,
+      "samples_per_second": 155892.73757535403,
       "memory_usage_mb": 32.0,
-      "total_time": 0.006130333989858627,
+      "total_time": 0.0064146670047193766,
       "samples_processed": 1000,
-      "efficiency_score": 163123.24934567898
+      "efficiency_score": 155892.73757535403
     },
     "XL Batch": {
       "batch_size": 128,
       "num_workers": 8,
-      "samples_per_second": 182322.35261895426,
+      "samples_per_second": 178976.2665454036,
       "memory_usage_mb": 64.0,
-      "total_time": 0.0054847910068929195,
+      "total_time": 0.005587332998402417,
       "samples_processed": 1000,
-      "efficiency_score": 182322.35261895426
+      "efficiency_score": 178976.2665454036
     }
   },
   "ml_samples": {

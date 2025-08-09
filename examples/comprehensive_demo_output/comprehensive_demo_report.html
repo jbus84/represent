@@ -297,6 +297,125 @@ features = processor.extract_features(
 
                     </tbody>
                 </table>
+
+                <h3>🎯 Global Classification Bin Edges</h3>
+                <p>These are the actual quantile boundaries used for uniform classification across all symbols and files.</p>
+                
+                <table style="margin: 20px 0;">
+                    <thead>
+                        <tr>
+                            <th>Bin #</th>
+                            <th>Lower Edge (μ-pips)</th>
+                            <th>Upper Edge (μ-pips)</th>
+                            <th>Range (μ-pips)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+
+                        <tr>
+                            <td><strong>Bin 0</strong></td>
+                            <td>-0.006538</td>
+                            <td>-0.000721</td>
+                            <td>0.005816</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Bin 1</strong></td>
+                            <td>-0.000721</td>
+                            <td>-0.000504</td>
+                            <td>0.000218</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Bin 2</strong></td>
+                            <td>-0.000504</td>
+                            <td>-0.000355</td>
+                            <td>0.000148</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Bin 3</strong></td>
+                            <td>-0.000355</td>
+                            <td>-0.000236</td>
+                            <td>0.000119</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Bin 4</strong></td>
+                            <td>-0.000236</td>
+                            <td>-0.000135</td>
+                            <td>0.000101</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Bin 5</strong></td>
+                            <td>-0.000135</td>
+                            <td>-0.000039</td>
+                            <td>0.000096</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Bin 6</strong></td>
+                            <td>-0.000039</td>
+                            <td>0.000057</td>
+                            <td>0.000096</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Bin 7</strong></td>
+                            <td>0.000057</td>
+                            <td>0.000158</td>
+                            <td>0.000101</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Bin 8</strong></td>
+                            <td>0.000158</td>
+                            <td>0.000261</td>
+                            <td>0.000103</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Bin 9</strong></td>
+                            <td>0.000261</td>
+                            <td>0.000371</td>
+                            <td>0.000110</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Bin 10</strong></td>
+                            <td>0.000371</td>
+                            <td>0.000508</td>
+                            <td>0.000137</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Bin 11</strong></td>
+                            <td>0.000508</td>
+                            <td>0.000711</td>
+                            <td>0.000203</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>Bin 12</strong></td>
+                            <td>0.000711</td>
+                            <td>0.007247</td>
+                            <td>0.006536</td>
+                        </tr>
+
+                    </tbody>
+                </table>
+                
+                <div class="feature-card" style="margin: 20px 0;">
+                    <h4>📊 Bin Edge Statistics</h4>
+
+                    <p><strong>Total Boundaries:</strong> 14 (for 13 classification bins)</p>
+                    <p><strong>Range:</strong> -0.006538 to 0.007247 micro-pips</p>
+                    <p><strong>Files Analyzed:</strong> 86 DBN files</p>
+                    <p><strong>Sample Size:</strong> 248,925 price movements</p>
+
+                </div>
+
                 
                 <div class="highlight">
                     <h4>🎯 Why Force Uniform Matters</h4>
@@ -330,36 +449,36 @@ features = processor.extract_features(
                             <td><strong>Small Batch</strong></td>
                             <td>16</td>
                             <td>2</td>
-                            <td class="performance-good">30308 sps</td>
+                            <td class="performance-good">34470 sps</td>
                             <td class="performance-good">8 MB</td>
-                            <td>30307.6</td>
+                            <td>34469.8</td>
                         </tr>
 
                         <tr>
                             <td><strong>Medium Batch</strong></td>
                             <td>32</td>
                             <td>4</td>
-                            <td class="performance-good">85156 sps</td>
+                            <td class="performance-good">93101 sps</td>
                             <td class="performance-good">16 MB</td>
-                            <td>85155.9</td>
+                            <td>93101.1</td>
                         </tr>
 
                         <tr>
                             <td><strong>Large Batch</strong></td>
                             <td>64</td>
                             <td>6</td>
-                            <td class="performance-good">163123 sps</td>
+                            <td class="performance-good">155893 sps</td>
                             <td class="performance-good">32 MB</td>
-                            <td>163123.2</td>
+                            <td>155892.7</td>
                         </tr>
 
                         <tr>
                             <td><strong>XL Batch</strong></td>
                             <td>128</td>
                             <td>8</td>
-                            <td class="performance-good">182322 sps</td>
+                            <td class="performance-good">178976 sps</td>
                             <td class="performance-good">64 MB</td>
-                            <td>182322.4</td>
+                            <td>178976.3</td>
                         </tr>
 
                     </tbody>

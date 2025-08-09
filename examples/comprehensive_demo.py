@@ -298,6 +298,7 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
                     'files_analyzed': global_thresholds.files_analyzed,
                     'sample_size': global_thresholds.sample_size,
                     'nbins': global_thresholds.nbins,
+                    'quantile_boundaries': global_thresholds.quantile_boundaries.tolist(),
                     'price_movement_stats': global_thresholds.price_movement_stats,
                     'calculation_time_seconds': threshold_time
                 },
@@ -1803,6 +1804,58 @@ features = processor.extract_features(
             html += """
                     </tbody>
                 </table>
+"""
+            
+            # Add global bin edges table if available
+            if 'dbn_processing' in self.results and 'global_thresholds' in self.results['dbn_processing']:
+                gt_data = self.results['dbn_processing']['global_thresholds']
+                if 'quantile_boundaries' in gt_data:
+                    html += """
+                <h3>🎯 Global Classification Bin Edges</h3>
+                <p>These are the actual quantile boundaries used for uniform classification across all symbols and files.</p>
+                
+                <table style="margin: 20px 0;">
+                    <thead>
+                        <tr>
+                            <th>Bin #</th>
+                            <th>Lower Edge (μ-pips)</th>
+                            <th>Upper Edge (μ-pips)</th>
+                            <th>Range (μ-pips)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+"""
+                    boundaries = gt_data['quantile_boundaries']
+                    for i in range(len(boundaries) - 1):
+                        lower = boundaries[i]
+                        upper = boundaries[i + 1]
+                        range_width = upper - lower
+                        html += f"""
+                        <tr>
+                            <td><strong>Bin {i}</strong></td>
+                            <td>{lower:.6f}</td>
+                            <td>{upper:.6f}</td>
+                            <td>{range_width:.6f}</td>
+                        </tr>
+"""
+                    html += """
+                    </tbody>
+                </table>
+                
+                <div class="feature-card" style="margin: 20px 0;">
+                    <h4>📊 Bin Edge Statistics</h4>
+"""
+                    html += f"""
+                    <p><strong>Total Boundaries:</strong> {len(boundaries)} (for {gt_data['nbins']} classification bins)</p>
+                    <p><strong>Range:</strong> {min(boundaries):.6f} to {max(boundaries):.6f} micro-pips</p>
+                    <p><strong>Files Analyzed:</strong> {gt_data['files_analyzed']} DBN files</p>
+                    <p><strong>Sample Size:</strong> {gt_data['sample_size']:,} price movements</p>
+"""
+                    html += """
+                </div>
+"""
+            
+            html += """
                 
                 <div class="highlight">
                     <h4>🎯 Why Force Uniform Matters</h4>
@@ -2106,6 +2159,33 @@ Comparison of classification distributions with and without force_uniform to dem
 - **Total Samples**: {data['total_samples']:,}
 - **Std Deviation**: {data['uniformity_deviation']:.2f}%
 - **Quality**: {quality}
+
+"""
+            
+            # Add global bin edges table if available
+            if 'dbn_processing' in self.results and 'global_thresholds' in self.results['dbn_processing']:
+                gt_data = self.results['dbn_processing']['global_thresholds']
+                if 'quantile_boundaries' in gt_data:
+                    markdown += """### 🎯 Global Classification Bin Edges
+
+These are the actual quantile boundaries used for uniform classification across all symbols and files:
+
+| Bin # | Lower Edge (μ-pips) | Upper Edge (μ-pips) | Range (μ-pips) |
+|-------|-------------------|-------------------|----------------|
+"""
+                    boundaries = gt_data['quantile_boundaries']
+                    for i in range(len(boundaries) - 1):
+                        lower = boundaries[i]
+                        upper = boundaries[i + 1]
+                        range_width = upper - lower
+                        markdown += f"| Bin {i} | {lower:.6f} | {upper:.6f} | {range_width:.6f} |\n"
+                    
+                    markdown += f"""
+**Bin Edge Statistics:**
+- **Total Boundaries:** {len(boundaries)} (for {gt_data['nbins']} classification bins)  
+- **Range:** {min(boundaries):.6f} to {max(boundaries):.6f} micro-pips
+- **Files Analyzed:** {gt_data['files_analyzed']} DBN files
+- **Sample Size:** {gt_data['sample_size']:,} price movements
 
 """
             

@@ -78,6 +78,32 @@ Comparison of classification distributions with and without force_uniform to dem
 - **Std Deviation**: 2.11%
 - **Quality**: GOOD
 
+### 🎯 Global Classification Bin Edges
+
+These are the actual quantile boundaries used for uniform classification across all symbols and files:
+
+| Bin # | Lower Edge (μ-pips) | Upper Edge (μ-pips) | Range (μ-pips) |
+|-------|-------------------|-------------------|----------------|
+| Bin 0 | -0.006538 | -0.000721 | 0.005816 |
+| Bin 1 | -0.000721 | -0.000504 | 0.000218 |
+| Bin 2 | -0.000504 | -0.000355 | 0.000148 |
+| Bin 3 | -0.000355 | -0.000236 | 0.000119 |
+| Bin 4 | -0.000236 | -0.000135 | 0.000101 |
+| Bin 5 | -0.000135 | -0.000039 | 0.000096 |
+| Bin 6 | -0.000039 | 0.000057 | 0.000096 |
+| Bin 7 | 0.000057 | 0.000158 | 0.000101 |
+| Bin 8 | 0.000158 | 0.000261 | 0.000103 |
+| Bin 9 | 0.000261 | 0.000371 | 0.000110 |
+| Bin 10 | 0.000371 | 0.000508 | 0.000137 |
+| Bin 11 | 0.000508 | 0.000711 | 0.000203 |
+| Bin 12 | 0.000711 | 0.007247 | 0.006536 |
+
+**Bin Edge Statistics:**
+- **Total Boundaries:** 14 (for 13 classification bins)  
+- **Range:** -0.006538 to 0.007247 micro-pips
+- **Files Analyzed:** 86 DBN files
+- **Sample Size:** 248,925 price movements
+
 ### Why Force Uniform Matters
 
 **Problem**: Natural price movement distributions are heavily skewed, leading to class imbalance that hurts ML model performance.
@@ -97,10 +123,10 @@ Comprehensive benchmarking of DataLoader configurations to identify optimal sett
 
 | Configuration | Batch Size | Workers | Throughput (sps) | Memory (MB) | Efficiency |
 |---------------|------------|---------|------------------|-------------|------------|
-| Small Batch | 16 | 2 | 30308 | 8 | 30307.6 |
-| Medium Batch | 32 | 4 | 85156 | 16 | 85155.9 |
-| Large Batch | 64 | 6 | 163123 | 32 | 163123.2 |
-| XL Batch | 128 | 8 | 182322 | 64 | 182322.4 |
+| Small Batch | 16 | 2 | 34470 | 8 | 34469.8 |
+| Medium Batch | 32 | 4 | 93101 | 16 | 93101.1 |
+| Large Batch | 64 | 6 | 155893 | 32 | 155892.7 |
+| XL Batch | 128 | 8 | 178976 | 64 | 178976.3 |
 
 ### Performance Targets
 - **Throughput**: >1000 samples/second for real-time training
@@ -215,4 +241,4 @@ dataloader = create_parquet_dataloader(
 
 ---
 
-*Report generated on 2025-08-09 14:54:30*
+*Report generated on 2025-08-09 15:09:40*
