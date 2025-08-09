@@ -246,13 +246,10 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
                 print(f"      🔄 Processing file {i+1}/{len(dbn_files)}: {dbn_file.name}")
                 
                 file_results = process_dbn_to_classified_parquets(
+                    config=self.config,
                     dbn_path=dbn_file,
                     output_dir=output_dir,
-                    currency=self.currency,
-                    features=self.features,
-                    min_symbol_samples=1000,
                     force_uniform=True,  # Ensure uniform class distribution
-                    nbins=self.nbins,
                     global_thresholds=global_thresholds  # Use calculated thresholds
                 )
                 
@@ -642,11 +639,15 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
                 temp_output.mkdir(exist_ok=True)
                 
                 # Process the same DBN file with different force_uniform settings
+                # Create temporary config for this classification approach
+                temp_config = create_represent_config(
+                    self.currency,
+                    features=['volume']  # Single feature for speed
+                )
                 process_dbn_to_classified_parquets(
+                    config=temp_config,
                     dbn_path=test_dbn_file,
                     output_dir=temp_output,
-                    currency=self.currency,
-                    features=['volume'],  # Single feature for speed
                     force_uniform=config['force_uniform'],
                     global_thresholds=global_thresholds,
                     verbose=False  # Reduce output noise
@@ -1996,10 +1997,9 @@ thresholds = calculate_global_thresholds(
 
 # 3. Process to classified parquet
 results = process_dbn_to_classified_parquets(
+    config=config,
     dbn_path="data.dbn",
     output_dir="classified/",
-    currency="AUDUSD",
-    features=["volume", "variance", "trade_counts"],
     global_thresholds=thresholds,
     force_uniform=True
 )
@@ -2240,10 +2240,9 @@ thresholds = calculate_global_thresholds(
 
 # 3. Process to classified parquet
 results = process_dbn_to_classified_parquets(
+    config=config,
     dbn_path="data.dbn",
     output_dir="classified/",
-    currency="AUDUSD",
-    features=["volume", "variance", "trade_counts"],
     global_thresholds=thresholds,
     force_uniform=True
 )

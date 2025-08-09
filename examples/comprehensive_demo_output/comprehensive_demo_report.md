@@ -21,19 +21,19 @@ Demonstration of extracting and visualizing different market depth features with
 ### Feature Statistics
 
 #### Volume Features
-- **Shape**: (402, 500)
-- **Range**: [-1.000, 1.000]
-- **Mean**: 0.330
+- **Shape**: (402, 250)
+- **Range**: [-1.000, 0.987]
+- **Mean**: 0.310
 
 #### Variance Features
-- **Shape**: (402, 500)
-- **Range**: [-0.981, 1.000]
-- **Mean**: 0.170
+- **Shape**: (402, 250)
+- **Range**: [-0.984, 1.000]
+- **Mean**: 0.205
 
 #### Trade_Counts Features
-- **Shape**: (402, 500)
-- **Range**: [-0.947, 1.000]
-- **Mean**: 0.345
+- **Shape**: (402, 250)
+- **Range**: [-0.950, 1.000]
+- **Mean**: 0.349
 
 ### Key Features
 - **Volume Features**: Traditional market depth from order sizes
@@ -53,8 +53,8 @@ features = processor.extract_features(
 )
 
 # Output shapes:
-# Single feature: (PRICE_LEVELS, TIME_BINS)
-# Multi-feature: (3, PRICE_LEVELS, TIME_BINS)
+# Single feature: (PRICE_LEVELS, config.time_bins)
+# Multi-feature: (3, PRICE_LEVELS, config.time_bins)
 ```
 
 ![Feature Extraction Visualization](feature_extraction_demo.png)
@@ -97,10 +97,10 @@ Comprehensive benchmarking of DataLoader configurations to identify optimal sett
 
 | Configuration | Batch Size | Workers | Throughput (sps) | Memory (MB) | Efficiency |
 |---------------|------------|---------|------------------|-------------|------------|
-| Small Batch | 16 | 2 | 38601 | 8 | 38601.1 |
-| Medium Batch | 32 | 4 | 80545 | 16 | 80545.4 |
-| Large Batch | 64 | 6 | 147385 | 32 | 147384.8 |
-| XL Batch | 128 | 8 | 202881 | 64 | 202880.9 |
+| Small Batch | 16 | 2 | 30308 | 8 | 30307.6 |
+| Medium Batch | 32 | 4 | 85156 | 16 | 85155.9 |
+| Large Batch | 64 | 6 | 163123 | 32 | 163123.2 |
+| XL Batch | 128 | 8 | 182322 | 64 | 182322.4 |
 
 ### Performance Targets
 - **Throughput**: >1000 samples/second for real-time training
@@ -119,9 +119,9 @@ Demonstration of generating training samples aligned with multi-feature extracti
 
 ### Sample Configuration
 - **Batch Size**: 3
-- **Feature Tensor Shape**: (3, 3, 402, 500)
+- **Feature Tensor Shape**: (3, 3, 402, 250)
 - **Label Tensor Shape**: (3,)
-- **Memory Usage**: 6.90 MB
+- **Memory Usage**: 3.45 MB
 - **Features**: volume, variance, trade_counts
 
 ### PyTorch Integration Example
@@ -140,7 +140,7 @@ model = nn.Sequential(
 
 # Training loop
 for features, labels in dataloader:
-    # features: (3, 3, 402, 500)
+    # features: (3, 3, 402, 250)
     # labels: (3,)
     
     outputs = model(features)
@@ -180,27 +180,31 @@ for features, labels in dataloader:
 from represent import (
     calculate_global_thresholds,
     process_dbn_to_classified_parquets,
-    create_parquet_dataloader
+    create_parquet_dataloader,
+    create_represent_config
 )
 
-# 1. Calculate global thresholds
+# 1. Create configuration
+config = create_represent_config("AUDUSD")
+
+# 2. Calculate global thresholds
 thresholds = calculate_global_thresholds(
-    data_directory="data/",
-    currency="AUDUSD",
-    nbins=13
+    config=config,
+    data_directory="data/"
 )
 
-# 2. Process to classified parquet
+# 3. Process to classified parquet
 results = process_dbn_to_classified_parquets(
+    config=config,
     dbn_path="data.dbn",
     output_dir="classified/",
-    features=["volume", "variance", "trade_counts"],
     global_thresholds=thresholds,
     force_uniform=True
 )
 
-# 3. Create ML dataloader
+# 4. Create ML dataloader
 dataloader = create_parquet_dataloader(
+    config=config,
     parquet_path="classified/data.parquet",
     batch_size=32,
     features=["volume", "variance", "trade_counts"]
@@ -211,4 +215,4 @@ dataloader = create_parquet_dataloader(
 
 ---
 
-*Report generated on 2025-08-08 09:45:56*
+*Report generated on 2025-08-09 14:54:30*

@@ -189,23 +189,23 @@
 
                     <div class="feature-card">
                         <h3>Volume Features</h3>
-                        <p><strong>Shape:</strong> (402, 500)</p>
-                        <p><strong>Range:</strong> [-1.000, 1.000]</p>
-                        <p><strong>Mean:</strong> 0.330</p>
+                        <p><strong>Shape:</strong> (402, 250)</p>
+                        <p><strong>Range:</strong> [-1.000, 0.987]</p>
+                        <p><strong>Mean:</strong> 0.310</p>
                     </div>
 
                     <div class="feature-card">
                         <h3>Variance Features</h3>
-                        <p><strong>Shape:</strong> (402, 500)</p>
-                        <p><strong>Range:</strong> [-0.981, 1.000]</p>
-                        <p><strong>Mean:</strong> 0.170</p>
+                        <p><strong>Shape:</strong> (402, 250)</p>
+                        <p><strong>Range:</strong> [-0.984, 1.000]</p>
+                        <p><strong>Mean:</strong> 0.205</p>
                     </div>
 
                     <div class="feature-card">
                         <h3>Trade_Counts Features</h3>
-                        <p><strong>Shape:</strong> (402, 500)</p>
-                        <p><strong>Range:</strong> [-0.947, 1.000]</p>
-                        <p><strong>Mean:</strong> 0.345</p>
+                        <p><strong>Shape:</strong> (402, 250)</p>
+                        <p><strong>Range:</strong> [-0.950, 1.000]</p>
+                        <p><strong>Mean:</strong> 0.349</p>
                     </div>
 
                 </div>
@@ -235,8 +235,8 @@ features = processor.extract_features(
 )
 
 # Output shapes:
-# Single feature: (PRICE_LEVELS, TIME_BINS)
-# Multi-feature: (3, PRICE_LEVELS, TIME_BINS)
+# Single feature: (PRICE_LEVELS, config.time_bins)
+# Multi-feature: (3, PRICE_LEVELS, config.time_bins)
                 </div>
             </div>
 
@@ -330,36 +330,36 @@ features = processor.extract_features(
                             <td><strong>Small Batch</strong></td>
                             <td>16</td>
                             <td>2</td>
-                            <td class="performance-good">38601 sps</td>
+                            <td class="performance-good">30308 sps</td>
                             <td class="performance-good">8 MB</td>
-                            <td>38601.1</td>
+                            <td>30307.6</td>
                         </tr>
 
                         <tr>
                             <td><strong>Medium Batch</strong></td>
                             <td>32</td>
                             <td>4</td>
-                            <td class="performance-good">80545 sps</td>
+                            <td class="performance-good">85156 sps</td>
                             <td class="performance-good">16 MB</td>
-                            <td>80545.4</td>
+                            <td>85155.9</td>
                         </tr>
 
                         <tr>
                             <td><strong>Large Batch</strong></td>
                             <td>64</td>
                             <td>6</td>
-                            <td class="performance-good">147385 sps</td>
+                            <td class="performance-good">163123 sps</td>
                             <td class="performance-good">32 MB</td>
-                            <td>147384.8</td>
+                            <td>163123.2</td>
                         </tr>
 
                         <tr>
                             <td><strong>XL Batch</strong></td>
                             <td>128</td>
                             <td>8</td>
-                            <td class="performance-good">202881 sps</td>
+                            <td class="performance-good">182322 sps</td>
                             <td class="performance-good">64 MB</td>
-                            <td>202880.9</td>
+                            <td>182322.4</td>
                         </tr>
 
                     </tbody>
@@ -383,13 +383,13 @@ features = processor.extract_features(
                 <div class="feature-grid">
                     <div class="feature-card">
                         <h3>Tensor Shape</h3>
-                        <p><strong>Features:</strong> (3, 3, 402, 500)</p>
+                        <p><strong>Features:</strong> (3, 3, 402, 250)</p>
                         <p><strong>Labels:</strong> (3,)</p>
                     </div>
                     <div class="feature-card">
                         <h3>Memory Usage</h3>
                         <p><strong>Batch Size:</strong> 3</p>
-                        <p><strong>Memory:</strong> 6.90 MB</p>
+                        <p><strong>Memory:</strong> 3.45 MB</p>
                     </div>
                     <div class="feature-card">
                         <h3>Features Included</h3>
@@ -418,7 +418,7 @@ model = nn.Sequential(
 
 # Training loop
 for features, labels in dataloader:
-    # features: (3, 3, 402, 500)
+    # features: (3, 3, 402, 250)
     # labels: (3,)
     
     outputs = model(features)
@@ -478,27 +478,31 @@ for features, labels in dataloader:
 from represent import (
     calculate_global_thresholds,
     process_dbn_to_classified_parquets,
-    create_parquet_dataloader
+    create_parquet_dataloader,
+    create_represent_config
 )
 
-# 1. Calculate global thresholds
+# 1. Create configuration
+config = create_represent_config("AUDUSD")
+
+# 2. Calculate global thresholds
 thresholds = calculate_global_thresholds(
-    data_directory="data/",
-    currency="AUDUSD",
-    nbins=13
+    config=config,
+    data_directory="data/"
 )
 
-# 2. Process to classified parquet
+# 3. Process to classified parquet
 results = process_dbn_to_classified_parquets(
+    config=config,
     dbn_path="data.dbn",
     output_dir="classified/",
-    features=["volume", "variance", "trade_counts"],
     global_thresholds=thresholds,
     force_uniform=True
 )
 
-# 3. Create ML dataloader
+# 4. Create ML dataloader
 dataloader = create_parquet_dataloader(
+    config=config,
     parquet_path="classified/data.parquet",
     batch_size=32,
     features=["volume", "variance", "trade_counts"]
