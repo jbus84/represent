@@ -11,6 +11,7 @@ from represent.global_threshold_calculator import (
     GlobalThresholdCalculator,
     calculate_global_thresholds
 )
+from represent.config import create_represent_config
 
 
 class TestGlobalThresholds:
@@ -39,32 +40,35 @@ class TestGlobalThresholds:
 class TestGlobalThresholdCalculator:
     """Test GlobalThresholdCalculator class."""
     
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
+    
     def test_calculator_initialization(self):
         """Test calculator initialization."""
         calculator = GlobalThresholdCalculator(
-            currency="AUDUSD",
-            nbins=13,
+            config=self.config,
             sample_fraction=0.3,
             verbose=False
         )
         
         assert calculator.currency == "AUDUSD"
-        assert calculator.nbins == 13
+        assert calculator.nbins == self.config.nbins
         assert calculator.sample_fraction == 0.3
         assert calculator.verbose is False
     
     def test_calculator_initialization_defaults(self):
         """Test calculator with default parameters."""
-        calculator = GlobalThresholdCalculator(verbose=False)
+        calculator = GlobalThresholdCalculator(config=self.config, verbose=False)
         
         assert calculator.currency == "AUDUSD"
-        assert calculator.nbins == 13
+        assert calculator.nbins == self.config.nbins
         assert calculator.sample_fraction == 0.5
-        assert calculator.max_samples_per_file == 10000
+        assert calculator.max_samples_per_file == self.config.max_samples_per_file
     
     def test_load_dbn_file_sample_no_file(self):
         """Test loading sample from non-existent file."""
-        calculator = GlobalThresholdCalculator(verbose=False)
+        calculator = GlobalThresholdCalculator(config=self.config, verbose=False)
         
         result = calculator.load_dbn_file_sample("non_existent_file.dbn")
         
@@ -72,7 +76,7 @@ class TestGlobalThresholdCalculator:
     
     def test_load_dbn_file_sample_success(self):
         """Test successful loading of DBN file sample."""
-        calculator = GlobalThresholdCalculator(verbose=False)
+        calculator = GlobalThresholdCalculator(config=self.config, verbose=False)
         
         # Mock the entire method to return valid data
         expected_result = np.random.randn(1000) * 0.001  # Realistic price movements
@@ -87,7 +91,7 @@ class TestGlobalThresholdCalculator:
     
     def test_calculate_global_thresholds_no_directory(self):
         """Test calculating thresholds with non-existent directory."""
-        calculator = GlobalThresholdCalculator(verbose=False)
+        calculator = GlobalThresholdCalculator(config=self.config, verbose=False)
         
         with pytest.raises(FileNotFoundError):
             calculator.calculate_global_thresholds("/non/existent/directory")
@@ -99,7 +103,7 @@ class TestGlobalThresholdCalculator:
         mock_exists.return_value = True
         mock_glob.return_value = []
         
-        calculator = GlobalThresholdCalculator(verbose=False)
+        calculator = GlobalThresholdCalculator(config=self.config, verbose=False)
         
         with pytest.raises(ValueError, match="No DBN files found"):
             calculator.calculate_global_thresholds("/some/directory")
@@ -122,7 +126,7 @@ class TestGlobalThresholdCalculator:
         mock_files = [mock_file1, mock_file2]
         mock_glob.return_value = mock_files
         
-        calculator = GlobalThresholdCalculator(verbose=False)
+        calculator = GlobalThresholdCalculator(config=self.config, verbose=False)
         
         # Mock load_dbn_file_sample to return None (no valid data)
         calculator.load_dbn_file_sample = Mock(return_value=None)
@@ -148,7 +152,7 @@ class TestGlobalThresholdCalculator:
         mock_files = [mock_file1, mock_file2]
         mock_glob.return_value = mock_files
         
-        calculator = GlobalThresholdCalculator(nbins=5, sample_fraction=1.0, verbose=False)
+        calculator = GlobalThresholdCalculator(config=self.config, sample_fraction=1.0, verbose=False)
         
         # Mock load_dbn_file_sample to return valid price movements
         price_movements_1 = np.random.randn(1000) * 10  # First file data
@@ -158,8 +162,8 @@ class TestGlobalThresholdCalculator:
         result = calculator.calculate_global_thresholds("/some/directory")
         
         assert isinstance(result, GlobalThresholds)
-        assert result.nbins == 5
-        assert len(result.quantile_boundaries) <= 6  # nbins + 1, but might be less due to uniqueness
+        assert result.nbins == self.config.nbins
+        assert len(result.quantile_boundaries) <= self.config.nbins + 1  # nbins + 1, but might be less due to uniqueness
         assert result.sample_size == 2000  # Combined from both files
         assert result.files_analyzed == 2
         assert "mean" in result.price_movement_stats
@@ -177,18 +181,17 @@ class TestConvenienceFunction:
         mock_calculator.calculate_global_thresholds.return_value = mock_thresholds
         mock_calculator_class.return_value = mock_calculator
         
+        gbpusd_config = create_represent_config("GBPUSD")
         result = calculate_global_thresholds(
-            "/some/directory",
-            currency="GBPUSD",
-            nbins=10,
+            config=gbpusd_config,
+            data_directory="/some/directory",
             sample_fraction=0.3,
             verbose=False
         )
         
         # Verify calculator was created with correct parameters
         mock_calculator_class.assert_called_once_with(
-            currency="GBPUSD",
-            nbins=10,
+            config=gbpusd_config,
             sample_fraction=0.3,
             verbose=False
         )
@@ -221,8 +224,9 @@ class TestIntegrationWithParquetClassifier:
         )
         
         # Should not raise any errors
+        config = create_represent_config("AUDUSD")
         classifier = ParquetClassifier(
-            currency="AUDUSD",
+            config,
             global_thresholds=thresholds,
             verbose=False
         )

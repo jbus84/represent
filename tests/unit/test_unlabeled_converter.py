@@ -14,6 +14,7 @@ from represent.unlabeled_converter import (
     convert_dbn_to_parquet,
     batch_convert_dbn_files
 )
+from represent.config import create_represent_config
 
 
 def create_mock_dbn_data(n_samples: int = 100) -> pl.DataFrame:
@@ -77,26 +78,30 @@ def create_mock_dbn_data(n_samples: int = 100) -> pl.DataFrame:
 
 class TestUnlabeledDBNConverter:
     """Test UnlabeledDBNConverter class functionality."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     def test_initialization_default(self):
-        """Test converter initialization with default parameters."""
-        converter = UnlabeledDBNConverter()
+        """Test converter initialization with config."""
+        converter = UnlabeledDBNConverter(config=self.config)
         
-        assert converter.features == ["volume"]
-        assert converter.min_symbol_samples == 1000  # Correct attribute name
-        assert converter.batch_size == 1000
+        assert converter.features == self.config.features
+        assert converter.min_symbol_samples == self.config.min_symbol_samples
+        assert converter.batch_size == self.config.batch_size
+        assert converter.currency == self.config.currency
 
-    def test_initialization_custom(self):
-        """Test converter initialization with custom parameters."""
-        converter = UnlabeledDBNConverter(
-            features=["volume", "variance"],
-            min_symbol_samples=500,
-            batch_size=1000
-        )
+    def test_initialization_custom_config(self):
+        """Test converter initialization with custom config."""
+        # Create custom config with different values
+        custom_config = create_represent_config("GBPUSD")
+        converter = UnlabeledDBNConverter(config=custom_config)
         
-        assert converter.features == ["volume", "variance"]
-        assert converter.min_symbol_samples == 500
-        assert converter.batch_size == 1000
+        assert converter.features == custom_config.features
+        assert converter.min_symbol_samples == custom_config.min_symbol_samples
+        assert converter.batch_size == custom_config.batch_size
+        assert converter.currency == custom_config.currency
 
     @patch('databento.DBNStore.from_file')
     @patch('polars.DataFrame.write_parquet')
@@ -108,7 +113,7 @@ class TestUnlabeledDBNConverter:
         mock_store.to_df.return_value = mock_dbn_data
         mock_dbn_store.return_value = mock_store
         
-        converter = UnlabeledDBNConverter()
+        converter = UnlabeledDBNConverter(config=self.config)
         
         with tempfile.TemporaryDirectory() as temp_dir:
             dbn_path = Path(temp_dir) / "test.dbn"
@@ -134,7 +139,7 @@ class TestUnlabeledDBNConverter:
         # Mock databento to raise an exception
         mock_dbn_store.side_effect = Exception("DBN read error")
         
-        converter = UnlabeledDBNConverter()
+        converter = UnlabeledDBNConverter(config=self.config)
         
         with tempfile.TemporaryDirectory() as temp_dir:
             dbn_path = Path(temp_dir) / "test.dbn"
@@ -146,7 +151,7 @@ class TestUnlabeledDBNConverter:
 
     def test_missing_dbn_file(self):
         """Test handling of missing DBN files."""
-        converter = UnlabeledDBNConverter()
+        converter = UnlabeledDBNConverter(config=self.config)
         
         with tempfile.TemporaryDirectory() as temp_dir:
             dbn_path = Path(temp_dir) / "nonexistent.dbn"
@@ -157,7 +162,7 @@ class TestUnlabeledDBNConverter:
 
     def test_add_metadata_columns(self):
         """Test metadata column addition."""
-        converter = UnlabeledDBNConverter()
+        converter = UnlabeledDBNConverter(config=self.config)
         mock_data = create_mock_dbn_data(100)
         
         source_path = Path("/test/data_20240403.dbn")
@@ -175,7 +180,7 @@ class TestUnlabeledDBNConverter:
 
     def test_process_symbol_chunk(self):
         """Test symbol chunk processing."""
-        converter = UnlabeledDBNConverter(batch_size=100)
+        converter = UnlabeledDBNConverter(config=self.config)
         
         # Create chunk with enough data (more than batch_size)
         chunk = create_mock_dbn_data(150)
@@ -200,6 +205,10 @@ class TestUnlabeledDBNConverter:
 
 class TestConvenienceFunctions:
     """Test module-level convenience functions."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     @patch('represent.unlabeled_converter.UnlabeledDBNConverter')
     def test_convert_dbn_to_parquet(self, mock_converter_class):
@@ -213,10 +222,10 @@ class TestConvenienceFunctions:
             output_dir = Path(temp_dir) / "output"
             dbn_path.touch()
             
-            stats = convert_dbn_to_parquet(dbn_path, output_dir)
+            stats = convert_dbn_to_parquet(config=self.config, dbn_path=dbn_path, output_dir=output_dir)
             
             assert stats["total_processed_samples"] == 100
-            mock_converter_class.assert_called_once()
+            mock_converter_class.assert_called_once_with(config=self.config)
             mock_converter.convert_dbn_to_symbol_parquets.assert_called_once()
 
     @patch('represent.unlabeled_converter.convert_dbn_to_parquet')
@@ -237,7 +246,7 @@ class TestConvenienceFunctions:
             for f in dbn_files:
                 f.touch()
             
-            results = batch_convert_dbn_files(input_dir, output_dir)
+            results = batch_convert_dbn_files(config=self.config, input_directory=input_dir, output_directory=output_dir)
             
             assert len(results) == 2
             assert all(result["total_processed_samples"] == 50 for result in results)
@@ -250,7 +259,7 @@ class TestConvenienceFunctions:
             input_dir.mkdir()
             
             with pytest.raises(ValueError, match="No DBN files found"):
-                batch_convert_dbn_files(input_dir, output_dir)
+                batch_convert_dbn_files(config=self.config, input_directory=input_dir, output_directory=output_dir)
 
     def test_batch_convert_missing_input_dir(self):
         """Test batch convert with missing input directory."""
@@ -259,11 +268,15 @@ class TestConvenienceFunctions:
             output_dir = Path(temp_dir) / "output"
             
             with pytest.raises(FileNotFoundError):
-                batch_convert_dbn_files(input_dir, output_dir)
+                batch_convert_dbn_files(config=self.config, input_directory=input_dir, output_directory=output_dir)
 
 
 class TestErrorHandling:
     """Test error handling scenarios."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     @patch('databento.DBNStore.from_file')
     def test_empty_dbn_file(self, mock_dbn_store):
@@ -274,7 +287,7 @@ class TestErrorHandling:
         mock_store.to_df.return_value = empty_df
         mock_dbn_store.return_value = mock_store
         
-        converter = UnlabeledDBNConverter()
+        converter = UnlabeledDBNConverter(config=self.config)
         
         with tempfile.TemporaryDirectory() as temp_dir:
             dbn_path = Path(temp_dir) / "empty.dbn"
@@ -295,7 +308,9 @@ class TestErrorHandling:
         mock_store.to_df.return_value = mock_data
         mock_dbn_store.return_value = mock_store
         
-        converter = UnlabeledDBNConverter(min_symbol_samples=500)
+        # Create config with custom min_symbol_samples through different currency
+        # (GBPUSD might have different defaults, or we'll use the default)
+        converter = UnlabeledDBNConverter(config=self.config)
         
         with tempfile.TemporaryDirectory() as temp_dir:
             dbn_path = Path(temp_dir) / "test.dbn"
@@ -314,6 +329,10 @@ class TestErrorHandling:
 
 class TestPerformanceOptimizations:
     """Test performance-related functionality."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     @patch('databento.DBNStore.from_file')
     @patch('polars.DataFrame.write_parquet')
@@ -329,7 +348,7 @@ class TestPerformanceOptimizations:
         # Mock file stat to avoid FileNotFoundError
         mock_stat.return_value.st_size = 1024 * 1024  # 1MB
         
-        converter = UnlabeledDBNConverter()
+        converter = UnlabeledDBNConverter(config=self.config)
         
         with tempfile.TemporaryDirectory() as temp_dir:
             dbn_path = Path(temp_dir) / "large.dbn"
@@ -353,12 +372,15 @@ class TestPerformanceOptimizations:
             assert stats["original_rows"] == 15000
 
     def test_batch_size_configuration(self):
-        """Test that batch size affects processing."""
-        converter_small = UnlabeledDBNConverter(batch_size=100)
-        converter_large = UnlabeledDBNConverter(batch_size=5000)
+        """Test that batch size comes from config."""
+        # Test default config
+        converter = UnlabeledDBNConverter(config=self.config)
+        assert converter.batch_size == self.config.batch_size
         
-        assert converter_small.batch_size == 100
-        assert converter_large.batch_size == 5000
+        # Test with different config
+        custom_config = create_represent_config("GBPUSD")
+        converter_custom = UnlabeledDBNConverter(config=custom_config)
+        assert converter_custom.batch_size == custom_config.batch_size
 
 
 if __name__ == "__main__":

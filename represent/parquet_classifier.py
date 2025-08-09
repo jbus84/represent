@@ -20,7 +20,7 @@ import polars as pl
 import databento as db
 from dataclasses import dataclass
 
-from .config import create_represent_config
+from .config import RepresentConfig
 # No longer need hardcoded constants - using RepresentConfig now
 from .global_threshold_calculator import GlobalThresholds
 
@@ -50,11 +50,8 @@ class ParquetClassifier:
 
     def __init__(
         self,
-        currency: str = "AUDUSD",
-        features: Optional[List[str]] = None,
-        min_symbol_samples: Optional[int] = None,
+        config: RepresentConfig,
         force_uniform: bool = True,
-        nbins: Optional[int] = None,
         global_thresholds: Optional[GlobalThresholds] = None,
         verbose: bool = True,
     ):
@@ -63,27 +60,24 @@ class ParquetClassifier:
         Initialize streamlined classifier using RepresentConfig for standardized configuration.
 
         Args:
-            currency: Currency pair for configuration
-            features: Features to extract (if None, uses config default)
-            min_symbol_samples: Minimum samples required per symbol (if None, uses config default)
+            config: RepresentConfig with currency-specific configuration
             force_uniform: Whether to enforce uniform class distribution
-            nbins: Number of classification bins (if None, uses config default)
             global_thresholds: Pre-calculated global thresholds for consistent classification
             verbose: Whether to print progress information
         """
-        # Load RepresentConfig for this currency
-        self.represent_config = create_represent_config(currency)
+        # Store RepresentConfig directly
+        self.represent_config = config
         
         # Get computed values to avoid type checker issues
-        default_min_samples: int = cast(int, self.represent_config.min_symbol_samples)
+        default_min_samples: int = cast(int, config.min_symbol_samples)
         
         # Create ClassificationConfig with config values as defaults
         self.config = ClassificationConfig(
-            currency=currency,
-            features=features or self.represent_config.features,
-            min_symbol_samples=min_symbol_samples if min_symbol_samples is not None else default_min_samples,
+            currency=config.currency,
+            features=config.features,
+            min_symbol_samples=default_min_samples,
             force_uniform=force_uniform,
-            nbins=nbins if nbins is not None else self.represent_config.nbins,
+            nbins=config.nbins,
             global_thresholds=global_thresholds,
         )
         
@@ -551,13 +545,10 @@ class ParquetClassifier:
 
 # Convenience function for direct usage
 def process_dbn_to_classified_parquets(
+    config: RepresentConfig,
     dbn_path: Union[str, Path],
     output_dir: Union[str, Path],
-    currency: str = "AUDUSD",
-    features: Optional[List[str]] = None,
-    min_symbol_samples: int = 1000,
     force_uniform: bool = True,
-    nbins: int = 13,
     global_thresholds: Optional[GlobalThresholds] = None,
     verbose: bool = True,
 ) -> Dict[str, Any]:
@@ -565,13 +556,10 @@ def process_dbn_to_classified_parquets(
     Convenience function to process DBN file directly to classified parquet files using lookback vs lookforward methodology.
 
     Args:
+        config: RepresentConfig with currency-specific configuration
         dbn_path: Path to input DBN file
         output_dir: Directory for output classified parquet files
-        currency: Currency pair for configuration
-        features: Features to extract
-        min_symbol_samples: Minimum samples required per symbol
         force_uniform: Whether to enforce uniform class distribution
-        nbins: Number of classification bins
         global_thresholds: Pre-calculated global thresholds for consistent classification
         verbose: Whether to print progress information
 
@@ -579,11 +567,8 @@ def process_dbn_to_classified_parquets(
         Processing statistics dictionary
     """
     classifier = ParquetClassifier(
-        currency=currency,
-        features=features,
-        min_symbol_samples=min_symbol_samples,
+        config=config,
         force_uniform=force_uniform,
-        nbins=nbins,
         global_thresholds=global_thresholds,
         verbose=verbose,
     )
@@ -592,9 +577,9 @@ def process_dbn_to_classified_parquets(
 
 
 def classify_parquet_file(
+    config: RepresentConfig,
     parquet_path: Union[str, Path],
     output_path: Optional[Union[str, Path]] = None,
-    currency: str = "AUDUSD",
     **kwargs
 ) -> Dict[str, Any]:
     """
@@ -604,15 +589,15 @@ def classify_parquet_file(
     The name is kept for API compatibility.
     
     Args:
+        config: RepresentConfig with currency-specific configuration
         parquet_path: Path to input DBN file
         output_path: Directory for classified output files
-        currency: Currency pair for configuration  
         **kwargs: Additional arguments
         
     Returns:
         Classification statistics
     """
-    classifier = ParquetClassifier(currency=currency, **kwargs)
+    classifier = ParquetClassifier(config=config, **kwargs)
     return classifier.classify_symbol_parquet(
         parquet_path=parquet_path,
         output_path=output_path
@@ -620,9 +605,9 @@ def classify_parquet_file(
 
 
 def batch_classify_parquet_files(
+    config: RepresentConfig,
     input_directory: Union[str, Path],
     output_directory: Union[str, Path], 
-    currency: str = "AUDUSD",
     pattern: str = "*.dbn*",
     **kwargs
 ) -> List[Dict[str, Any]]:
@@ -633,16 +618,16 @@ def batch_classify_parquet_files(
     The name is kept for API compatibility.
     
     Args:
+        config: RepresentConfig with currency-specific configuration
         input_directory: Directory with DBN files
         output_directory: Directory for classified output files
-        currency: Currency pair for configuration
         pattern: File pattern to match
         **kwargs: Additional arguments
         
     Returns:
         List of classification statistics for each file
     """
-    classifier = ParquetClassifier(currency=currency, **kwargs)
+    classifier = ParquetClassifier(config=config, **kwargs)
     return classifier.batch_classify_parquets(
         input_directory=input_directory,
         output_directory=output_directory,

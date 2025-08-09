@@ -34,7 +34,7 @@ class TestDataFormatCompatibility:
             print(f"Databento columns found: {databento_cols_present}")
 
             # Process the data
-            result = process_market_data(sample_real_data)
+            result = process_market_data(sample_real_data, config=self.config)
 
             assert result.shape == self.config.output_shape
             assert np.all(np.isfinite(result))
@@ -48,7 +48,7 @@ class TestDataFormatCompatibility:
             pytest.skip("Real market data not available")
 
         # Test with the data as-is
-        result = process_market_data(sample_real_data)
+        result = process_market_data(sample_real_data, config=self.config)
         assert result.shape == self.config.output_shape
 
         # If we have the expected columns, test renaming scenarios
@@ -73,7 +73,7 @@ class TestDataFormatCompatibility:
         print(f"Available levels - Ask: {ask_levels}, Bid: {bid_levels}")
 
         # Should handle any number of levels gracefully
-        result = process_market_data(sample_real_data)
+        result = process_market_data(sample_real_data, config=self.config)
         assert result.shape == self.config.output_shape
         assert np.all(np.isfinite(result))
 
@@ -88,7 +88,7 @@ class TestDataFormatCompatibility:
         print(f"Data schema: {schema}")
 
         # Process regardless of input data types
-        result = process_market_data(sample_real_data)
+        result = process_market_data(sample_real_data, config=self.config)
 
         # Output should always be float32
         assert result.dtype == np.float32
@@ -116,12 +116,12 @@ class TestRealDataQuality:
             print(f"Found {total_nulls} null values in real data")
 
             # Should handle nulls gracefully
-            result = process_market_data(sample_real_data)
+            result = process_market_data(sample_real_data, config=self.config)
             assert result.shape == self.config.output_shape
             assert np.all(np.isfinite(result))
         else:
             print("No null values found in real data")
-            result = process_market_data(sample_real_data)
+            result = process_market_data(sample_real_data, config=self.config)
             assert result.shape == self.config.output_shape
 
     @pytest.mark.e2e
@@ -152,7 +152,7 @@ class TestRealDataQuality:
                     assert cv < 1.0, f"Excessive price variation in {col}: CV={cv:.3f}"
 
         # Process the data
-        result = process_market_data(sample_real_data)
+        result = process_market_data(sample_real_data, config=self.config)
         assert result.shape == self.config.output_shape
 
     @pytest.mark.e2e
@@ -178,7 +178,7 @@ class TestRealDataQuality:
                     assert max_volume < 1e12, f"Unreasonably high volume in {col}: {max_volume}"
 
         # Process the data
-        result = process_market_data(sample_real_data)
+        result = process_market_data(sample_real_data, config=self.config)
         assert result.shape == self.config.output_shape
 
     @pytest.mark.e2e
@@ -219,7 +219,7 @@ class TestRealDataQuality:
                     )
 
         # Process the data
-        result = process_market_data(sample_real_data)
+        result = process_market_data(sample_real_data, config=self.config)
         assert result.shape == self.config.output_shape
 
 
@@ -239,9 +239,9 @@ class TestRealDataIntegration:
 
         # Test with the standard 50K sample size (required by pipeline)
         # Test both direct function and processor
-        result1 = process_market_data(sample_real_data)
+        result1 = process_market_data(sample_real_data, config=self.config)
 
-        processor = create_processor()
+        processor = create_processor(config=self.config)
         result2 = processor.process(sample_real_data)
 
         # Results should be identical
@@ -256,7 +256,7 @@ class TestRealDataIntegration:
         if sample_real_data is None:
             pytest.skip("Real market data not available")
 
-        processor = create_processor()
+        processor = create_processor(config=self.config)
 
         # Process the same data multiple times
         results = []
@@ -277,7 +277,7 @@ class TestRealDataIntegration:
             pytest.skip("Real market data not available")
 
         # Create multiple processors (simulating concurrent usage)
-        processors = [create_processor() for _ in range(3)]
+        processors = [create_processor(config=self.config) for _ in range(3)]
 
         # Process with different processors
         results = []

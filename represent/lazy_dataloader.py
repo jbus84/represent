@@ -14,7 +14,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 
 from .constants import PRICE_LEVELS
-from .config import create_represent_config
+from .config import RepresentConfig
 
 
 class LazyParquetDataset(Dataset):
@@ -31,6 +31,7 @@ class LazyParquetDataset(Dataset):
 
     def __init__(
         self,
+        config: RepresentConfig,
         parquet_path: Union[str, Path],
         batch_size: int = 32,
         shuffle: bool = True,
@@ -40,12 +41,12 @@ class LazyParquetDataset(Dataset):
         shape_column: Optional[str] = "feature_shape",
         cache_size: int = 1000,
         prefetch_batches: int = 5,
-        currency: str = "AUDUSD",
     ):
         """
         Initialize lazy parquet dataset.
 
         Args:
+            config: RepresentConfig with currency-specific configuration
             parquet_path: Path to labeled parquet file
             batch_size: Batch size for DataLoader compatibility
             shuffle: Whether to shuffle data indices
@@ -56,6 +57,7 @@ class LazyParquetDataset(Dataset):
             cache_size: Number of samples to cache in memory
             prefetch_batches: Number of batches to prefetch for performance
         """
+        self.config = config
         self.parquet_path = Path(parquet_path)
         self.batch_size = batch_size
         self.shuffle = shuffle
@@ -65,9 +67,6 @@ class LazyParquetDataset(Dataset):
         self.shape_column = shape_column
         self.cache_size = cache_size
         self.prefetch_batches = prefetch_batches
-        
-        # Create config for accessing time_bins
-        self.config = create_represent_config(currency)
 
         if not self.parquet_path.exists():
             raise FileNotFoundError(f"Parquet file not found: {self.parquet_path}")
@@ -361,6 +360,7 @@ class LazyParquetDataLoader:
 
     def __init__(
         self,
+        config: RepresentConfig,
         parquet_path: Union[str, Path],
         batch_size: int = 32,
         shuffle: bool = True,
@@ -373,6 +373,7 @@ class LazyParquetDataLoader:
         Initialize lazy parquet dataloader.
 
         Args:
+            config: RepresentConfig with currency-specific configuration
             parquet_path: Path to labeled parquet file
             batch_size: Batch size for training
             shuffle: Whether to shuffle samples
@@ -382,6 +383,7 @@ class LazyParquetDataLoader:
             pin_memory: Pin memory for GPU transfer
         """
         self.dataset = LazyParquetDataset(
+            config=config,
             parquet_path=parquet_path,
             batch_size=batch_size,
             shuffle=shuffle,
@@ -432,6 +434,7 @@ class LazyParquetDataLoader:
 
 
 def create_parquet_dataloader(
+    config: RepresentConfig,
     parquet_path: Union[str, Path],
     batch_size: int = 32,
     shuffle: bool = True,
@@ -443,6 +446,7 @@ def create_parquet_dataloader(
     Convenience function to create a lazy parquet dataloader.
 
     Args:
+        config: RepresentConfig with currency-specific configuration
         parquet_path: Path to labeled parquet file
         batch_size: Batch size for training
         shuffle: Whether to shuffle samples
@@ -454,6 +458,7 @@ def create_parquet_dataloader(
         Configured LazyParquetDataLoader
     """
     return LazyParquetDataLoader(
+        config=config,
         parquet_path=parquet_path,
         batch_size=batch_size,
         shuffle=shuffle,

@@ -26,7 +26,7 @@ class TestRealDataProcessing:
             pytest.skip("Real market data not available")
 
         # Process the data
-        result = process_market_data(sample_real_data)
+        result = process_market_data(sample_real_data, config=self.config)
 
         # Validate output shape and type
         assert result.shape == self.config.output_shape, f"Expected shape {self.config.output_shape}, got {result.shape}"
@@ -47,7 +47,7 @@ class TestRealDataProcessing:
             pytest.skip("Real market data not available")
 
         # Create processor
-        processor = create_processor()
+        processor = create_processor(config=self.config)
         assert isinstance(processor, MarketDepthProcessor)
 
         # Process data
@@ -64,7 +64,7 @@ class TestRealDataProcessing:
         if real_market_data is None:
             pytest.skip("Real market data not available")
 
-        processor = create_processor()
+        processor = create_processor(config=self.config)
 
         # Process multiple 50K chunks (required size)
         chunk_size = 50000
@@ -97,7 +97,7 @@ class TestRealDataProcessing:
 
         # Use the standard 50K sample (required by pipeline)
         start_time = time.perf_counter()
-        result = process_market_data(sample_real_data)
+        result = process_market_data(sample_real_data, config=self.config)
         end_time = time.perf_counter()
 
         processing_time = end_time - start_time
@@ -244,11 +244,11 @@ class TestRealDataPerformance:
             pytest.skip("Real market data not available")
 
         # Warm up
-        process_market_data(sample_real_data)
+        process_market_data(sample_real_data, config=self.config)
 
         # Measure latency
         start_time = time.perf_counter()
-        result = process_market_data(sample_real_data)
+        result = process_market_data(sample_real_data, config=self.config)
         end_time = time.perf_counter()
 
         latency_ms = (end_time - start_time) * 1000
@@ -276,7 +276,7 @@ class TestRealDataPerformance:
 
         for _ in range(num_runs):
             start_time = time.perf_counter()
-            result = process_market_data(sample_real_data)
+            result = process_market_data(sample_real_data, config=self.config)
             end_time = time.perf_counter()
             durations.append(end_time - start_time)
 
@@ -308,7 +308,7 @@ class TestRealDataPerformance:
         baseline_memory = process.memory_info().rss / 1024 / 1024  # MB
 
         # Process data
-        result = process_market_data(sample_real_data)
+        result = process_market_data(sample_real_data, config=self.config)
 
         # Measure peak memory
         peak_memory = process.memory_info().rss / 1024 / 1024  # MB
@@ -337,7 +337,7 @@ class TestRealDataEdgeCases:
             pytest.skip("Real market data not available")
 
         # Test with the standard 50K sample (pipeline requirement)
-        result = process_market_data(sample_real_data)
+        result = process_market_data(sample_real_data, config=self.config)
 
         assert result.shape == self.config.output_shape
         assert np.all(np.isfinite(result))
@@ -353,7 +353,7 @@ class TestRealDataEdgeCases:
             # Take every 10th row to create gaps, then take first 50K
             gapped_data = real_market_data.filter(pl.int_range(pl.len()).mod(10) == 0).head(50000)
 
-            result = process_market_data(gapped_data)
+            result = process_market_data(gapped_data, config=self.config)
 
             assert result.shape == self.config.output_shape
             assert np.all(np.isfinite(result))

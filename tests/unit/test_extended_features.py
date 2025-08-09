@@ -28,7 +28,7 @@ class TestExtendedFeatures:
     def test_single_feature_volume(self):
         """Test single volume feature extraction."""
         data = generate_realistic_market_data(50000)
-        processor = MarketDepthProcessor(features=["volume"])
+        processor = MarketDepthProcessor(config=self.config, features=["volume"])
 
         result = processor.process(data)
 
@@ -45,7 +45,7 @@ class TestExtendedFeatures:
             if col not in data.columns:
                 data = data.with_columns(pl.lit(1.0).alias(col))
 
-        processor = MarketDepthProcessor(features=["trade_counts"])
+        processor = MarketDepthProcessor(config=self.config, features=["trade_counts"])
         result = processor.process(data)
 
         # Single feature should return 2D array
@@ -58,7 +58,7 @@ class TestExtendedFeatures:
 
         # Note: Variance feature is calculated dynamically from volume data
 
-        processor = MarketDepthProcessor(features=["variance"])
+        processor = MarketDepthProcessor(config=self.config, features=["variance"])
         result = processor.process(data)
 
         # Single feature should return 2D array
@@ -74,7 +74,7 @@ class TestExtendedFeatures:
             if col not in data.columns:
                 data = data.with_columns(pl.lit(1.0).alias(col))
 
-        processor = MarketDepthProcessor(features=["volume", "trade_counts"])
+        processor = MarketDepthProcessor(config=self.config, features=["volume", "trade_counts"])
         result = processor.process(data)
 
         # Multiple features should return 3D array
@@ -92,7 +92,7 @@ class TestExtendedFeatures:
 
         # Variance feature calculated dynamically from volume data - no separate column needed
 
-        processor = MarketDepthProcessor(features=["volume", "variance", "trade_counts"])
+        processor = MarketDepthProcessor(config=self.config, features=["volume", "variance", "trade_counts"])
         result = processor.process(data)
 
         # Multiple features should return 3D array
@@ -111,8 +111,8 @@ class TestExtendedFeatures:
         # Variance feature calculated dynamically from volume data - no separate column needed
 
         # Test with different feature order inputs
-        processor1 = MarketDepthProcessor(features=["trade_counts", "volume", "variance"])
-        processor2 = MarketDepthProcessor(features=["variance", "volume", "trade_counts"])
+        processor1 = MarketDepthProcessor(config=self.config, features=["trade_counts", "volume", "variance"])
+        processor2 = MarketDepthProcessor(config=self.config, features=["variance", "volume", "trade_counts"])
 
         result1 = processor1.process(data)
         result2 = processor2.process(data)
@@ -129,7 +129,7 @@ class TestExtendedFeatures:
         data = generate_realistic_market_data(50000)
 
         # Test with no features specified
-        processor = MarketDepthProcessor()
+        processor = MarketDepthProcessor(config=self.config)
         result = processor.process(data)
 
         assert processor.features == DEFAULT_FEATURES
@@ -138,14 +138,15 @@ class TestExtendedFeatures:
     def test_invalid_features(self):
         """Test error handling for invalid features."""
         with pytest.raises(ValueError, match="Invalid features"):
-            MarketDepthProcessor(features=["invalid_feature"])
+            MarketDepthProcessor(config=self.config, features=["invalid_feature"])
 
         with pytest.raises(ValueError, match="At least one feature"):
-            MarketDepthProcessor(features=[])
+            MarketDepthProcessor(config=self.config, features=[])
 
         # Test too many valid features
         with pytest.raises(ValueError, match="Too many features"):
             MarketDepthProcessor(
+                config=self.config,
                 features=["volume", "variance", "trade_counts", "volume"]
             )  # 4 features
 
@@ -154,7 +155,7 @@ class TestExtendedFeatures:
         data = generate_realistic_market_data(50000)
 
         # Test single feature
-        result_single = process_market_data(data, features=["volume"])
+        result_single = process_market_data(data, config=self.config, features=["volume"])
         assert result_single.shape == (PRICE_LEVELS, self.config.time_bins)
 
         # Test multiple features
@@ -162,21 +163,21 @@ class TestExtendedFeatures:
             if col not in data.columns:
                 data = data.with_columns(pl.lit(1.0).alias(col))
 
-        result_multi = process_market_data(data, features=["volume", "trade_counts"])
+        result_multi = process_market_data(data, config=self.config, features=["volume", "trade_counts"])
         assert result_multi.shape == (2, PRICE_LEVELS, self.config.time_bins)
 
         # Test default behavior (backward compatibility)
-        result_default = process_market_data(data)
+        result_default = process_market_data(data, config=self.config)
         assert result_default.shape == (PRICE_LEVELS, self.config.time_bins)
 
     def test_create_processor_factory_with_features(self):
         """Test create_processor factory with features parameter."""
         # Test with features
-        processor = create_processor(features=["volume", "trade_counts"])
+        processor = create_processor(config=self.config, features=["volume", "trade_counts"])
         assert processor.features == ["volume", "trade_counts"]
 
         # Test default behavior
-        processor_default = create_processor()
+        processor_default = create_processor(config=self.config)
         assert processor_default.features == DEFAULT_FEATURES
 
     def test_variance_feature_calculation(self):
@@ -184,7 +185,7 @@ class TestExtendedFeatures:
         data = generate_realistic_market_data(50000)
         # Variance feature now calculates variance of volume data, not from a separate column
 
-        processor = MarketDepthProcessor(features=["variance"])
+        processor = MarketDepthProcessor(config=self.config, features=["variance"])
         result = processor.process(data)
 
         # Should return proper shape
@@ -204,7 +205,7 @@ class TestExtendedFeatures:
                 data = data.with_columns(pl.lit(1.0).alias(col))
 
         # Test that multi-feature processing works correctly
-        processor = MarketDepthProcessor(features=["volume", "trade_counts"])
+        processor = MarketDepthProcessor(config=self.config, features=["volume", "trade_counts"])
         result = processor.process(data)
 
         # Verify we have the expected shape and valid results
@@ -245,13 +246,13 @@ class TestFeaturePerformance:
                 data = data.with_columns(pl.lit(1.0).alias(col))
 
         # Test single feature
-        processor_single = MarketDepthProcessor(features=["volume"])
+        processor_single = MarketDepthProcessor(config=self.config, features=["volume"])
         start_time = time.perf_counter()
         result_single = processor_single.process(data)
         single_time = time.perf_counter() - start_time
 
         # Test multiple features
-        processor_multi = MarketDepthProcessor(features=["volume", "trade_counts"])
+        processor_multi = MarketDepthProcessor(config=self.config, features=["volume", "trade_counts"])
         start_time = time.perf_counter()
         result_multi = processor_multi.process(data)
         multi_time = time.perf_counter() - start_time
@@ -279,7 +280,7 @@ class TestFeaturePerformance:
 
         # Variance feature calculated dynamically from volume data - no separate column needed
 
-        processor = MarketDepthProcessor(features=["volume", "variance", "trade_counts"])
+        processor = MarketDepthProcessor(config=self.config, features=["volume", "variance", "trade_counts"])
 
         # Run multiple times to get stable measurement
         times = []
@@ -308,11 +309,11 @@ class TestBackwardCompatibility:
         data = generate_realistic_market_data(50000)
 
         # These should work exactly as before
-        processor = MarketDepthProcessor()
+        processor = MarketDepthProcessor(config=self.config)
         result = processor.process(data)
         assert result.shape == (PRICE_LEVELS, self.config.time_bins)
 
-        result2 = process_market_data(data)
+        result2 = process_market_data(data, config=self.config)
         assert result2.shape == (PRICE_LEVELS, self.config.time_bins)
 
         # Results should be identical to preserve backward compatibility
@@ -323,8 +324,8 @@ class TestBackwardCompatibility:
         data = generate_realistic_market_data(50000)
 
         # Default should be volume-only
-        processor_default = MarketDepthProcessor()
-        processor_explicit = MarketDepthProcessor(features=["volume"])
+        processor_default = MarketDepthProcessor(config=self.config)
+        processor_explicit = MarketDepthProcessor(config=self.config, features=["volume"])
 
         result_default = processor_default.process(data)
         result_explicit = processor_explicit.process(data)

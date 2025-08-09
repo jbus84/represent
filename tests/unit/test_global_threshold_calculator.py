@@ -67,21 +67,19 @@ class TestGlobalThresholdCalculator:
     def test_calculator_initialization(self):
         """Test calculator initializes with correct configuration."""
         calc = GlobalThresholdCalculator(
-            currency="AUDUSD",
-            nbins=13,
+            config=self.config,
             sample_fraction=0.3,
-            max_samples_per_file=5000,
             verbose=False
         )
         
         assert calc.currency == "AUDUSD"
         assert calc.sample_fraction == 0.3
-        assert calc.max_samples_per_file == 5000
+        assert calc.max_samples_per_file == self.config.max_samples_per_file
         assert calc.verbose is False
     
     def test_calculator_uses_config_nbins(self):
         """Test calculator uses RepresentConfig nbins when not specified."""
-        calc = GlobalThresholdCalculator(currency="AUDUSD")
+        calc = GlobalThresholdCalculator(config=self.config)
         
         # Should use config nbins (13 for AUDUSD)
         assert calc.config.nbins == 13
@@ -91,7 +89,8 @@ class TestGlobalThresholdCalculator:
         currencies = ["AUDUSD", "EURUSD", "GBPUSD"]
         
         for currency in currencies:
-            calc = GlobalThresholdCalculator(currency=currency, verbose=False)
+            currency_config = create_represent_config(currency)
+            calc = GlobalThresholdCalculator(config=currency_config, verbose=False)
             assert calc.currency == currency
             assert hasattr(calc, 'config')
             assert calc.config.nbins > 0
@@ -100,19 +99,18 @@ class TestGlobalThresholdCalculator:
         """Test calculator parameter validation."""
         # Test with valid parameters
         calc = GlobalThresholdCalculator(
-            currency="AUDUSD",
+            config=self.config,
             sample_fraction=0.5,
-            max_samples_per_file=10000,
             verbose=True
         )
         
         assert calc.sample_fraction == 0.5
-        assert calc.max_samples_per_file == 10000
+        assert calc.max_samples_per_file == self.config.max_samples_per_file
         assert calc.verbose is True
         
     def test_calculator_config_integration(self):
         """Test that calculator integrates with RepresentConfig."""
-        calc = GlobalThresholdCalculator(currency="AUDUSD", verbose=False)
+        calc = GlobalThresholdCalculator(config=self.config, verbose=False)
         
         # Should have valid config
         assert hasattr(calc, 'config')
@@ -122,6 +120,10 @@ class TestGlobalThresholdCalculator:
 
 class TestGlobalThresholdCalculatorAPI:
     """Test the public API function."""
+    
+    def setup_method(self):
+        """Setup test fixtures."""
+        self.config = create_represent_config("AUDUSD")
     
     def test_calculate_global_thresholds_function_signature(self):
         """Test the function signature and parameters."""
@@ -140,8 +142,8 @@ class TestGlobalThresholdCalculatorAPI:
             mock_calc.return_value = mock_thresholds
             
             calculate_global_thresholds(
+                config=self.config,
                 data_directory="dummy_path",
-                currency="AUDUSD",
                 sample_fraction=0.3
             )
             
@@ -155,17 +157,15 @@ class TestGlobalThresholdCalculatorAPI:
                 mock_calc.return_value = MagicMock()
                 
                 calculate_global_thresholds(
+                    config=self.config,
                     data_directory="test_dir",
-                    currency="AUDUSD",
-                    nbins=7,
                     sample_fraction=0.2,
                     verbose=False
                 )
                 
                 # Verify correct parameters passed to constructor
                 mock_init.assert_called_once_with(
-                    currency="AUDUSD",
-                    nbins=7,
+                    config=self.config,
                     sample_fraction=0.2,
                     verbose=False
                 )
@@ -174,10 +174,15 @@ class TestGlobalThresholdCalculatorAPI:
 class TestGlobalThresholdCalculatorErrorHandling:
     """Test error handling and edge cases."""
     
+    def setup_method(self):
+        """Setup test fixtures."""
+        self.config = create_represent_config("AUDUSD")
+    
     def test_unsupported_currency(self):
         """Test behavior with unsupported currency that still matches format."""
         # Use a valid format currency that's not in our predefined list
-        calc = GlobalThresholdCalculator(currency="NZDUSD", verbose=False)
+        nzdusd_config = create_represent_config("NZDUSD")
+        calc = GlobalThresholdCalculator(config=nzdusd_config, verbose=False)
         assert calc.currency == "NZDUSD"
         # Config should still be created with defaults
         assert hasattr(calc, 'config')
@@ -186,32 +191,39 @@ class TestGlobalThresholdCalculatorErrorHandling:
     def test_edge_case_parameters(self):
         """Test behavior with edge case parameters."""
         # Test with extreme sample fraction
-        calc = GlobalThresholdCalculator(sample_fraction=1.5, verbose=False)
+        calc = GlobalThresholdCalculator(config=self.config, sample_fraction=1.5, verbose=False)
         assert calc.sample_fraction == 1.5  # Should accept it
         
         # Test with very small sample fraction
-        calc = GlobalThresholdCalculator(sample_fraction=0.01, verbose=False)
+        calc = GlobalThresholdCalculator(config=self.config, sample_fraction=0.01, verbose=False)
         assert calc.sample_fraction == 0.01
         
         # Test with zero max samples
-        calc = GlobalThresholdCalculator(max_samples_per_file=0, verbose=False)
-        assert calc.max_samples_per_file == 0
+        # Test that we're using config value
+        calc = GlobalThresholdCalculator(config=self.config, verbose=False)
+        assert calc.max_samples_per_file == self.config.max_samples_per_file
     
-    def test_calculator_with_nbins_override(self):
-        """Test calculator with nbins override."""
-        calc = GlobalThresholdCalculator(currency="AUDUSD", nbins=7, verbose=False)
-        assert calc.nbins == 7
+    def test_calculator_uses_config_nbins(self):
+        """Test calculator uses config nbins (no override)."""
+        calc = GlobalThresholdCalculator(config=self.config, verbose=False)
+        assert calc.nbins == self.config.nbins
         
-        calc = GlobalThresholdCalculator(currency="AUDUSD", nbins=21, verbose=False)
-        assert calc.nbins == 21
+        # Test with different currency config
+        gbpusd_config = create_represent_config("GBPUSD")
+        calc2 = GlobalThresholdCalculator(config=gbpusd_config, verbose=False)
+        assert calc2.nbins == gbpusd_config.nbins
 
 
 class TestGlobalThresholdCalculatorConfiguration:
     """Test configuration integration."""
     
+    def setup_method(self):
+        """Setup test fixtures."""
+        self.config = create_represent_config("AUDUSD")
+    
     def test_configuration_consistency(self):
         """Test that calculator maintains configuration consistency."""
-        calc = GlobalThresholdCalculator(currency="AUDUSD", verbose=False)
+        calc = GlobalThresholdCalculator(config=self.config, verbose=False)
         config = create_represent_config("AUDUSD")
         
         # Should use same micro pip size
@@ -223,7 +235,8 @@ class TestGlobalThresholdCalculatorConfiguration:
         calculators = {}
         
         for currency in currencies:
-            calculators[currency] = GlobalThresholdCalculator(currency=currency, verbose=False)
+            currency_config = create_represent_config(currency)
+            calculators[currency] = GlobalThresholdCalculator(config=currency_config, verbose=False)
             
         # All should have valid configurations
         for currency, calc in calculators.items():
@@ -232,12 +245,17 @@ class TestGlobalThresholdCalculatorConfiguration:
             assert calc.config.micro_pip_size > 0
             assert calc.config.nbins > 0
     
-    def test_nbins_parameter_override(self):
-        """Test that nbins parameter properly overrides config."""
-        # Test with different nbins values
-        for nbins in [5, 7, 9, 13, 21]:
-            calc = GlobalThresholdCalculator(currency="AUDUSD", nbins=nbins, verbose=False)
-            assert calc.nbins == nbins
+    def test_nbins_from_config(self):
+        """Test that nbins always comes from config (no parameter override)."""
+        # Test that nbins always matches config
+        calc = GlobalThresholdCalculator(config=self.config, verbose=False)
+        assert calc.nbins == self.config.nbins
+        
+        # Test with different currency configs
+        for currency in ["EURUSD", "GBPUSD", "USDJPY"]:
+            currency_config = create_represent_config(currency)
+            calc = GlobalThresholdCalculator(config=currency_config, verbose=False)
+            assert calc.nbins == currency_config.nbins
     
     def test_calculator_memory_efficiency(self):
         """Test that calculator doesn't consume excessive memory."""
@@ -248,7 +266,7 @@ class TestGlobalThresholdCalculatorConfiguration:
         initial_memory = process.memory_info().rss / 1024 / 1024  # MB
         
         # Create multiple calculators
-        calcs = [GlobalThresholdCalculator(currency="AUDUSD", verbose=False) for _ in range(10)]
+        calcs = [GlobalThresholdCalculator(config=self.config, verbose=False) for _ in range(10)]
         
         final_memory = process.memory_info().rss / 1024 / 1024  # MB
         memory_increase = final_memory - initial_memory
@@ -267,9 +285,13 @@ class TestGlobalThresholdCalculatorConfiguration:
 class TestGlobalThresholdCalculatorFileProcessing:
     """Test file processing methods with simpler approaches."""
     
+    def setup_method(self):
+        """Setup test fixtures."""
+        self.config = create_represent_config("AUDUSD")
+    
     def test_load_dbn_file_sample_method_exists(self):
         """Test that load_dbn_file_sample method exists."""
-        calc = GlobalThresholdCalculator(currency="AUDUSD", verbose=False)
+        calc = GlobalThresholdCalculator(config=self.config, verbose=False)
         
         # Test that method exists and is callable
         assert hasattr(calc, 'load_dbn_file_sample')
@@ -277,7 +299,7 @@ class TestGlobalThresholdCalculatorFileProcessing:
     
     def test_calculate_global_thresholds_method_exists(self):
         """Test that calculate_global_thresholds method exists."""
-        calc = GlobalThresholdCalculator(currency="AUDUSD", verbose=False)
+        calc = GlobalThresholdCalculator(config=self.config, verbose=False)
         
         # Test that method exists and is callable
         assert hasattr(calc, 'calculate_global_thresholds')
@@ -285,7 +307,7 @@ class TestGlobalThresholdCalculatorFileProcessing:
     
     def test_calculator_config_integration(self):
         """Test that calculator integrates properly with config."""
-        calc = GlobalThresholdCalculator(currency="AUDUSD", verbose=False)
+        calc = GlobalThresholdCalculator(config=self.config, verbose=False)
         
         # Test config attributes are accessible
         assert calc.config.lookback_rows > 0
@@ -297,6 +319,10 @@ class TestGlobalThresholdCalculatorFileProcessing:
 class TestGlobalThresholdCalculatorVerboseOutput:
     """Test verbose output and edge cases."""
     
+    def setup_method(self):
+        """Setup test fixtures."""
+        self.config = create_represent_config("AUDUSD")
+    
     def test_verbose_initialization(self):
         """Test verbose output during initialization."""
         import io
@@ -306,7 +332,7 @@ class TestGlobalThresholdCalculatorVerboseOutput:
         captured_output = io.StringIO()
         sys.stdout = captured_output
         
-        _ = GlobalThresholdCalculator(currency="AUDUSD", verbose=True)
+        _ = GlobalThresholdCalculator(config=self.config, verbose=True)
         
         # Restore stdout
         sys.stdout = sys.__stdout__
@@ -318,7 +344,7 @@ class TestGlobalThresholdCalculatorVerboseOutput:
     
     def test_unique_quantile_boundaries_handling(self):
         """Test handling of non-unique quantile boundaries."""
-        calc = GlobalThresholdCalculator(currency="AUDUSD", verbose=False)
+        calc = GlobalThresholdCalculator(config=self.config, verbose=False)
         
         # Create data with very little variance (will create duplicate quantiles)
         mock_movements = np.array([0.0] * 500 + [0.0001] * 500)  # Mostly zeros
@@ -341,7 +367,7 @@ class TestGlobalThresholdCalculatorVerboseOutput:
         # Test with different sample fractions
         for fraction in [0.1, 0.5, 1.0]:
             calc = GlobalThresholdCalculator(
-                currency="AUDUSD", 
+                config=self.config, 
                 sample_fraction=fraction, 
                 verbose=False
             )

@@ -43,25 +43,25 @@ class TestPipelineCoverage:
         """Test processor initialization edge cases."""
         # Test with empty features list
         with pytest.raises(ValueError, match="At least one feature must be specified"):
-            MarketDepthProcessor(features=[])
+            MarketDepthProcessor(config=self.config, features=[])
 
         # Test with too many features
         too_many_features = ["volume", "variance", "trade_counts", "invalid"]
         with pytest.raises(ValueError, match="Invalid features"):
-            MarketDepthProcessor(features=too_many_features)
+            MarketDepthProcessor(config=self.config, features=too_many_features)
 
         # Test with FeatureType enums
-        processor = MarketDepthProcessor(features=[FeatureType.VOLUME, FeatureType.VARIANCE])
+        processor = MarketDepthProcessor(config=self.config, features=[FeatureType.VOLUME, FeatureType.VARIANCE])
         assert processor.features == ["volume", "variance"]
 
         # Test with mixed string and enum types
-        processor = MarketDepthProcessor(features=[FeatureType.VOLUME, "trade_counts"])
+        processor = MarketDepthProcessor(config=self.config, features=[FeatureType.VOLUME, "trade_counts"])
         assert "volume" in processor.features
         assert "trade_counts" in processor.features
 
     def test_processor_expression_compilation(self, sample_data):
         """Test expression compilation and reuse."""
-        processor = MarketDepthProcessor(features=["volume"])
+        processor = MarketDepthProcessor(config=self.config, features=["volume"])
 
         # Test that expressions are compiled on first use
         assert not processor._compiled_expressions_ready
@@ -76,7 +76,7 @@ class TestPipelineCoverage:
 
     def test_price_lookup_caching(self, sample_data):
         """Test price lookup table caching."""
-        processor = MarketDepthProcessor(features=["volume"])
+        processor = MarketDepthProcessor(config=self.config, features=["volume"])
 
         # First processing should create lookup table
         processor.process(sample_data)
@@ -104,7 +104,7 @@ class TestPipelineCoverage:
 
     def test_input_validation(self, sample_data):
         """Test input validation."""
-        processor = MarketDepthProcessor(features=["volume"])
+        processor = MarketDepthProcessor(config=self.config, features=["volume"])
 
         # Test with insufficient samples
         small_data = sample_data.head(100)  # Too small for meaningful processing
@@ -113,7 +113,7 @@ class TestPipelineCoverage:
 
     def test_variance_feature_processing(self, sample_data):
         """Test variance feature specific processing."""
-        processor = MarketDepthProcessor(features=["variance"])
+        processor = MarketDepthProcessor(config=self.config, features=["variance"])
         result = processor.process(sample_data)
 
         assert result.shape == (402, self.config.time_bins)
@@ -121,7 +121,7 @@ class TestPipelineCoverage:
 
     def test_trade_counts_feature_processing(self, sample_data):
         """Test trade counts feature specific processing."""
-        processor = MarketDepthProcessor(features=["trade_counts"])
+        processor = MarketDepthProcessor(config=self.config, features=["trade_counts"])
         result = processor.process(sample_data)
 
         assert result.shape == (402, self.config.time_bins)
@@ -129,7 +129,7 @@ class TestPipelineCoverage:
 
     def test_side_data_processing_with_empty_data(self):
         """Test side data processing with minimal data."""
-        processor = MarketDepthProcessor(features=["volume"])
+        processor = MarketDepthProcessor(config=self.config, features=["volume"])
 
         # Create minimal data with zeros
         empty_data = {}
@@ -171,7 +171,7 @@ class TestPipelineCoverage:
         ]
 
         for features in combinations:
-            processor = MarketDepthProcessor(features=features)
+            processor = MarketDepthProcessor(config=self.config, features=features)
             result = processor.process(sample_data)
 
             assert result.shape == (2, 402, self.config.time_bins)
@@ -179,7 +179,7 @@ class TestPipelineCoverage:
 
         # Test single features
         for feature in ["volume", "variance", "trade_counts"]:
-            processor = MarketDepthProcessor(features=[feature])
+            processor = MarketDepthProcessor(config=self.config, features=[feature])
             result = processor.process(sample_data)
 
             assert result.shape == (402, self.config.time_bins)
@@ -188,28 +188,28 @@ class TestPipelineCoverage:
     def test_factory_functions(self, sample_data):
         """Test factory functions."""
         # Test create_processor with various parameters
-        processor1 = create_processor()
+        processor1 = create_processor(config=self.config)
         assert processor1.features == ["volume"]
 
-        processor2 = create_processor(features=["variance"])
+        processor2 = create_processor(config=self.config, features=["variance"])
         assert processor2.features == ["variance"]
 
-        processor3 = create_processor(features=[FeatureType.TRADE_COUNTS])
+        processor3 = create_processor(config=self.config, features=[FeatureType.TRADE_COUNTS])
         assert processor3.features == ["trade_counts"]
 
         # Test process_market_data function
-        result1 = process_market_data(sample_data)
+        result1 = process_market_data(sample_data, config=self.config)
         assert result1.shape == (402, self.config.time_bins)
 
-        result2 = process_market_data(sample_data, features=["volume", "variance"])
+        result2 = process_market_data(sample_data, config=self.config, features=["volume", "variance"])
         assert result2.shape == (2, 402, self.config.time_bins)
 
-        result3 = process_market_data(sample_data, features=[FeatureType.TRADE_COUNTS])
+        result3 = process_market_data(sample_data, config=self.config, features=[FeatureType.TRADE_COUNTS])
         assert result3.shape == (402, self.config.time_bins)
 
     def test_edge_cases_in_processing(self, sample_data):
         """Test edge cases in data processing."""
-        processor = MarketDepthProcessor(features=["volume"])
+        processor = MarketDepthProcessor(config=self.config, features=["volume"])
 
         # Test with data that has very similar prices (minimal spread)
         flat_data = sample_data.with_columns(
@@ -224,9 +224,9 @@ class TestPipelineCoverage:
 
     def test_processor_state_isolation(self, sample_data):
         """Test that processor instances don't interfere with each other."""
-        processor1 = MarketDepthProcessor(features=["volume"])
-        processor2 = MarketDepthProcessor(features=["variance"])
-        processor3 = MarketDepthProcessor(features=["volume", "trade_counts"])
+        processor1 = MarketDepthProcessor(config=self.config, features=["volume"])
+        processor2 = MarketDepthProcessor(config=self.config, features=["variance"])
+        processor3 = MarketDepthProcessor(config=self.config, features=["volume", "trade_counts"])
 
         # Process with different processors
         result1 = processor1.process(sample_data)

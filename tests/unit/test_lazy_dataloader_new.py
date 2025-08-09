@@ -49,6 +49,10 @@ def create_synthetic_dbn_data(num_rows: int = 10000) -> pl.DataFrame:
 
 class TestLazyParquetDataset:
     """Test lazy parquet dataset functionality."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     def create_test_parquet(self, temp_dir: Path) -> Path:
         """Create a test parquet file with labeled data."""
@@ -82,7 +86,7 @@ class TestLazyParquetDataset:
         with tempfile.TemporaryDirectory() as temp_dir:
             parquet_path = self.create_test_parquet(Path(temp_dir))
 
-            dataset = LazyParquetDataset(parquet_path)
+            dataset = LazyParquetDataset(config=self.config, parquet_path=parquet_path)
 
             assert dataset.parquet_path == parquet_path
             assert dataset.batch_size == 32  # Default
@@ -93,7 +97,7 @@ class TestLazyParquetDataset:
         with tempfile.TemporaryDirectory() as temp_dir:
             parquet_path = self.create_test_parquet(Path(temp_dir))
 
-            dataset = LazyParquetDataset(parquet_path, sample_fraction=0.5)
+            dataset = LazyParquetDataset(config=self.config, parquet_path=parquet_path, sample_fraction=0.5)
 
             assert len(dataset) == 50  # Half the samples
 
@@ -102,7 +106,7 @@ class TestLazyParquetDataset:
         with tempfile.TemporaryDirectory() as temp_dir:
             parquet_path = self.create_test_parquet(Path(temp_dir))
 
-            dataset = LazyParquetDataset(parquet_path, cache_size=10)
+            dataset = LazyParquetDataset(config=self.config, parquet_path=parquet_path, cache_size=10)
 
             # Get first sample
             features, label = dataset[0]
@@ -118,7 +122,7 @@ class TestLazyParquetDataset:
         with tempfile.TemporaryDirectory() as temp_dir:
             parquet_path = self.create_test_parquet(Path(temp_dir))
 
-            dataset = LazyParquetDataset(parquet_path, cache_size=5)
+            dataset = LazyParquetDataset(config=self.config, parquet_path=parquet_path, cache_size=5)
 
             # Access samples to populate cache
             for i in range(10):
@@ -133,7 +137,7 @@ class TestLazyParquetDataset:
         with tempfile.TemporaryDirectory() as temp_dir:
             parquet_path = self.create_test_parquet(Path(temp_dir))
 
-            dataset = LazyParquetDataset(parquet_path)
+            dataset = LazyParquetDataset(config=self.config, parquet_path=parquet_path)
             info = dataset.get_dataset_info()
 
             assert "parquet_file" in info
@@ -145,6 +149,10 @@ class TestLazyParquetDataset:
 
 class TestLazyParquetDataLoader:
     """Test lazy parquet dataloader functionality."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     def create_test_parquet(self, temp_dir: Path) -> Path:
         """Create a test parquet file with labeled data."""
@@ -175,7 +183,7 @@ class TestLazyParquetDataLoader:
             parquet_path = self.create_test_parquet(Path(temp_dir))
 
             dataloader = LazyParquetDataLoader(
-                parquet_path=parquet_path, batch_size=8, shuffle=False
+                config=self.config, parquet_path=parquet_path, batch_size=8, shuffle=False
             )
 
             assert dataloader.batch_size == 8
@@ -187,7 +195,7 @@ class TestLazyParquetDataLoader:
             parquet_path = self.create_test_parquet(Path(temp_dir))
 
             dataloader = LazyParquetDataLoader(
-                parquet_path=parquet_path, batch_size=4, shuffle=False, num_workers=0
+                config=self.config, parquet_path=parquet_path, batch_size=4, shuffle=False, num_workers=0
             )
 
             batch_count = 0
@@ -209,7 +217,7 @@ class TestLazyParquetDataLoader:
             parquet_path = self.create_test_parquet(Path(temp_dir))
 
             dataloader = create_parquet_dataloader(
-                parquet_path=parquet_path, batch_size=16, sample_fraction=0.5
+                config=self.config, parquet_path=parquet_path, batch_size=16, sample_fraction=0.5
             )
 
             assert isinstance(dataloader, LazyParquetDataLoader)
@@ -256,6 +264,9 @@ class TestIntegration:
         """Test complete end-to-end pipeline."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_dir = Path(temp_dir)
+            
+            # Create config for testing
+            config = create_represent_config("AUDUSD")
 
             # Create synthetic data
             synthetic_data = create_synthetic_dbn_data(5000)
@@ -284,7 +295,10 @@ class TestIntegration:
 
             # Test dataloader with labeled data
             dataloader = create_parquet_dataloader(
-                parquet_path=labeled_parquet, batch_size=8, sample_fraction=1.0
+                config=config,
+                parquet_path=labeled_parquet, 
+                batch_size=8, 
+                sample_fraction=1.0
             )
 
             # Verify we can iterate through data
@@ -303,6 +317,10 @@ class TestIntegration:
 
 class TestPerformance:
     """Performance tests for the new architecture."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     def test_lazy_loading_performance(self):
         """Test lazy loading performance."""
@@ -330,7 +348,7 @@ class TestPerformance:
 
             # Test dataloader performance
             dataloader = create_parquet_dataloader(
-                parquet_path=parquet_path,
+                config=self.config, parquet_path=parquet_path,
                 batch_size=32,
                 sample_fraction=0.1,  # Use 10% for quick test
             )
@@ -388,7 +406,7 @@ class TestPerformance:
 
             # Create dataloader with small cache
             dataloader = create_parquet_dataloader(
-                parquet_path=parquet_path,
+                config=self.config, parquet_path=parquet_path,
                 batch_size=16,
                 sample_fraction=0.2,  # Use 20% of data
             )

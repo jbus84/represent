@@ -13,7 +13,7 @@ import numpy as np
 import polars as pl
 from datetime import datetime
 
-from .config import RepresentConfig, create_represent_config
+from .config import RepresentConfig
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +28,7 @@ class ClassificationConfigGenerator:
     
     def __init__(
         self, 
-        currency: str = "AUDUSD",
-        nbins: int = 13,
-        target_samples: int = 1000,
+        config: RepresentConfig,
         validation_split: float = 0.3,
         random_seed: int = 42
     ):
@@ -38,20 +36,18 @@ class ClassificationConfigGenerator:
         Initialize the classification config generator.
         
         Args:
-            currency: Currency pair for configuration (used for micro_pip_size)
-            nbins: Number of classification bins (default: 13)
-            target_samples: Minimum samples required for reliable config generation
+            config: RepresentConfig with currency-specific configuration
             validation_split: Fraction of data to use for validation (0.0-1.0)
             random_seed: Random seed for reproducible results
         """
-        self.config = create_represent_config(currency)
-        self.nbins = nbins
-        self.target_samples = target_samples
+        self.config = config
+        self.nbins = config.nbins
+        self.target_samples = config.target_samples
         self.validation_split = validation_split
         self.random_seed = random_seed
-        self.target_percent = 100.0 / nbins
+        self.target_percent = 100.0 / self.nbins
         
-        logger.info(f"ClassificationConfigGenerator initialized: {currency}, {nbins} bins, {target_samples} min samples")
+        logger.info(f"ClassificationConfigGenerator initialized: {config.currency}, {self.nbins} bins, {self.target_samples} min samples")
     
     def extract_price_changes_from_parquet(
         self, 
@@ -359,25 +355,23 @@ class ClassificationConfigGenerator:
 
 
 def generate_classification_config_from_parquet(
+    config: RepresentConfig,
     parquet_files: Union[str, Path, List[Union[str, Path]]],
-    currency: str = "AUDUSD",
-    nbins: int = 13,
     **kwargs
 ) -> Tuple[RepresentConfig, Dict]:
     """
     Convenience function to generate classification config from parquet data.
     
     Args:
+        config: RepresentConfig with currency-specific configuration
         parquet_files: Parquet file(s) containing price data
-        currency: Currency pair name
-        nbins: Number of classification bins
         **kwargs: Additional parameters for ClassificationConfigGenerator
         
     Returns:
         Tuple of (RepresentConfig, validation_metrics)
     """
-    generator = ClassificationConfigGenerator(currency=currency, nbins=nbins, **kwargs)
-    return generator.generate_classification_config(parquet_files, currency)
+    generator = ClassificationConfigGenerator(config=config, **kwargs)
+    return generator.generate_classification_config(parquet_files, config.currency)
 
 
 def classify_with_generated_config(

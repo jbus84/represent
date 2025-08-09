@@ -88,7 +88,7 @@ class TestSyntheticE2E:
         data = create_realistic_synthetic_data(n_samples=50000, seed=42)
 
         # Process the data
-        result = process_market_data(data)
+        result = process_market_data(data, config=self.config)
 
         # Validate output
         assert result.shape == (402, self.config.time_bins), f"Expected shape {(402, self.config.time_bins)}, got {result.shape}"
@@ -105,7 +105,7 @@ class TestSyntheticE2E:
     @pytest.mark.e2e
     def test_processor_reuse_synthetic(self):
         """Test processor reuse with synthetic data."""
-        processor = create_processor()
+        processor = create_processor(config=self.config)
 
         # Generate different datasets
         datasets = [
@@ -134,11 +134,11 @@ class TestSyntheticE2E:
         data = create_realistic_synthetic_data(n_samples=50000, seed=42)
 
         # Warm up
-        process_market_data(data)
+        process_market_data(data, config=self.config)
 
         # Measure performance
         start_time = time.perf_counter()
-        result = process_market_data(data)
+        result = process_market_data(data, config=self.config)
         end_time = time.perf_counter()
 
         duration = end_time - start_time
@@ -169,7 +169,7 @@ class TestSyntheticE2E:
             data = create_realistic_synthetic_data(n_samples=50000, seed=42)
 
             # Process the data
-            result = process_market_data(data)
+            result = process_market_data(data, config=self.config)
 
             # Validate output
             assert result.shape == (402, self.config.time_bins), f"Wrong shape for {condition['name']} market"
@@ -210,7 +210,7 @@ class TestSyntheticE2E:
         assert ordered_ratio > 0.99, f"Only {ordered_ratio:.1%} of timestamps are ordered"
 
         # Process the validated data
-        result = process_market_data(data)
+        result = process_market_data(data, config=self.config)
         assert result.shape == (402, self.config.time_bins)
 
     @pytest.mark.e2e
@@ -221,7 +221,7 @@ class TestSyntheticE2E:
         data = create_realistic_synthetic_data(n_samples=50000, seed=42)
 
         start_time = time.perf_counter()
-        result = process_market_data(data)
+        result = process_market_data(data, config=self.config)
         end_time = time.perf_counter()
 
         duration = end_time - start_time
@@ -252,7 +252,7 @@ class TestSyntheticE2E:
             ]
         )
 
-        result = process_market_data(extreme_data)
+        result = process_market_data(extreme_data, config=self.config)
         assert result.shape == (402, self.config.time_bins)
         assert np.all(np.isfinite(result))
 
@@ -270,10 +270,10 @@ class TestSyntheticDataCompatibility:
         data = create_realistic_synthetic_data(n_samples=50000, seed=42)
 
         # Test direct function
-        result1 = process_market_data(data)
+        result1 = process_market_data(data, config=self.config)
 
         # Test processor factory
-        processor = create_processor()
+        processor = create_processor(config=self.config)
         result2 = processor.process(data)
 
         # Results should be identical
@@ -288,7 +288,7 @@ class TestSyntheticDataCompatibility:
         # Process multiple times
         results = []
         for _ in range(3):
-            result = process_market_data(data)
+            result = process_market_data(data, config=self.config)
             results.append(result)
 
         # All results should be identical
@@ -309,7 +309,7 @@ class TestSyntheticDataCompatibility:
         # Process multiple datasets
         for i in range(5):
             data = create_realistic_synthetic_data(n_samples=50000, seed=42 + i)
-            result = process_market_data(data)
+            result = process_market_data(data, config=self.config)
             assert result.shape == (402, self.config.time_bins)
 
         final_memory = process.memory_info().rss / 1024 / 1024  # MB

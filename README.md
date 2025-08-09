@@ -35,21 +35,59 @@ uv sync --all-extras
 
 ## 🔧 v4.0.0 Architecture Updates
 
-### **RepresentConfig System**
-Replaced hardcoded constants with dynamic configuration:
+### **RepresentConfig System & Dependency Injection**
+Replaced hardcoded constants with dynamic configuration and introduced dependency injection:
+
+**Configuration Improvements:**
 - **TIME_BINS**: Now computed as `samples // ticks_per_bin = 25000 // 100 = 250`
 - **Output Shape**: Dynamic `(402, time_bins)` instead of hardcoded `(402, 500)`
 - **Currency-Specific**: Each currency pair has optimized parameters
 - **Consistent**: All components use same configuration source
 
-### **Key Configuration Changes:**
-```python
-from represent import create_represent_config
+**Dependency Injection Benefits:**
+- **Simplified APIs**: Single `config` parameter instead of 10+ individual parameters
+- **No Parameter Duplication**: Parameters like `max_samples_per_file` and `target_samples` moved to config
+- **Better Testability**: Easy to mock configurations in tests
+- **Type Safety**: All parameters validated through Pydantic models
 
+### **API Migration Examples:**
+
+**Before (v3.x) - Multiple Parameters:**
+```python
+# Old API with many individual parameters
+calculator = GlobalThresholdCalculator(
+    currency="AUDUSD",
+    nbins=13,
+    max_samples_per_file=10000,  # Duplicated parameter
+    sample_fraction=0.5,
+    verbose=True
+)
+
+converter = UnlabeledDBNConverter(
+    currency="AUDUSD",
+    features=['volume'],
+    batch_size=100,
+    min_symbol_samples=1000      # Another duplicated parameter
+)
+```
+
+**After (v4.x) - RepresentConfig Dependency Injection:**
+```python
+# New API with config dependency injection
 config = create_represent_config("AUDUSD")
+
+calculator = GlobalThresholdCalculator(
+    config=config,              # Single config parameter
+    sample_fraction=0.5,        # Only unique parameters
+    verbose=True
+)
+
+converter = UnlabeledDBNConverter(
+    config=config               # Same config, consistent parameters
+)
+
 print(f"TIME_BINS: {config.time_bins}")        # 250 (computed)
-print(f"Output Shape: {config.output_shape}")  # (402, 250)
-print(f"Micro Pip Size: {config.micro_pip_size}")  # 0.00001
+print(f"Max samples: {config.max_samples_per_file}")  # 10000 (from config)
 ```
 
 ## 🏗️ Streamlined 2-Stage Architecture
@@ -67,26 +105,28 @@ Memory-efficient lazy loading for PyTorch training with optimal class balance.
 **🎯 RECOMMENDED: Use global thresholds for consistent classification across files**
 
 ```python
-from represent import calculate_global_thresholds, process_dbn_to_classified_parquets
+from represent import calculate_global_thresholds, process_dbn_to_classified_parquets, create_represent_config
 
-# Step 1: Calculate global thresholds from sample of your data files
+# Step 1: Create configuration for your currency
+config = create_represent_config("AUDUSD")
+
+# Step 2: Calculate global thresholds from sample of your data files
 global_thresholds = calculate_global_thresholds(
+    config=config,
     data_directory="/path/to/your/dbn/files/",
-    currency="AUDUSD", 
     sample_fraction=0.5,                    # Use 50% of files for threshold calculation
-    nbins=13                                # 13-class uniform distribution
 )
 
 print(f"Global thresholds calculated from {global_thresholds.files_analyzed} files")
 
-# Step 2: Process all files using the same global thresholds
+# Step 3: Process all files using the same global thresholds
 stats = process_dbn_to_classified_parquets(
     dbn_path="data/glbx-mdp3-20240403.mbp-10.dbn.zst",
     output_dir="data/classified/",          # Directory for classified symbol files
-    currency="AUDUSD",
-    features=['volume', 'variance'],        # Multi-feature extraction
+    currency=config.currency,
+    features=config.features,               # Uses config features (volume, variance, etc.)
     global_thresholds=global_thresholds,    # 🎯 Consistent thresholds across ALL files!
-    min_symbol_samples=1000,                # Only symbols with sufficient data
+    min_symbol_samples=config.min_symbol_samples,  # Uses config minimum
     force_uniform=True                      # Guarantee uniform class distribution
 )
 
@@ -104,19 +144,23 @@ print(f"All files use consistent global thresholds - same price movement = same 
 ### Stage 2: ML Training with Lazy Loading
 
 ```python
-from represent.lazy_dataloader import create_parquet_dataloader
+from represent import create_parquet_dataloader, create_represent_config
 
-# Create memory-efficient dataloader
+# Use same config for consistent parameters
+config = create_represent_config("AUDUSD")
+
+# Create memory-efficient dataloader with config
 dataloader = create_parquet_dataloader(
+    config=config,                         # Config provides batch_size, features, etc.
     parquet_path="data/classified/AUDUSD_M6AM4_classified.parquet",
-    batch_size=32,
+    batch_size=32,                         # Override config default if needed
     shuffle=True,
     num_workers=4                          # Parallel loading for performance
 )
 
 # Use in PyTorch training loop
 for batch_features, batch_labels in dataloader:
-    # batch_features: torch.Tensor of shape [32, 2, 402, 500] for 2 features
+    # batch_features: torch.Tensor of shape [32, 2, 402, config.time_bins] for 2 features
     # batch_labels: torch.Tensor of shape [32] with uniform distribution (7.69% each class)
     model_output = model(batch_features)
     loss = criterion(model_output, batch_labels)
@@ -432,6 +476,8 @@ config = create_represent_config(
 print(f"Lookback: {config.lookback_rows}")        # Direct access
 print(f"Lookforward: {config.lookforward_input}") # No config.classification.lookforward_input
 print(f"Batch Size: {config.batch_size}")         # No more hardcoded values
+print(f"Max Samples: {config.max_samples_per_file}")  # New: Performance parameters
+print(f"Target Samples: {config.target_samples}")     # New: From dependency injection
 ```
 
 ### **Currency-Specific Optimizations**
@@ -561,13 +607,60 @@ uv run ruff format && uv run ruff check && uv run pyright
 uv run pytest -m performance
 ```
 
+## 🔄 Migration Guide (v3.x → v4.x)
+
+### **1. Update Function Calls**
+
+**Old API:**
+```python
+# Multiple parameters - hard to maintain
+calculator = GlobalThresholdCalculator(currency="AUDUSD", nbins=13, max_samples_per_file=10000)
+converter = UnlabeledDBNConverter(currency="AUDUSD", batch_size=100)
+```
+
+**New API:**
+```python
+# Single config parameter - consistent and maintainable
+config = create_represent_config("AUDUSD")
+calculator = GlobalThresholdCalculator(config=config)
+converter = UnlabeledDBNConverter(config=config)
+```
+
+### **2. Update Test Code**
+
+**Old Test Setup:**
+```python
+def test_old_api():
+    calc = GlobalThresholdCalculator(currency="AUDUSD", nbins=13)
+    # Many individual parameters to mock
+```
+
+**New Test Setup:**
+```python
+def setup_method(self):
+    self.config = create_represent_config("AUDUSD")
+
+def test_new_api(self):
+    calc = GlobalThresholdCalculator(config=self.config)
+    # Single config object - easier to test
+```
+
+### **3. Benefits of Migration**
+
+- ✅ **Reduced Complexity**: 10+ parameters → 1 config object
+- ✅ **Type Safety**: Pydantic validation catches errors early
+- ✅ **Consistency**: All components use same configuration
+- ✅ **Testability**: Easy to mock and test with single config
+- ✅ **Performance**: Eliminated parameter duplication
+
 ## 📈 Architecture Details
 
 - **Price Levels**: 402 levels (200 bid + 200 ask + 2 mid)
-- **Time Bins**: 500 bins (configurable ticks per bin)
+- **Time Bins**: Dynamic computation based on samples/ticks_per_bin
 - **Classification**: 13-bin uniform distribution by default
 - **Memory**: Linear scaling with feature count
 - **Thread Safety**: Concurrent access support
+- **Configuration**: RepresentConfig with dependency injection
 
 ## 🎯 Why Streamlined Architecture?
 

@@ -56,13 +56,19 @@ class ComprehensiveDemo:
         # Common demo configuration
         self.currency = "AUDUSD"
         self.features = ["volume", "variance", "trade_counts"]
-        self.nbins = 13
+        
+        # Create RepresentConfig for the demo
+        self.config = create_represent_config(self.currency)
+        self.nbins = self.config.nbins
         
         # Results storage
         self.results = {}
         
         print("🚀 Comprehensive Represent Package Demo")
         print("=" * 60)
+        print(f"   🔧 Using configuration: {self.config.currency}")
+        print(f"   📊 Features: {self.features}")
+        print(f"   🎯 Classification bins: {self.config.nbins}")
         
     def get_real_dataset(self) -> Path:
         """Get the real classified parquet data from the data directory."""
@@ -207,9 +213,8 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
             
             start_time = time.time()
             global_thresholds = calculate_global_thresholds(
+                config=self.config,
                 data_directory=dbn_directory,
-                currency=self.currency,
-                nbins=self.nbins,
                 sample_fraction=0.3  # Use smaller fraction for demo speed
             )
             # Store for use in classification demo
@@ -354,7 +359,8 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
             df = pl.read_parquet(data_file)
             
             # Create configuration using the proper config system
-            config = create_represent_config(self.currency)
+            # Use the instance config
+            config = self.config
             
             # Override features if specified
             if self.features:
@@ -379,7 +385,7 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
             # Use process_market_data - this is the core represent API for feature extraction
             
             # Get multi-feature tensor (n_features, PRICE_LEVELS, config.time_bins) - already normalized by process_market_data
-            multi_feature_tensor = process_market_data(symbol_data, features=config.features)
+            multi_feature_tensor = process_market_data(symbol_data, config=config, features=config.features)
             
             print(f"   ✅ Multi-feature tensor: {multi_feature_tensor.shape}")
             
@@ -422,7 +428,8 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
     
     def _create_dummy_features(self) -> Dict[str, Any]:
         """Create dummy feature data as fallback."""
-        config = create_represent_config(self.currency)
+        # Use the instance config
+        config = self.config
         feature_results = {}
         for feature in self.features:
             # Create realistic-looking dummy arrays
@@ -1178,7 +1185,8 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
             df = pl.read_parquet(data_file)
             
             # Use the same configuration as feature extraction demo
-            config = create_represent_config(self.currency)
+            # Use the instance config
+            config = self.config
             
             # Override features if specified
             if self.features:
@@ -1204,7 +1212,7 @@ Range: [{global_thresholds.price_movement_stats["min"]:.0f}, {global_thresholds.
                 
                 if len(sample_data) >= 100:  # Minimum data check
                     # Extract features using the SAME approach as feature extraction demo
-                    multi_feature_tensor = process_market_data(sample_data, features=config.features)
+                    multi_feature_tensor = process_market_data(sample_data, config=config, features=config.features)
                     
                     # Extract individual features from the multi-feature tensor
                     sample_features = {}
@@ -1973,27 +1981,32 @@ for features, labels in dataloader:
 from represent import (
     calculate_global_thresholds,
     process_dbn_to_classified_parquets,
-    create_parquet_dataloader
+    create_parquet_dataloader,
+    create_represent_config
 )
 
-# 1. Calculate global thresholds
+# 1. Create configuration
+config = create_represent_config("AUDUSD")
+
+# 2. Calculate global thresholds
 thresholds = calculate_global_thresholds(
-    data_directory="data/",
-    currency="AUDUSD",
-    nbins=13
+    config=config,
+    data_directory="data/"
 )
 
-# 2. Process to classified parquet
+# 3. Process to classified parquet
 results = process_dbn_to_classified_parquets(
     dbn_path="data.dbn",
     output_dir="classified/",
+    currency="AUDUSD",
     features=["volume", "variance", "trade_counts"],
     global_thresholds=thresholds,
     force_uniform=True
 )
 
-# 3. Create ML dataloader
+# 4. Create ML dataloader
 dataloader = create_parquet_dataloader(
+    config=config,
     parquet_path="classified/data.parquet",
     batch_size=32,
     features=["volume", "variance", "trade_counts"]
@@ -2212,27 +2225,32 @@ for features, labels in dataloader:
 from represent import (
     calculate_global_thresholds,
     process_dbn_to_classified_parquets,
-    create_parquet_dataloader
+    create_parquet_dataloader,
+    create_represent_config
 )
 
-# 1. Calculate global thresholds
+# 1. Create configuration
+config = create_represent_config("AUDUSD")
+
+# 2. Calculate global thresholds
 thresholds = calculate_global_thresholds(
-    data_directory="data/",
-    currency="AUDUSD",
-    nbins=13
+    config=config,
+    data_directory="data/"
 )
 
-# 2. Process to classified parquet
+# 3. Process to classified parquet
 results = process_dbn_to_classified_parquets(
     dbn_path="data.dbn",
     output_dir="classified/",
+    currency="AUDUSD",
     features=["volume", "variance", "trade_counts"],
     global_thresholds=thresholds,
     force_uniform=True
 )
 
-# 3. Create ML dataloader
+# 4. Create ML dataloader
 dataloader = create_parquet_dataloader(
+    config=config,
     parquet_path="classified/data.parquet",
     batch_size=32,
     features=["volume", "variance", "trade_counts"]

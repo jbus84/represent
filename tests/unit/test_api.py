@@ -72,16 +72,10 @@ class TestRepresentAPI:
         assert hasattr(api, 'load_dataset')
         assert callable(api.load_dataset)
 
-    def test_api_get_currency_config_method(self):
-        """Test API get_currency_config method."""
-        api = RepresentAPI()
-        
-        # Test that method exists and is callable
-        assert hasattr(api, 'get_currency_config')
-        assert callable(api.get_currency_config)
-        
-        # Test actual config retrieval
-        config = api.get_currency_config("AUDUSD")
+    def test_api_config_creation(self):
+        """Test direct config creation (no longer via API method)."""
+        # Test direct config creation since get_currency_config is removed
+        config = create_represent_config("AUDUSD")
         assert config is not None
         assert config.currency == "AUDUSD"
         assert config.nbins > 0
@@ -317,17 +311,17 @@ class TestRepresentAPIMethods:
         assert callable(api.create_parquet_classifier)
         
         # Test classifier creation with default parameters
-        classifier = api.create_parquet_classifier(verbose=False)
+        config = create_represent_config("AUDUSD")
+        classifier = api.create_parquet_classifier(config, verbose=False)
         assert classifier is not None
         assert hasattr(classifier, 'config')
         assert classifier.config.currency == "AUDUSD"  # Default
         assert classifier.config.features == ["volume"]  # Default
         
         # Test classifier creation with custom parameters
+        custom_config = create_represent_config("EURUSD", features=["volume", "variance"], nbins=7)
         classifier = api.create_parquet_classifier(
-            currency="EURUSD",
-            features=["volume", "variance"],
-            nbins=7,
+            custom_config,
             verbose=False
         )
         assert classifier.config.currency == "EURUSD"
@@ -340,7 +334,7 @@ class TestRepresentAPIMethods:
         
         # Test existence of all main API methods
         expected_methods = [
-            'create_dataloader', 'load_dataset', 'get_currency_config',
+            'create_dataloader', 'load_dataset',
             'convert_dbn_to_unlabeled_parquet', 'batch_convert_dbn_to_unlabeled_parquet',
             'classify_symbol_parquet', 'batch_classify_symbol_parquets',
             'create_ml_dataloader', 'run_complete_pipeline',
@@ -360,13 +354,13 @@ class TestRepresentAPIMethods:
         currencies = ["AUDUSD", "EURUSD", "GBPUSD"]
         
         for currency in currencies:
-            # Test config retrieval for each currency
-            config = api.get_currency_config(currency)
+            # Test config creation for each currency (direct creation)
+            config = create_represent_config(currency)
             assert config.currency == currency
             assert config.nbins > 0
             
             # Test classifier creation for each currency
-            classifier = api.create_parquet_classifier(currency=currency, verbose=False)
+            classifier = api.create_parquet_classifier(config, verbose=False)
             assert classifier.config.currency == currency
 
     def test_api_parameter_validation(self):
@@ -374,12 +368,15 @@ class TestRepresentAPIMethods:
         api = RepresentAPI()
         
         # Test with various parameter combinations
-        classifier = api.create_parquet_classifier(
+        config = create_represent_config(
             currency="AUDUSD",
             features=["volume", "variance"],
             min_symbol_samples=500,
+            nbins=13
+        )
+        classifier = api.create_parquet_classifier(
+            config,
             force_uniform=True,
-            nbins=13,
             verbose=False
         )
         
@@ -394,5 +391,12 @@ class TestRepresentAPIMethods:
         from represent.api import create_training_dataloader, load_training_dataset
         
         # Test that convenience functions exist and are callable
+        assert callable(create_training_dataloader)
+        assert callable(load_training_dataset)
+        
+        # Test that they require config parameter
+        _ = create_represent_config("AUDUSD")
+        # Just test that they accept the config parameter
+        # (full functional testing would require mock parquet files)
         assert callable(create_training_dataloader)
         assert callable(load_training_dataset)

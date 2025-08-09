@@ -13,7 +13,7 @@ import polars as pl
 import databento as db
 from dataclasses import dataclass
 
-from .config import create_represent_config
+from .config import RepresentConfig
 # JUMP_SIZE now comes from RepresentConfig
 
 
@@ -37,30 +37,24 @@ class GlobalThresholdCalculator:
     
     def __init__(
         self,
-        currency: str = "AUDUSD",
-        nbins: Optional[int] = None,
+        config: RepresentConfig,
         sample_fraction: float = 0.5,
-        max_samples_per_file: int = 10000,
         verbose: bool = True,
     ):
         """
         Initialize global threshold calculator using RepresentConfig.
         
         Args:
-            currency: Currency pair for configuration
-            nbins: Number of classification bins (if None, uses config default)
+            config: RepresentConfig with currency-specific configuration
             sample_fraction: Fraction of files to use for threshold calculation
-            max_samples_per_file: Maximum samples to extract per file (for performance)
             verbose: Whether to print progress information
         """
-        self.currency = currency
+        self.config = config
+        self.currency = config.currency
         self.sample_fraction = sample_fraction
-        self.max_samples_per_file = max_samples_per_file
+        self.max_samples_per_file = config.max_samples_per_file
         self.verbose = verbose
-        
-        # Load RepresentConfig for this currency
-        self.config = create_represent_config(currency)
-        self.nbins = nbins if nbins is not None else self.config.nbins
+        self.nbins = self.config.nbins
         
         if self.verbose:
             print("🌐 GlobalThresholdCalculator initialized")
@@ -307,9 +301,8 @@ class GlobalThresholdCalculator:
 
 
 def calculate_global_thresholds(
+    config: RepresentConfig,
     data_directory: Union[str, Path],
-    currency: str = "AUDUSD",
-    nbins: int = 13,
     sample_fraction: float = 0.5,
     file_pattern: str = "*.dbn*",
     verbose: bool = True,
@@ -318,9 +311,8 @@ def calculate_global_thresholds(
     Convenience function to calculate global thresholds using lookback vs lookforward methodology.
     
     Args:
+        config: RepresentConfig with currency-specific configuration
         data_directory: Directory containing DBN files
-        currency: Currency pair for configuration
-        nbins: Number of classification bins
         sample_fraction: Fraction of files to use for threshold calculation
         file_pattern: Pattern to match DBN files
         verbose: Whether to print progress information
@@ -330,9 +322,10 @@ def calculate_global_thresholds(
         
     Example:
         # Calculate percentage-based thresholds from first 50% of files
+        config = create_represent_config("AUDUSD")
         thresholds = calculate_global_thresholds(
+            config,
             "/Users/danielfisher/data/databento/AUDUSD-micro",
-            currency="AUDUSD",
             sample_fraction=0.5
         )
         
@@ -343,8 +336,7 @@ def calculate_global_thresholds(
         )
     """
     calculator = GlobalThresholdCalculator(
-        currency=currency,
-        nbins=nbins,
+        config=config,
         sample_fraction=sample_fraction,
         verbose=verbose,
     )

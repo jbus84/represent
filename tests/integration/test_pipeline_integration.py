@@ -24,7 +24,7 @@ class TestIntegration:
         data = generate_realistic_market_data(n_samples=50000, seed=42)
 
         # Run the current pipeline
-        result = process_market_data(data, currency="AUDUSD")
+        result = process_market_data(data, config=self.config)
 
         # Validate output with current config
         expected_shape = self.config.output_shape
@@ -45,8 +45,8 @@ class TestIntegration:
         data2 = generate_realistic_market_data(n_samples=50000, seed=123)
 
         # Run pipeline
-        result1 = process_market_data(data1, currency="AUDUSD")
-        result2 = process_market_data(data2, currency="AUDUSD")
+        result1 = process_market_data(data1, config=self.config)
+        result2 = process_market_data(data2, config=self.config)
 
         # Results should be identical
         np.testing.assert_array_equal(result1, result2)
@@ -68,7 +68,7 @@ class TestIntegration:
                 spread=condition["spread"],
                 seed=42,
             )
-            result = process_market_data(data, currency="AUDUSD")
+            result = process_market_data(data, config=self.config)
             results.append(result)
 
             # Each result should be valid
@@ -91,7 +91,7 @@ class TestIntegration:
                     pl.lit(1.0).alias(col)
                 )
 
-        result = process_market_data(constant_data, currency="AUDUSD")
+        result = process_market_data(constant_data, config=self.config)
 
         # Should still produce valid output
         assert result.shape == self.config.output_shape
@@ -102,11 +102,11 @@ class TestIntegration:
         data = generate_realistic_market_data(n_samples=50000, seed=42)
 
         # Test single feature
-        result_single = process_market_data(data, features=["volume"], currency="AUDUSD")
+        result_single = process_market_data(data, config=self.config, features=["volume"])
         assert result_single.shape == (PRICE_LEVELS, self.config.time_bins)
 
         # Test multiple features
-        result_multi = process_market_data(data, features=["volume", "variance"], currency="AUDUSD")
+        result_multi = process_market_data(data, config=self.config, features=["volume", "variance"])
         assert result_multi.shape == (2, PRICE_LEVELS, self.config.time_bins)
 
         # Results might be the same if only using volume feature
@@ -123,7 +123,7 @@ class TestIntegration:
 
         for currency in currencies:
             config = create_represent_config(currency)
-            result = process_market_data(data, currency=currency)
+            result = process_market_data(data, config=config)
             results[currency] = result
 
             # Each should have correct shape for that currency
@@ -143,7 +143,7 @@ class TestIntegration:
 
         # Measure processing time
         start_time = time.perf_counter()
-        result = process_market_data(data, currency="AUDUSD")
+        result = process_market_data(data, config=self.config)
         end_time = time.perf_counter()
 
         processing_time_ms = (end_time - start_time) * 1000
@@ -166,7 +166,7 @@ class TestIntegration:
         # Process multiple datasets
         for i in range(5):
             data = generate_realistic_market_data(n_samples=25000, seed=i)
-            result = process_market_data(data, currency="AUDUSD")
+            result = process_market_data(data, config=self.config)
             assert result.shape == (PRICE_LEVELS, 250)  # Verify correct time_bins
 
         final_memory = process.memory_info().rss / 1024 / 1024  # MB
@@ -185,7 +185,7 @@ class TestConfigurationIntegration:
         
         currency = "AUDUSD"
         config = create_represent_config(currency)
-        processor = MarketDepthProcessor(currency=currency)
+        processor = MarketDepthProcessor(config=config)
 
         # All should use same configuration values
         assert processor.config.time_bins == config.time_bins
@@ -206,7 +206,7 @@ class TestConfigurationIntegration:
         data = generate_realistic_market_data(n_samples=50000, seed=42)
         config = create_represent_config("AUDUSD")
         
-        result = process_market_data(data, currency="AUDUSD")
+        result = process_market_data(data, config=config)
         
         # Result shape should match config output_shape
         assert result.shape == config.output_shape

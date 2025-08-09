@@ -7,6 +7,7 @@ from represent.parquet_classifier import (
     ClassificationConfig,
     process_dbn_to_classified_parquets
 )
+from represent.config import create_represent_config
 
 
 class TestClassificationConfig:
@@ -42,7 +43,8 @@ class TestParquetClassifier:
     
     def test_initialization(self):
         """Test classifier initialization."""
-        classifier = ParquetClassifier(verbose=False)
+        config = create_represent_config("AUDUSD")
+        classifier = ParquetClassifier(config, verbose=False)
         
         assert classifier.config.currency == "AUDUSD"
         assert classifier.config.features == ["volume"]
@@ -51,10 +53,13 @@ class TestParquetClassifier:
     
     def test_custom_initialization(self):
         """Test classifier with custom parameters."""
-        classifier = ParquetClassifier(
+        config = create_represent_config(
             currency="EURUSD",
             features=["volume", "variance"],
-            min_symbol_samples=100,
+            min_symbol_samples=100
+        )
+        classifier = ParquetClassifier(
+            config,
             verbose=False
         )
         
@@ -64,8 +69,9 @@ class TestParquetClassifier:
     
     def test_filter_symbols_by_threshold(self):
         """Test symbol filtering logic."""
+        config = create_represent_config("AUDUSD", min_symbol_samples=20)
         classifier = ParquetClassifier(
-            min_symbol_samples=20,
+            config,
             verbose=False
         )
         
@@ -93,7 +99,9 @@ class TestParquetClassifier:
     
     def test_calculate_price_movements(self):
         """Test price movement calculation."""
+        config = create_represent_config("AUDUSD")
         classifier = ParquetClassifier(
+            config,
             verbose=False
         )
         
@@ -118,9 +126,10 @@ class TestParquetClassifier:
     
     def test_apply_quantile_classification_uniform(self):
         """Test quantile-based uniform classification."""
+        config = create_represent_config("AUDUSD", nbins=5)
         classifier = ParquetClassifier(
+            config,
             force_uniform=True,
-            nbins=5,
             verbose=False
         )
         
@@ -143,7 +152,9 @@ class TestParquetClassifier:
     
     def test_filter_processable_rows(self):
         """Test row filtering for processable data."""
+        config = create_represent_config("AUDUSD")
         classifier = ParquetClassifier(
+            config,
             verbose=False
         )
         
@@ -175,7 +186,8 @@ class TestParquetClassifier:
     
     def test_classifier_has_expected_methods(self):
         """Test that classifier has expected methods."""
-        classifier = ParquetClassifier(verbose=False)
+        config = create_represent_config("AUDUSD")
+        classifier = ParquetClassifier(config, verbose=False)
         
         # Test that key methods exist
         assert hasattr(classifier, 'filter_symbols_by_threshold')
@@ -202,20 +214,24 @@ class TestParquetClassifierAPI:
                 "total_samples": 1000
             }
             
-            result = process_dbn_to_classified_parquets(
-                dbn_path="dummy.dbn",
-                output_dir="output",
+            config = create_represent_config(
                 currency="EURUSD",
                 features=["volume", "variance"],
                 min_symbol_samples=500
             )
+            result = process_dbn_to_classified_parquets(
+                config=config,
+                dbn_path="dummy.dbn",
+                output_dir="output"
+            )
             
             # Verify classifier was created with correct parameters
             mock_classifier_class.assert_called_once()
-            call_kwargs = mock_classifier_class.call_args[1]
-            assert call_kwargs['currency'] == "EURUSD"
-            assert call_kwargs['features'] == ["volume", "variance"]
-            assert call_kwargs['min_symbol_samples'] == 500
+            call_kwargs = mock_classifier_class.call_args[1]  # Get keyword arguments
+            config_arg = call_kwargs['config']  # Config passed as keyword arg
+            assert config_arg.currency == "EURUSD"
+            assert config_arg.features == ["volume", "variance"]
+            assert config_arg.min_symbol_samples == 500
             
             # Verify processing was called
             mock_classifier.process_dbn_to_classified_parquets.assert_called_once()
@@ -230,7 +246,8 @@ class TestParquetClassifierEdgeCases:
     
     def test_empty_dataframe_handling(self):
         """Test handling of empty DataFrames."""
-        classifier = ParquetClassifier(verbose=False)
+        config = create_represent_config("AUDUSD")
+        classifier = ParquetClassifier(config, verbose=False)
         
         empty_df = pl.DataFrame({
             'symbol': [],
@@ -246,7 +263,8 @@ class TestParquetClassifierEdgeCases:
     
     def test_basic_configuration_access(self):
         """Test basic configuration access."""
-        classifier = ParquetClassifier(verbose=False)
+        config = create_represent_config("AUDUSD")
+        classifier = ParquetClassifier(config, verbose=False)
         
         # Should have basic configuration
         assert hasattr(classifier, 'config')
@@ -255,9 +273,12 @@ class TestParquetClassifierEdgeCases:
     
     def test_multi_feature_support(self):
         """Test classifier with multiple features."""
-        classifier = ParquetClassifier(
+        config = create_represent_config(
             currency="AUDUSD",
-            features=["volume", "variance"],
+            features=["volume", "variance"]
+        )
+        classifier = ParquetClassifier(
+            config,
             verbose=False
         )
         
@@ -270,7 +291,8 @@ class TestParquetClassifierConfiguration:
     
     def test_configuration_consistency(self):
         """Test that classifier uses RepresentConfig consistently."""
-        classifier = ParquetClassifier(currency="EURUSD", verbose=False)
+        config = create_represent_config("EURUSD")
+        classifier = ParquetClassifier(config, verbose=False)
         
         # Should use EURUSD configuration
         assert classifier.config.currency == "EURUSD"
@@ -280,8 +302,9 @@ class TestParquetClassifierConfiguration:
     
     def test_error_handling_insufficient_data(self):
         """Test error handling with insufficient data."""
+        config = create_represent_config("AUDUSD", min_symbol_samples=10000)
         classifier = ParquetClassifier(
-            min_symbol_samples=10000,
+            config,
             verbose=False
         )
         
@@ -300,7 +323,8 @@ class TestParquetClassifierConfiguration:
     
     def test_constant_price_handling(self):
         """Test handling of constant prices (no movement)."""
-        classifier = ParquetClassifier(verbose=False)
+        config = create_represent_config("AUDUSD")
+        classifier = ParquetClassifier(config, verbose=False)
         
         constant_data = pl.DataFrame({
             'ts_event': range(1000),
@@ -332,10 +356,10 @@ class TestParquetClassifierAdvanced:
             price_movement_stats={"mean": 0.0, "std": 0.0005}
         )
         
+        config = create_represent_config("AUDUSD", nbins=5)
         classifier = ParquetClassifier(
-            currency="AUDUSD",
+            config,
             global_thresholds=mock_thresholds,
-            nbins=5,
             verbose=False
         )
         
@@ -352,9 +376,9 @@ class TestParquetClassifierAdvanced:
         ]
         
         for features in feature_combinations:
+            config = create_represent_config("AUDUSD", features=features)
             classifier = ParquetClassifier(
-                currency="AUDUSD",
-                features=features,
+                config,
                 verbose=False
             )
             
@@ -366,8 +390,9 @@ class TestParquetClassifierAdvanced:
         currencies = ["AUDUSD", "EURUSD", "GBPUSD", "USDJPY"]
         
         for currency in currencies:
+            config = create_represent_config(currency)
             classifier = ParquetClassifier(
-                currency=currency,
+                config,
                 verbose=False
             )
             
@@ -377,12 +402,15 @@ class TestParquetClassifierAdvanced:
 
     def test_classifier_parameter_validation(self):
         """Test classifier parameter combinations."""
-        classifier = ParquetClassifier(
+        config = create_represent_config(
             currency="EURUSD",
             features=["volume", "variance"],
             min_symbol_samples=2000,
+            nbins=7
+        )
+        classifier = ParquetClassifier(
+            config,
             force_uniform=False,
-            nbins=7,
             verbose=False
         )
         
@@ -394,7 +422,8 @@ class TestParquetClassifierAdvanced:
 
     def test_process_symbol_method_structure(self):
         """Test process_symbol method structure and requirements."""
-        classifier = ParquetClassifier(verbose=False)
+        config = create_represent_config("AUDUSD")
+        classifier = ParquetClassifier(config, verbose=False)
         
         # Test that method exists
         assert hasattr(classifier, 'process_symbol')
@@ -414,8 +443,9 @@ class TestParquetClassifierAdvanced:
 
     def test_load_dbn_file_method(self):
         """Test load_dbn_file method structure."""
+        config = create_represent_config("AUDUSD", features=["volume", "variance"])
         classifier = ParquetClassifier(
-            features=["volume", "variance"],
+            config,
             verbose=False
         )
         
@@ -425,11 +455,14 @@ class TestParquetClassifierAdvanced:
 
     def test_classifier_config_consistency(self):
         """Test configuration consistency across methods."""
-        classifier = ParquetClassifier(
+        config = create_represent_config(
             currency="GBPUSD",
             features=["volume"],
             min_symbol_samples=500,
-            nbins=9,
+            nbins=9
+        )
+        classifier = ParquetClassifier(
+            config,
             verbose=False
         )
         
@@ -454,7 +487,8 @@ class TestParquetClassifierAdvanced:
         captured_output = io.StringIO()
         sys.stdout = captured_output
         
-        _ = ParquetClassifier(currency="AUDUSD", verbose=True)
+        config = create_represent_config("AUDUSD")
+        _ = ParquetClassifier(config, verbose=True)
         
         # Restore stdout
         sys.stdout = sys.__stdout__
@@ -465,7 +499,8 @@ class TestParquetClassifierAdvanced:
 
     def test_classifier_method_signatures(self):
         """Test that all expected methods exist with correct signatures."""
-        classifier = ParquetClassifier(verbose=False)
+        config = create_represent_config("AUDUSD")
+        classifier = ParquetClassifier(config, verbose=False)
         
         expected_methods = [
             'filter_symbols_by_threshold',
@@ -568,24 +603,24 @@ class TestParquetClassifierAPIFunction:
             }
             
             # Test function call with various parameters
-            result = process_dbn_to_classified_parquets(
-                dbn_path="test.dbn",
-                output_dir="output",
+            config = create_represent_config(
                 currency="EURUSD",
                 features=["volume", "variance"],
                 min_symbol_samples=500,
+                nbins=7
+            )
+            result = process_dbn_to_classified_parquets(
+                config=config,
+                dbn_path="test.dbn",
+                output_dir="output",
                 force_uniform=True,
-                nbins=7,
                 verbose=False
             )
             
-            # Verify classifier was created with correct parameters
+            # Verify classifier was created with correct parameters (new signature)
             mock_classifier_class.assert_called_once_with(
-                currency="EURUSD",
-                features=["volume", "variance"],
-                min_symbol_samples=500,
+                config=config,
                 force_uniform=True,
-                nbins=7,
                 global_thresholds=None,
                 verbose=False
             )

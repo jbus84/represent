@@ -64,8 +64,12 @@ class TestRepresentConfig:
         # time_bins should be computed as samples // ticks_per_bin
         assert config.time_bins == 10000 // 50  # = 200
         
-        # min_symbol_samples should be computed as samples // 25
-        assert config.min_symbol_samples == 10000 // 25  # = 400
+        # min_symbol_samples is now configurable with default 1000
+        assert config.min_symbol_samples == 1000  # default value
+        
+        # Test that min_symbol_samples can be configured
+        config_custom = RepresentConfig(samples=10000, ticks_per_bin=50, min_symbol_samples=400)
+        assert config_custom.min_symbol_samples == 400  # custom value
         
     def test_feature_validation(self):
         """Test feature validation."""

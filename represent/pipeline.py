@@ -25,7 +25,7 @@ from .constants import (
     FeatureType,
     get_output_shape,
 )
-from .config import create_represent_config
+from .config import RepresentConfig
 from .data_structures import PriceLookupTable, VolumeGrid, OutputBuffer
 
 
@@ -38,19 +38,19 @@ class MarketDepthProcessor:
 
     def __init__(
         self, 
-        features: Optional[Union[list[str], list[FeatureType]]] = None,
-        currency: str = "AUDUSD"
+        config: RepresentConfig,
+        features: Optional[Union[list[str], list[FeatureType]]] = None
     ):
         """Initialize processor with pre-allocated structures.
 
         Args:
+            config: RepresentConfig with currency-specific configuration
             features: List of features to extract. Can be strings or FeatureType enums.
                      Options: 'volume', 'variance', 'trade_counts' or FeatureType enum values
                      Defaults to ['volume'] for backward compatibility.
-            currency: Currency pair for configuration (used for micro_pip_size and ticks_per_bin)
         """
-        # Load RepresentConfig for this currency
-        self.config = create_represent_config(currency)
+        # Use the provided RepresentConfig
+        self.config = config
         
         # Pre-compute values for performance
         self.micro_pip_multiplier = 1.0 / self.config.micro_pip_size
@@ -351,43 +351,41 @@ class MarketDepthProcessor:
 
 # Factory function for easy instantiation
 def create_processor(
-    features: Optional[Union[list[str], list[FeatureType]]] = None,
-    currency: str = "AUDUSD"
+    config: RepresentConfig,
+    features: Optional[Union[list[str], list[FeatureType]]] = None
 ) -> MarketDepthProcessor:
     """Create a new market depth processor instance.
 
     Args:
+        config: RepresentConfig with currency-specific configuration
         features: List of features to extract. Can be strings or FeatureType enums.
                  Options: 'volume', 'variance', 'trade_counts' or FeatureType enum values
                  Defaults to ['volume'] for backward compatibility.
-        currency: Currency pair for configuration (used for micro_pip_size and ticks_per_bin)
     """
-    return MarketDepthProcessor(features=features, currency=currency)
+    return MarketDepthProcessor(config=config, features=features)
 
 
-# Main API function that matches the reference implementation interface
+# Main API function that uses RepresentConfig
 def process_market_data(
     df: pl.DataFrame, 
-    features: Optional[Union[list[str], list[FeatureType]]] = None,
-    currency: str = "AUDUSD"
+    config: RepresentConfig,
+    features: Optional[Union[list[str], list[FeatureType]]] = None
 ) -> np.ndarray:
     """
     Process market data and return normalized depth representation.
-
-    This function provides the same interface as the reference implementation
-    but with significant performance optimizations and extended feature support.
+    Now uses RepresentConfig to determine output shape and processing parameters.
 
     Args:
         df: Polars DataFrame with market data
+        config: RepresentConfig with currency-specific configuration and shape parameters
         features: List of features to extract. Can be strings or FeatureType enums.
                  Options: 'volume', 'variance', 'trade_counts' or FeatureType enum values
                  Defaults to ['volume'] for backward compatibility.
-        currency: Currency pair for configuration (used for micro_pip_size and ticks_per_bin)
 
     Returns:
         numpy array with normalized market depth:
-        - Single feature: shape (402, 500)
-        - Multiple features: shape (N, 402, 500) where N is number of features
+        - Single feature: shape (402, config.time_bins)
+        - Multiple features: shape (N, 402, config.time_bins) where N is number of features
     """
-    processor = create_processor(features=features, currency=currency)
+    processor = create_processor(config=config, features=features)
     return processor.process(df)

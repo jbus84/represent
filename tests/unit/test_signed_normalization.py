@@ -16,11 +16,16 @@ import numpy as np
 import polars as pl
 import pandas as pd
 from represent.pipeline import process_market_data
+from represent.config import create_represent_config
 from represent.data_structures import OutputBuffer
 
 
 class TestSignedNormalization:
     """Critical tests to prevent normalization regression."""
+    
+    def setup_method(self):
+        """Setup config for each test."""
+        self.config = create_represent_config("AUDUSD")
 
     def test_process_market_data_produces_signed_output(self):
         """
@@ -60,7 +65,7 @@ class TestSignedNormalization:
         df = pl.DataFrame(data)
         
         # Process data
-        result = process_market_data(df, features=["volume"])
+        result = process_market_data(df, config=self.config, features=["volume"])
         
         # CRITICAL ASSERTIONS
         assert result.min() >= -1.0, f"Minimum {result.min()} should be >= -1.0"
@@ -98,7 +103,7 @@ class TestSignedNormalization:
         df = pl.DataFrame(data)
         
         # Test all features
-        result = process_market_data(df, features=["volume", "variance", "trade_counts"])
+        result = process_market_data(df, config=self.config, features=["volume", "variance", "trade_counts"])
         
         assert result.shape[0] == 3, "Should have 3 feature channels"
         

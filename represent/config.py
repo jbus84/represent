@@ -97,6 +97,18 @@ class RepresentConfig(BaseModel):
         description="True pip size for the currency pair"
     )
     
+    # Performance parameters
+    max_samples_per_file: int = Field(
+        default=10000,
+        gt=0,
+        description="Maximum samples to extract per file for performance optimization"
+    )
+    target_samples: int = Field(
+        default=1000,
+        gt=0,
+        description="Target number of samples for analysis operations"
+    )
+    
     @field_validator("currency")
     @classmethod
     def validate_currency_pair(cls, v: str) -> str:
@@ -132,10 +144,11 @@ class RepresentConfig(BaseModel):
         """Auto-computed time bins based on samples and ticks_per_bin."""
         return self.samples // self.ticks_per_bin
     
-    @computed_field
-    def min_symbol_samples(self) -> int:
-        """Auto-computed minimum samples per symbol."""
-        return self.samples // 25
+    min_symbol_samples: int = Field(
+        default_factory=lambda: 1000,
+        gt=0,
+        description="Minimum samples required per symbol for processing"
+    )
     
     @computed_field
     def output_shape(self) -> Tuple[int, int]:
