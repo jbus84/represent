@@ -256,6 +256,40 @@ class TestAPIIntegration:
             assert result > 0  # Should have some currencies available
 
 
+class TestAPIClassification:
+    """Test API classification functionality."""
+    
+    @pytest.mark.skipif(not API_AVAILABLE, reason="API imports not available")
+    def test_batch_classify_symbol_parquets_method_exists(self):
+        """Test that batch_classify_symbol_parquets method exists."""
+        api = RepresentAPI()
+        assert hasattr(api, 'batch_classify_symbol_parquets')
+        assert callable(api.batch_classify_symbol_parquets)
+    
+    @pytest.mark.skipif(not API_AVAILABLE, reason="API imports not available") 
+    def test_classify_symbol_parquet_method_exists(self):
+        """Test that classify_symbol_parquet method exists."""
+        api = RepresentAPI()
+        assert hasattr(api, 'classify_symbol_parquet')
+        assert callable(api.classify_symbol_parquet)
+    
+    @pytest.mark.skipif(not API_AVAILABLE, reason="API imports not available")
+    def test_batch_classify_symbol_parquets_signature(self):
+        """Test batch_classify_symbol_parquets method signature."""
+        api = RepresentAPI()
+        import inspect
+        sig = inspect.signature(api.batch_classify_symbol_parquets)
+        
+        # Check required parameters
+        assert 'config' in sig.parameters
+        assert 'input_directory' in sig.parameters
+        assert 'output_directory' in sig.parameters
+        
+        # Check default pattern parameter
+        assert 'pattern' in sig.parameters
+        assert sig.parameters['pattern'].default == "*_*.parquet"
+
+
 class TestAPIUtilities:
     """Test API utility functions and helpers."""
     

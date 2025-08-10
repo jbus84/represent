@@ -475,41 +475,86 @@ class ParquetClassifier:
         **kwargs
     ) -> Dict[str, Any]:
         """
-        Classify a single symbol parquet file (compatibility method).
-        
-        This method provides compatibility with the old API but redirects
-        to the streamlined DBN processing approach.
+        Classify a single symbol parquet file.
         
         Args:
-            parquet_path: Path to input data (treated as DBN path)
-            output_path: Directory for output files
+            parquet_path: Path to input parquet file
+            output_path: Path for output classified parquet file
             **kwargs: Additional arguments
             
         Returns:
             Processing statistics
         """
-        if output_path is None:
-            output_path = Path(parquet_path).parent / "classified"
+        parquet_file = Path(parquet_path)
         
-        return self.process_dbn_to_classified_parquets(
-            dbn_path=parquet_path,
-            output_dir=output_path
-        )
+        if not parquet_file.exists():
+            raise FileNotFoundError(f"Parquet file not found: {parquet_file}")
+        
+        if not parquet_file.suffix == '.parquet':
+            raise ValueError(f"Input file must be a parquet file, got: {parquet_file.suffix}")
+        
+        # Load parquet file
+        if self.verbose:
+            print(f"📄 Loading parquet file: {parquet_file}")
+            
+        symbol_df = pl.read_parquet(parquet_file)
+        
+        # Extract symbol from filename (format: CURRENCY_SYMBOL.parquet)
+        filename_parts = parquet_file.stem.split('_')
+        if len(filename_parts) >= 2:
+            symbol = '_'.join(filename_parts[1:])  # Handle symbols with underscores
+        else:
+            # Fallback: try to get symbol from data
+            if 'symbol' in symbol_df.columns:
+                symbol = symbol_df['symbol'][0]
+            else:
+                symbol = "UNKNOWN"
+        
+        # Process the symbol data
+        processed_df = self.process_symbol(symbol, symbol_df)
+        
+        if processed_df is None or len(processed_df) == 0:
+            raise ValueError(f"No processable data found in {parquet_file}")
+        
+        # Determine output path
+        if output_path is None:
+            output_file = parquet_file.parent / f"{parquet_file.stem}_classified.parquet"
+        else:
+            output_file = Path(output_path)
+            if output_file.is_dir():
+                output_file = output_file / f"{parquet_file.stem}_classified.parquet"
+        
+        # Save classified data
+        processed_df.write_parquet(output_file)
+        
+        stats = {
+            'input_file': str(parquet_file),
+            'output_file': str(output_file),
+            'symbol': symbol,
+            'input_samples': len(symbol_df),
+            'output_samples': len(processed_df),
+            'file_size_mb': output_file.stat().st_size / 1024 / 1024,
+        }
+        
+        if self.verbose:
+            print(f"✅ Classified {symbol}: {len(processed_df):,} samples → {output_file.name}")
+        
+        return stats
 
     def batch_classify_parquets(
         self,
         input_directory: Union[str, Path], 
         output_directory: Union[str, Path],
-        pattern: str = "*.dbn*",
+        pattern: str = "*_*.parquet",
         **kwargs
     ) -> List[Dict[str, Any]]:
         """
-        Batch classify multiple files (compatibility method).
+        Batch classify multiple parquet files.
         
         Args:
-            input_directory: Directory with DBN files
-            output_directory: Directory for output files  
-            pattern: File pattern to match
+            input_directory: Directory with unlabeled parquet files from Stage 1
+            output_directory: Directory for classified output files  
+            pattern: File pattern to match parquet files
             **kwargs: Additional arguments
             
         Returns:
@@ -523,22 +568,29 @@ class ParquetClassifier:
             
         output_dir.mkdir(parents=True, exist_ok=True)
         
-        dbn_files = list(input_dir.glob(pattern))
-        if not dbn_files:
+        parquet_files = list(input_dir.glob(pattern))
+        if not parquet_files:
             raise ValueError(f"No files found matching pattern '{pattern}' in {input_dir}")
         
+        if self.verbose:
+            print(f"🔄 Found {len(parquet_files)} parquet files to classify")
+        
         results = []
-        for dbn_file in dbn_files:
+        for parquet_file in parquet_files:
             try:
-                stats = self.process_dbn_to_classified_parquets(
-                    dbn_path=dbn_file,
-                    output_dir=output_dir
+                stats = self.classify_symbol_parquet(
+                    parquet_path=parquet_file,
+                    output_path=output_dir
                 )
                 results.append(stats)
             except Exception as e:
                 if self.verbose:
-                    print(f"❌ Failed to process {dbn_file.name}: {e}")
+                    print(f"❌ Failed to process {parquet_file.name}: {e}")
                 continue
+                
+        if self.verbose:
+            total_processed = sum(result.get('output_samples', 0) for result in results)
+            print(f"✅ Batch classification complete: {len(results)} files, {total_processed:,} total samples")
                 
         return results
 
@@ -583,15 +635,12 @@ def classify_parquet_file(
     **kwargs
 ) -> Dict[str, Any]:
     """
-    Convenience function to classify a single file.
-    
-    Note: This now processes DBN files directly, not parquet files.
-    The name is kept for API compatibility.
+    Convenience function to classify a single parquet file.
     
     Args:
         config: RepresentConfig with currency-specific configuration
-        parquet_path: Path to input DBN file
-        output_path: Directory for classified output files
+        parquet_path: Path to input parquet file
+        output_path: Path for classified output file
         **kwargs: Additional arguments
         
     Returns:
@@ -608,20 +657,17 @@ def batch_classify_parquet_files(
     config: RepresentConfig,
     input_directory: Union[str, Path],
     output_directory: Union[str, Path], 
-    pattern: str = "*.dbn*",
+    pattern: str = "*_*.parquet",
     **kwargs
 ) -> List[Dict[str, Any]]:
     """
-    Convenience function to classify multiple files.
-    
-    Note: This now processes DBN files directly, not parquet files.
-    The name is kept for API compatibility.
+    Convenience function to classify multiple parquet files.
     
     Args:
         config: RepresentConfig with currency-specific configuration
-        input_directory: Directory with DBN files
+        input_directory: Directory with unlabeled parquet files
         output_directory: Directory for classified output files
-        pattern: File pattern to match
+        pattern: File pattern to match parquet files
         **kwargs: Additional arguments
         
     Returns:
