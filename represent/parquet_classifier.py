@@ -318,6 +318,135 @@ class ParquetClassifier:
         
         return processable_df
 
+    def _classify_processed_parquet(
+        self, 
+        symbol_df: pl.DataFrame, 
+        parquet_file: Path, 
+        output_path: Optional[Union[str, Path]] = None
+    ) -> Dict[str, Any]:
+        """
+        Classify processed parquet file from UnlabeledDBNConverter.
+        
+        This handles the case where the parquet file contains serialized market depth features
+        and metadata (from UnlabeledDBNConverter) rather than raw DBN data.
+        
+        Args:
+            symbol_df: DataFrame with processed market depth features
+            parquet_file: Path to the input parquet file
+            output_path: Optional output path for classified file
+            
+        Returns:
+            Classification statistics
+        """
+        # Extract symbol from filename or data
+        filename_parts = parquet_file.stem.split('_')
+        if len(filename_parts) >= 2:
+            symbol = '_'.join(filename_parts[1:])
+        else:
+            symbol = symbol_df['symbol'][0] if 'symbol' in symbol_df.columns else "UNKNOWN"
+        
+        if self.verbose:
+            print(f"🎯 Processing processed parquet for symbol: {symbol}")
+            print(f"   📊 Found {len(symbol_df):,} processed samples")
+        
+        # Check if we have sufficient samples
+        if len(symbol_df) < self.config.min_symbol_samples:
+            error_msg = f"Insufficient samples: {len(symbol_df)} < {self.config.min_symbol_samples}"
+            if self.verbose:
+                print(f"   ❌ {error_msg}")
+            raise ValueError(error_msg)
+        
+        # For processed data, we already have start_mid_price and end_mid_price
+        # We can calculate price movements and apply classification
+        if 'start_mid_price' not in symbol_df.columns or 'end_mid_price' not in symbol_df.columns:
+            raise ValueError("Processed parquet must contain 'start_mid_price' and 'end_mid_price' columns")
+        
+        # Calculate price movements (in micro-pips)
+        price_movements = (symbol_df['end_mid_price'] - symbol_df['start_mid_price']) / self.represent_config.micro_pip_size
+        price_movements_array = price_movements.to_numpy()
+        
+        # Apply classification thresholds
+        if self.config.global_thresholds:
+            # Use global thresholds if provided
+            class_labels = self._apply_global_classification(price_movements_array)
+        else:
+            # Use quantile-based classification on this data
+            class_labels = self._apply_quantile_classification(price_movements_array)
+        
+        # Add classification labels to the dataframe
+        classified_df = symbol_df.with_columns([
+            pl.Series("price_movement", price_movements),
+            pl.Series("classification_label", class_labels)
+        ])
+        
+        # Determine output path
+        if output_path is None:
+            output_file = parquet_file.parent / f"{parquet_file.stem}_classified.parquet"
+        else:
+            output_file = Path(output_path)
+            if output_file.is_dir():
+                output_file = output_file / f"{parquet_file.stem}_classified.parquet"
+        
+        # Save classified data
+        classified_df.write_parquet(
+            str(output_file),
+            compression="snappy",
+            statistics=True,
+            row_group_size=50000
+        )
+        
+        # Generate statistics
+        class_distribution = classified_df.group_by("classification_label").len().sort("classification_label")
+        
+        stats = {
+            "input_file": str(parquet_file),
+            "output_file": str(output_file),
+            "symbol": symbol,
+            "total_samples": len(classified_df),
+            "class_distribution": {
+                int(row[0]): int(row[1]) 
+                for row in class_distribution.iter_rows()
+            },
+            "price_movement_stats": {
+                "mean": float(np.mean(price_movements_array)),
+                "std": float(np.std(price_movements_array)),
+                "min": float(np.min(price_movements_array)),
+                "max": float(np.max(price_movements_array))
+            },
+            "processing_type": "processed_parquet_from_unlabeled_converter"
+        }
+        
+        if self.verbose:
+            print(f"   ✅ Classified {len(classified_df):,} samples")
+            print(f"   📁 Saved to: {output_file}")
+            print(f"   📊 Class distribution: {stats['class_distribution']}")
+        
+        return stats
+    
+    def _apply_quantile_classification(self, price_movements: np.ndarray) -> np.ndarray:
+        """Apply quantile-based classification to price movements."""
+        # Create quantile boundaries for uniform distribution
+        quantiles = np.linspace(0, 1, self.config.nbins + 1)
+        thresholds = np.quantile(price_movements, quantiles[1:-1])  # Exclude 0 and 1
+        
+        # Apply classification
+        class_labels = np.zeros(len(price_movements), dtype=int)
+        for i, threshold in enumerate(thresholds):
+            class_labels[price_movements >= threshold] = i + 1
+            
+        return class_labels
+    
+    def _apply_global_classification(self, price_movements: np.ndarray) -> np.ndarray:
+        """Apply global threshold-based classification to price movements."""
+        if not self.config.global_thresholds:
+            raise ValueError("Global thresholds not provided")
+        
+        class_labels = np.zeros(len(price_movements), dtype=int)
+        for i, threshold in enumerate(self.config.global_thresholds.quantile_boundaries[1:-1]):
+            class_labels[price_movements >= threshold] = i + 1
+            
+        return class_labels
+
     def process_symbol(self, symbol: str, symbol_df: pl.DataFrame) -> Optional[pl.DataFrame]:
         """
         Process a single symbol's data.
@@ -499,6 +628,13 @@ class ParquetClassifier:
             
         symbol_df = pl.read_parquet(parquet_file)
         
+        # Check if this is processed data from UnlabeledDBNConverter vs raw DBN data
+        is_processed_data = 'market_depth_features' in symbol_df.columns
+        
+        if is_processed_data:
+            # Handle processed parquet from UnlabeledDBNConverter
+            return self._classify_processed_parquet(symbol_df, parquet_file, output_path)
+        
         # Extract symbol from filename (format: CURRENCY_SYMBOL.parquet)
         filename_parts = parquet_file.stem.split('_')
         if len(filename_parts) >= 2:
@@ -510,7 +646,7 @@ class ParquetClassifier:
             else:
                 symbol = "UNKNOWN"
         
-        # Process the symbol data
+        # Process the raw symbol data
         processed_df = self.process_symbol(symbol, symbol_df)
         
         if processed_df is None or len(processed_df) == 0:
