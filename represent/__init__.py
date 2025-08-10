@@ -40,11 +40,6 @@ from .global_threshold_calculator import (
 
 # Alternative: Unlabeled conversion approach
 from .unlabeled_converter import convert_dbn_to_parquet, batch_convert_dbn_files as batch_convert_unlabeled
-from .lazy_dataloader import (
-    LazyParquetDataset,
-    LazyParquetDataLoader,
-    create_parquet_dataloader,
-)
 
 # Dynamic classification configuration
 from .classification_config_generator import (
@@ -88,9 +83,6 @@ __all__ = [
     # Alternative: Unlabeled conversion approach
     "convert_dbn_to_parquet",
     "batch_convert_unlabeled",
-    "create_parquet_dataloader",
-    "LazyParquetDataset",
-    "LazyParquetDataLoader",
     # Core processing
     "process_market_data",
     "create_processor",
@@ -116,11 +108,9 @@ __all__ = [
     "generate_classification_config_from_parquet",
     "classify_with_generated_config",
     # High-level convenience API
-    "create_training_dataloader",
     "RepresentAPI",
     "api",
     "load_training_dataset",
-    "create_parquet_dataloader",
 ]
 
 
@@ -128,6 +118,5 @@ __all__ = [
 from .api import (
     RepresentAPI,
     api,
-    create_training_dataloader,
     load_training_dataset,
 )

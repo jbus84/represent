@@ -10,8 +10,6 @@ from pathlib import Path
 
 from .unlabeled_converter import convert_dbn_to_parquet, batch_convert_dbn_files as batch_convert_unlabeled
 from .parquet_classifier import classify_parquet_file, batch_classify_parquet_files
-from .lazy_dataloader import LazyParquetDataset, LazyParquetDataLoader
-from .lazy_dataloader import create_parquet_dataloader
 from .config import RepresentConfig
 from .classification_config_generator import (
     generate_classification_config_from_parquet
@@ -36,82 +34,6 @@ class RepresentAPI:
 
 
 
-    def create_dataloader(
-        self,
-        config: RepresentConfig,
-        parquet_path: Union[str, Path],
-        batch_size: int = 32,
-        shuffle: bool = True,
-        num_workers: int = 0,
-        sample_fraction: float = 1.0,
-        cache_size: int = 1000,
-    ) -> LazyParquetDataLoader:
-        """
-        Create a PyTorch-compatible dataloader from labeled parquet file.
-
-        Args:
-            config: RepresentConfig with currency-specific configuration
-            parquet_path: Path to labeled parquet file
-            batch_size: Batch size for training
-            shuffle: Whether to shuffle samples
-            num_workers: Number of worker processes
-            sample_fraction: Fraction of dataset to use
-            cache_size: Number of samples to cache
-
-        Returns:
-            LazyParquetDataLoader instance
-
-        Examples:
-            api = RepresentAPI()
-            config = create_represent_config("AUDUSD")
-            dataloader = api.create_dataloader(config, 'labeled_data.parquet', batch_size=64)
-
-            for features, labels in dataloader:
-                # features: (64, 402, 500) market depth tensors
-                # labels: (64,) classification targets
-                pass
-        """
-        return create_parquet_dataloader(
-            config=config,
-            parquet_path=parquet_path,
-            batch_size=batch_size,
-            shuffle=shuffle,
-            num_workers=num_workers,
-            sample_fraction=sample_fraction,
-            cache_size=cache_size,
-        )
-
-    def load_dataset(
-        self,
-        config: RepresentConfig,
-        parquet_path: Union[str, Path],
-        batch_size: int = 32,
-        shuffle: bool = True,
-        sample_fraction: float = 1.0,
-        cache_size: int = 1000,
-    ) -> LazyParquetDataset:
-        """
-        Load a dataset from labeled parquet file.
-
-        Args:
-            config: RepresentConfig with currency-specific configuration
-            parquet_path: Path to labeled parquet file
-            batch_size: Batch size for compatibility
-            shuffle: Whether to shuffle sample indices
-            sample_fraction: Fraction of dataset to use
-            cache_size: Number of samples to cache
-
-        Returns:
-            LazyParquetDataset instance
-        """
-        return LazyParquetDataset(
-            config=config,
-            parquet_path=parquet_path,
-            batch_size=batch_size,
-            shuffle=shuffle,
-            sample_fraction=sample_fraction,
-            cache_size=cache_size,
-        )
 
 
 
@@ -262,54 +184,6 @@ class RepresentAPI:
             **kwargs,
         )
 
-    def create_ml_dataloader(
-        self,
-        config: RepresentConfig,
-        parquet_path: Union[str, Path],
-        batch_size: int = 32,
-        shuffle: bool = True,
-        num_workers: int = 0,
-        sample_fraction: float = 1.0,
-        cache_size: int = 1000,
-    ) -> LazyParquetDataLoader:
-        """
-        Stage 3: Create ML training dataloader from classified parquet file.
-
-        Args:
-            config: RepresentConfig with currency-specific configuration
-            parquet_path: Path to classified parquet file
-            batch_size: Batch size for training
-            shuffle: Whether to shuffle samples
-            num_workers: Number of worker processes
-            sample_fraction: Fraction of dataset to use
-            cache_size: Number of samples to cache
-
-        Returns:
-            LazyParquetDataLoader instance
-
-        Examples:
-            api = RepresentAPI()
-            config = create_represent_config("AUDUSD")
-            dataloader = api.create_ml_dataloader(
-                config,
-                '/data/classified/AUDUSD_M6AM4_classified.parquet', 
-                batch_size=64
-            )
-
-            for features, labels in dataloader:
-                # features: (64, [N_features,] 402, 500) market depth tensors
-                # labels: (64,) classification targets 0-12
-                pass
-        """
-        return create_parquet_dataloader(
-            config=config,
-            parquet_path=parquet_path,
-            batch_size=batch_size,
-            shuffle=shuffle,
-            num_workers=num_workers,
-            sample_fraction=sample_fraction,
-            cache_size=cache_size,
-        )
 
     def run_complete_pipeline(
         self,
@@ -623,11 +497,10 @@ api = RepresentAPI()
 
 
 # Convenience functions that use the default API instance
-def create_training_dataloader(config: RepresentConfig, *args, **kwargs):
-    """Convenience function for creating training dataloader."""
-    return api.create_dataloader(config, *args, **kwargs)
-
-
 def load_training_dataset(config: RepresentConfig, *args, **kwargs):
-    """Convenience function for loading training dataset."""
-    return api.load_dataset(config, *args, **kwargs)
+    """Deprecated: Dataloader functionality moved to ML training repos."""
+    raise NotImplementedError(
+        "Dataloader functionality has been moved out of the represent package. "
+        "Please see DATALOADER_MIGRATION_GUIDE.md for instructions on rebuilding "
+        "the dataloader in your ML training repository."
+    )

@@ -62,23 +62,19 @@ stats = classifier.process_dbn_to_classified_parquets(
 - **Preserved Schema**: Original DBN columns + classification_label column
 - **Fast Loading**: Optimized parquet files for ML training
 
-### Stage 2: ML Training
+### Stage 2: ML Training (External Implementation)
 
-```python  
-from represent import create_parquet_dataloader
+The classified parquet files are ready for ML training. **Dataloader functionality has been moved out of the represent package** to allow for customization in your ML training repository.
 
-# Create lazy dataloader for memory-efficient training
-dataloader = create_parquet_dataloader(
-    parquet_dir="/data/classified/",       # Directory with classified parquet files
-    batch_size=32,
-    shuffle=True,
-    sample_fraction=0.1,                   # Use 10% of dataset for quick iteration
-    num_workers=4,                         # Parallel loading
-    symbols=["M6AM4", "M6AM5"]            # Optional: specific symbols only
-)
+**See `DATALOADER_MIGRATION_GUIDE.md` for comprehensive instructions on rebuilding the dataloader with Claude.**
 
-# Standard PyTorch training loop with guaranteed uniform distribution
-for features, labels in dataloader:
+**Expected Workflow:**
+```python
+# In your ML training repository, implement a custom dataloader
+# that reads the classified parquet files from Stage 1
+
+# Standard PyTorch training loop structure:
+for features, labels in your_custom_dataloader:
     # features: torch.Tensor shape (batch_size, [N_features,] 402, 500)  
     # labels: torch.Tensor shape (batch_size,) with uniform distribution (7.69% each class)
     outputs = model(features)
@@ -89,7 +85,7 @@ for features, labels in dataloader:
 **Key Benefits:**
 - **Guaranteed Uniform Distribution**: Each class has equal representation from Stage 1
 - **Symbol Flexibility**: Train on specific symbols or all available symbols
-- **Memory Efficient**: Load only required batches, not entire dataset
+- **Custom Implementation**: Tailor dataloader to your specific ML framework needs
 - **Faster Loading**: Single parquet files per symbol load much faster
 - **No Intermediate Processing**: Files are ready for ML training immediately
 
@@ -269,20 +265,15 @@ class ParquetClassifier:
     """
 ```
 
-### Lazy Parquet DataLoader (`represent/lazy_dataloader.py`)
+### Custom DataLoader (External Implementation)
 
-Memory-efficient PyTorch dataloader for classified parquet datasets.
+**Dataloader functionality moved to ML training repositories.**
 
-```python
-class LazyParquetDataLoader:
-    """
-    Lazy loading dataloader with:
-    - Multi-symbol dataset support
-    - Guaranteed uniform class distribution
-    - Memory usage independent of dataset size
-    - Symbol-specific sampling strategies
-    """
-```
+See `DATALOADER_MIGRATION_GUIDE.md` for comprehensive instructions on rebuilding with:
+- Multi-symbol dataset support
+- Guaranteed uniform class distribution  
+- Memory usage independent of dataset size
+- Symbol-specific sampling strategies
 
 ### Market Depth Processor (`represent/pipeline.py`)
 
@@ -308,8 +299,8 @@ class MarketDepthProcessor:
 from represent import ParquetClassifier, process_dbn_to_classified_parquets
 from represent import classify_parquet_file, batch_classify_parquet_files
 
-# ML Training DataLoader
-from represent import create_parquet_dataloader
+# ML Training DataLoader (implement in your ML repo)
+# See DATALOADER_MIGRATION_GUIDE.md for implementation instructions
 
 # Core Processing  
 from represent import MarketDepthProcessor, process_market_data
@@ -374,7 +365,7 @@ When working on this codebase:
 
 **WORKFLOW INTEGRATION:**
 - Use `convert_dbn_file()` for offline preprocessing
-- Use `LazyParquetDataLoader` for memory-efficient training
+- Implement custom dataloader in your ML repository (see DATALOADER_MIGRATION_GUIDE.md)
 - Leverage currency configs for market-specific optimizations
 - Pre-computed labels eliminate runtime classification overhead
 
@@ -383,9 +374,8 @@ When working on this codebase:
 ### Complete ML Pipeline (3-Stage)
 
 ```python
-from represent import convert_dbn_to_parquet, classify_parquet_file, create_parquet_dataloader
-import torch
-import torch.nn as nn
+from represent import convert_dbn_to_parquet, classify_parquet_file
+# Note: Dataloader functionality moved to your ML training repo
 
 # Stage 1: Convert DBN to unlabeled parquet with symbol grouping
 print("Stage 1: Converting DBN to parquet...")
@@ -406,39 +396,21 @@ classification_stats = apply_classification_to_parquet(
     target_distribution="uniform"         # Guarantee uniform class distribution
 )
 
-# Stage 3: Create lazy dataloader for training
-print("Stage 3: Creating training dataloader...")
-dataloader = create_parquet_dataloader(
-    parquet_dir="/data/classified/",
-    batch_size=32,
-    shuffle=True,
-    sample_fraction=0.2,                  # Use 20% of data
-    num_workers=4,
-    symbols=["M6AM4", "M6AM5"]           # Train on specific symbols
-)
+# Stage 3: ML Training (implement custom dataloader in your ML repo)
+print("Stage 3: Ready for ML training...")
+print("Classified parquet files available in /data/classified/")
+print("See DATALOADER_MIGRATION_GUIDE.md to implement custom dataloader")
 
-# Train PyTorch model with guaranteed uniform distribution
-model = nn.Sequential(
-    nn.Conv2d(2, 32, 3),                 # 2 features: volume + variance
-    nn.ReLU(),
-    nn.AdaptiveAvgPool2d(1),
-    nn.Flatten(),
-    nn.Linear(32, 13)                    # 13-class uniform classification
-)
-
-optimizer = torch.optim.Adam(model.parameters())
-criterion = nn.CrossEntropyLoss()
-
-for epoch in range(10):
-    for features, labels in dataloader:
-        # features: (32, 2, 402, 500) for volume+variance
-        # labels: (32,) with uniform distribution (7.69% each class 0-12)
-        outputs = model(features)
-        loss = criterion(outputs, labels)
-        
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+# Example training structure (implement custom_dataloader):
+# for features, labels in your_custom_dataloader:
+#     # features: (32, 2, 402, 500) for volume+variance
+#     # labels: (32,) with uniform distribution (7.69% each class 0-12)
+#     outputs = model(features)
+#     loss = criterion(outputs, labels)
+#     
+#     optimizer.zero_grad()
+#     loss.backward()
+#     optimizer.step()
 ```
 
 ### Symbol-Specific Analysis

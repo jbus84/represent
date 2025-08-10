@@ -13,9 +13,9 @@ High-performance Python package for creating normalized market depth representat
 - **⚖️ Dynamic Configuration**: TIME_BINS computed as `samples // ticks_per_bin` (250 for AUDUSD)
 - **📊 Guaranteed Uniform Distribution**: 7.69% per class (13-bin) for optimal ML training
 - **💾 Symbol-Grouped Processing**: Separate parquet files per symbol for targeted analysis
-- **🔋 Memory-Efficient Training**: Lazy loading with configurable batch sizes for large datasets
+- **🔋 ML-Ready Output**: Classified parquet files optimized for external dataloader implementation
 - **🎯 Multi-Feature Support**: Volume, variance, and trade count features (configurable)
-- **🧠 PyTorch Integration**: Production-ready DataLoader with direct tensor operations
+- **🧠 Framework Agnostic**: Output compatible with PyTorch, TensorFlow, or custom ML frameworks
 - **⚡ Performance Optimized**: RepresentConfig system eliminates hardcoded constants
 - **📈 Real-World Tested**: Validated on AUDUSD, GBPUSD, and EURJPY market data
 
@@ -95,8 +95,8 @@ print(f"Max samples: {config.max_samples_per_file}")  # 10000 (from config)
 ### **Stage 1: DBN → Classified Parquet (Direct Processing)**
 Process raw DBN files directly to classified parquet datasets with uniform distribution, grouped by symbol.
 
-### **Stage 2: ML Training**
-Memory-efficient lazy loading for PyTorch training with optimal class balance.
+### **Stage 2: ML Training (External Implementation)**
+Classified parquet files ready for custom dataloader implementation in your ML training repository.
 
 ## 🚀 Quick Start
 
@@ -139,24 +139,29 @@ print(f"All files use consistent global thresholds - same price movement = same 
 - **✅ Global thresholds**: Same price movement gets the same label across ALL files
 - **Result**: Consistent, comparable training data for better ML performance
 
-### Stage 2: ML Training with Lazy Loading
+### Stage 2: ML Training (External Implementation)
+
+The classified parquet files are ready for ML training. **Dataloader functionality has been moved to your ML training repository** for maximum customization.
+
+**See `DATALOADER_MIGRATION_GUIDE.md` for comprehensive instructions on rebuilding the dataloader with Claude.**
 
 ```python
-from represent import create_parquet_dataloader, create_represent_config
+# Expected workflow in your ML training repository:
+from your_ml_package import create_custom_dataloader  # Implement using guide
+from represent import create_represent_config
 
 # Use same config for consistent parameters
 config = create_represent_config("AUDUSD")
 
-# Create memory-efficient dataloader with config
-dataloader = create_parquet_dataloader(
-    config=config,                         # Config provides batch_size, features, etc.
+# Implement custom dataloader following migration guide
+dataloader = create_custom_dataloader(
     parquet_path="data/classified/AUDUSD_M6AM4_classified.parquet",
-    batch_size=32,                         # Override config default if needed
+    batch_size=32,
     shuffle=True,
-    num_workers=4                          # Parallel loading for performance
+    num_workers=4
 )
 
-# Use in PyTorch training loop  
+# Standard PyTorch training loop structure:
 for batch_features, batch_labels in dataloader:
     # batch_features: torch.Tensor of shape [32, 2, 402, 250] for 2 features (AUDUSD time_bins=250)
     # batch_labels: torch.Tensor of shape [32] with uniform distribution (7.69% each class)
@@ -168,7 +173,7 @@ for batch_features, batch_labels in dataloader:
 ## 🔥 Complete Pipeline Example with Global Thresholds
 
 ```python
-from represent import calculate_global_thresholds, process_dbn_to_classified_parquets, create_parquet_dataloader
+from represent import calculate_global_thresholds, process_dbn_to_classified_parquets, create_represent_config
 import torch
 import torch.nn as nn
 
@@ -191,29 +196,22 @@ processing_stats = process_dbn_to_classified_parquets(
     force_uniform=True
 )
 
-# Stage 2: ML training with guaranteed uniform distribution
-print("🔄 Stage 2: Creating ML training dataloader...")
-dataloader = create_parquet_dataloader(
-    config=config,
+# Stage 2: ML training (implement custom dataloader in your ML repo)
+print("🔄 Stage 2: Classified parquet files ready for training...")
+print("📁 Classified files available in: data/classified/")
+print("📖 See DATALOADER_MIGRATION_GUIDE.md for dataloader implementation")
+
+# Example training structure (implement in your ML training repository):
+"""
+# In your ML training repo, implement custom dataloader using the migration guide:
+dataloader = your_custom_dataloader(
     parquet_path="data/classified/AUDUSD_M6AM4_classified.parquet",
     batch_size=32,
     shuffle=True,
     sample_fraction=0.3
 )
 
-# Train PyTorch model with optimal class balance
-model = nn.Sequential(
-    nn.Conv2d(2, 32, 3),                   # 2 features: volume + variance
-    nn.ReLU(),
-    nn.AdaptiveAvgPool2d(1),
-    nn.Flatten(),
-    nn.Linear(32, 13)                      # 13-class uniform classification
-)
-
-optimizer = torch.optim.Adam(model.parameters())
-criterion = nn.CrossEntropyLoss()
-
-print("🔄 Training with guaranteed uniform distribution...")
+# Standard PyTorch training loop:
 for epoch in range(5):
     for features, labels in dataloader:
         # features: (32, 2, 402, 250) for volume+variance with dynamic TIME_BINS=250
@@ -224,6 +222,7 @@ for epoch in range(5):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+"""
 
 print("✅ Complete streamlined pipeline finished successfully!")
 ```
@@ -538,11 +537,11 @@ The comprehensive demo showcases:
 - **🎯 Bin Edges Table**: Detailed quantile boundaries with precise micro-pip values
 - **📊 Statistics**: Range, sample sizes, and files analyzed for each threshold
 
-### **⚡ DataLoader Performance**
-- **Multiple Configurations**: Batch sizes and worker counts
-- **Throughput Analysis**: Samples per second benchmarking
-- **Memory Usage**: RAM consumption tracking  
-- **Efficiency Metrics**: Performance optimization insights
+### **⚡ Parquet Output Performance**
+- **Symbol-Grouped Files**: Optimized for targeted analysis
+- **Compressed Format**: Efficient storage and loading
+- **Schema Optimization**: Ready for external dataloader implementation
+- **Benchmark Ready**: Performance metrics for custom implementations
 
 ### **🧠 ML Sample Generation**
 - **Multi-Feature Tensors**: Ready for PyTorch training
@@ -557,7 +556,7 @@ comprehensive_demo_output/
 ├── comprehensive_demo_report.md            # Documentation
 ├── feature_extraction_demo.png             # Feature visualization
 ├── classification_distribution_demo.png    # Classification analysis
-├── dataloader_performance_demo.png         # Performance benchmarks
+├── parquet_output_performance_demo.png     # Output performance benchmarks
 ├── ml_sample_generation_demo.png           # ML integration
 └── demo_results.json                       # Raw results data
 ```
@@ -683,9 +682,11 @@ The test suite has been reorganized to align with the current architecture:
 
 ### **Removed Outdated Components:**
 - ❌ `test_legacy_dataloader.py` - Old ring buffer architecture  
+- ❌ `test_lazy_dataloader_new.py` - Moved dataloader functionality to ML training repos
 - ❌ `test_reference_implementation.py` - Notebook-based reference code
 - ❌ `test_benchmarks.py` - Benchmarks against removed reference implementation
 - ❌ `reference_implementation.py` - Static reference module
+- ❌ `lazy_dataloader.py` - DataLoader functionality moved to external implementation
 
 ### **Enhanced Test Coverage:**
 - ✅ **Global Threshold Calculator**: Comprehensive tests for threshold calculation logic
