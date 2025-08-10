@@ -16,7 +16,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 try:
     from represent.api import RepresentAPI
     from represent.config import create_represent_config
-    from represent.lazy_dataloader import create_parquet_dataloader as create_training_dataloader
 
     API_AVAILABLE = True
 except ImportError as e:
@@ -56,21 +55,15 @@ class TestRepresentAPI:
         assert len(api._available_currencies) > 0
         assert "AUDUSD" in api._available_currencies
         
-    def test_api_create_dataloader_method(self):
-        """Test API create_dataloader method signature."""
+    def test_api_dataloader_removed(self):
+        """Test that dataloader methods have been removed."""
         api = RepresentAPI()
         
-        # Test that method exists and is callable
-        assert hasattr(api, 'create_dataloader')
-        assert callable(api.create_dataloader)
+        # Test that dataloader methods no longer exist
+        assert not hasattr(api, 'create_dataloader')
+        assert not hasattr(api, 'load_dataset')
+        assert not hasattr(api, 'create_ml_dataloader')
 
-    def test_api_load_dataset_method(self):
-        """Test API load_dataset method signature."""
-        api = RepresentAPI()
-        
-        # Test that method exists and is callable
-        assert hasattr(api, 'load_dataset')
-        assert callable(api.load_dataset)
 
     def test_api_config_creation(self):
         """Test direct config creation (no longer via API method)."""
@@ -129,22 +122,26 @@ class TestAPIFunctions:
     """Test standalone API functions."""
     
     @pytest.mark.skipif(not API_AVAILABLE, reason="API imports not available")
-    def test_create_training_dataloader_import(self):
-        """Test create_training_dataloader is properly imported."""
-        # Test that create_training_dataloader is available
-        assert callable(create_training_dataloader)
+    def test_dataloader_functionality_removed(self):
+        """Test that dataloader functionality has been properly removed."""
+        # Test that create_training_dataloader is no longer available
+        import represent.api as api_module
+        with pytest.raises(AttributeError):
+            getattr(api_module, 'create_training_dataloader')
         
     @pytest.mark.skipif(not API_AVAILABLE, reason="API imports not available") 
     def test_api_module_imports(self):
         """Test that API module imports are working."""
-        from represent.api import api, RepresentAPI, create_training_dataloader
+        from represent.api import api, RepresentAPI, load_training_dataset
         
         # Test singleton API instance
         assert api is not None
         assert isinstance(api, RepresentAPI)
         
-        # Test that create_training_dataloader is available
-        assert callable(create_training_dataloader)
+        # Test that load_training_dataset raises NotImplementedError
+        assert callable(load_training_dataset)
+        with pytest.raises(NotImplementedError):
+            load_training_dataset(None)
         
     def test_mock_data_creation(self):
         """Test our mock data creation utility."""
@@ -321,12 +318,14 @@ class TestAPIUtilities:
     def test_api_package_consistency(self):
         """Test that API integrates properly with the package."""
         # Test that we can import all expected API components
-        from represent.api import RepresentAPI, api, create_training_dataloader
-        from represent import create_parquet_dataloader
+        from represent.api import RepresentAPI, api, load_training_dataset
         
-        # Verify they are both callable functions
-        assert callable(create_training_dataloader)
-        assert callable(create_parquet_dataloader)
+        # Verify they are callable functions
+        assert callable(load_training_dataset)
+        
+        # Verify that the deprecated function raises NotImplementedError
+        with pytest.raises(NotImplementedError):
+            load_training_dataset(None)
         
         # Test singleton
         assert isinstance(api, RepresentAPI)
@@ -366,12 +365,11 @@ class TestRepresentAPIMethods:
         """Test that all expected API methods exist."""
         api = RepresentAPI()
         
-        # Test existence of all main API methods
+        # Test existence of all main API methods (excluding removed dataloader methods)
         expected_methods = [
-            'create_dataloader', 'load_dataset',
             'convert_dbn_to_unlabeled_parquet', 'batch_convert_dbn_to_unlabeled_parquet',
             'classify_symbol_parquet', 'batch_classify_symbol_parquets',
-            'create_ml_dataloader', 'run_complete_pipeline',
+            'run_complete_pipeline',
             'process_dbn_to_classified_parquets', 'create_parquet_classifier',
             'list_available_currencies', 'generate_classification_config',
             'calculate_global_thresholds', 'get_package_info'
@@ -422,15 +420,15 @@ class TestRepresentAPIMethods:
 
     def test_api_convenience_functions(self):
         """Test the module-level convenience functions."""
-        from represent.api import create_training_dataloader, load_training_dataset
+        from represent.api import load_training_dataset
         
-        # Test that convenience functions exist and are callable
-        assert callable(create_training_dataloader)
+        # Test that convenience function exists and is callable
         assert callable(load_training_dataset)
         
-        # Test that they require config parameter
-        _ = create_represent_config("AUDUSD")
-        # Just test that they accept the config parameter
-        # (full functional testing would require mock parquet files)
-        assert callable(create_training_dataloader)
+        # Test that it raises NotImplementedError with helpful message
+        with pytest.raises(NotImplementedError) as exc_info:
+            load_training_dataset(None)
+        
+        # Verify the error message mentions the migration guide
+        assert "DATALOADER_MIGRATION_GUIDE.md" in str(exc_info.value)
         assert callable(load_training_dataset)
