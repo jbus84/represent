@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.11.1 (2025-08-10)
+
+### Bug Fixes
+
+- Stage 2 parquet classification in run_complete_pipeline
+  ([`7719e50`](https://github.com/jbus84/represent/commit/7719e50f72eff14de05242787471a69b74f32ab0))
+
+- **version**: Add new lock
+  ([`f23bacf`](https://github.com/jbus84/represent/commit/f23bacf0adf2b913f491e56b182d70d354095017))
+
+
 ## v1.11.0 (2025-08-09)
 
 ### Bug Fixes
