@@ -145,7 +145,7 @@ class RepresentConfig(BaseModel):
         return self.samples // self.ticks_per_bin
     
     min_symbol_samples: int = Field(
-        default_factory=lambda: 1000,
+        default_factory=lambda: 100,
         gt=0,
         description="Minimum samples required per symbol for processing"
     )

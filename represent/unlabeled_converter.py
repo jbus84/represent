@@ -260,6 +260,7 @@ class UnlabeledDBNConverter:
                     "feature_shape": str(features_array.shape),
                     "start_timestamp": sample_window["ts_event"].min(),
                     "end_timestamp": sample_window["ts_event"].max(),
+                    "ts_event": sample_window["ts_event"].min(),  # Add ts_event column for compatibility
                     "global_start_idx": start_pos,
                     "global_end_idx": end_pos,
                     "sample_id": f"{symbol}_{start_pos}_{end_pos}",
