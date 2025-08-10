@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.11.2 (2025-08-10)
+
+### Bug Fixes
+
+- **bugs**: Update with bug fixes
+  ([`a3ce719`](https://github.com/jbus84/represent/commit/a3ce7191ac88658fcbdafd086cfb8dae3c4326b4))
+
+
 ## v1.11.1 (2025-08-10)
 
 ### Bug Fixes
