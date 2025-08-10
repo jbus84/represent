@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.12.0 (2025-08-10)
+
+### Features
+
+- **dataloader**: Remove all dataloder logic
+  ([`5576dea`](https://github.com/jbus84/represent/commit/5576dea99e33828cd0fdec6a23b12a5973057849))
+
+
 ## v1.11.2 (2025-08-10)
 
 ### Bug Fixes
