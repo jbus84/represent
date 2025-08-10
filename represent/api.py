@@ -1,362 +1,198 @@
 """
 High-level API for the represent package.
 
-This module provides simplified, user-friendly functions for common workflows
-in market depth machine learning pipelines.
+This module provides simplified, user-friendly functions for the
+symbol-split-merge architecture (v5.0.0).
 """
 
 from typing import Dict, List, Optional, Union, Any
 from pathlib import Path
 
-from .unlabeled_converter import convert_dbn_to_parquet, batch_convert_dbn_files as batch_convert_unlabeled
-from .parquet_classifier import classify_parquet_file, batch_classify_parquet_files
+from .dataset_builder import (
+    DatasetBuilder, 
+    DatasetBuildConfig,
+    build_datasets_from_dbn_files,
+    batch_build_datasets_from_directory
+)
 from .config import RepresentConfig
 from .classification_config_generator import (
     generate_classification_config_from_parquet
 )
-from .parquet_classifier import ParquetClassifier, process_dbn_to_classified_parquets
 from .global_threshold_calculator import GlobalThresholds, calculate_global_thresholds
 
 
 class RepresentAPI:
     """
-    High-level API class for represent package workflows.
+    High-level API class for represent package symbol-split-merge workflows.
 
-    This provides a clean, object-oriented interface for common tasks:
-    - Converting DBN files to training datasets
-    - Loading and configuring dataloaders
-    - Managing currency-specific configurations
+    This provides a clean, object-oriented interface for creating comprehensive
+    symbol datasets from multiple DBN files.
     """
 
     def __init__(self):
         """Initialize the API."""
         self._available_currencies = ["AUDUSD", "GBPUSD", "EURJPY", "EURUSD", "USDJPY"]
 
-
-
-
-
-
-
-    def convert_dbn_to_unlabeled_parquet(
+    def build_comprehensive_symbol_datasets(
         self,
         config: RepresentConfig,
-        dbn_path: Union[str, Path],
+        dbn_files: List[Union[str, Path]],
         output_dir: Union[str, Path],
-        **kwargs,
+        dataset_config: Optional[DatasetBuildConfig] = None,
+        intermediate_dir: Optional[Union[str, Path]] = None,
+        verbose: bool = True,
     ) -> Dict[str, Any]:
         """
-        Stage 1: Convert DBN file to unlabeled symbol-grouped parquet datasets.
-
+        Build comprehensive symbol datasets from multiple DBN files.
+        
+        This is the primary workflow that implements symbol-split-merge architecture:
+        1. Split each DBN file by symbol into intermediate files
+        2. Merge all instances of each symbol across files into comprehensive datasets
+        
         Args:
             config: RepresentConfig with currency-specific configuration
-            dbn_path: Path to input DBN file
-            output_dir: Directory for output parquet files
-            **kwargs: Additional arguments for converter
-
+            dbn_files: List of DBN files to process
+            output_dir: Directory for final comprehensive symbol datasets
+            dataset_config: Configuration for dataset building process
+            intermediate_dir: Directory for intermediate split files (temp if None)
+            verbose: Whether to print progress information
+            
         Returns:
-            Conversion statistics dictionary
-
+            Processing statistics and comprehensive dataset information
+            
         Examples:
             api = RepresentAPI()
             config = create_represent_config("AUDUSD", features=['volume', 'variance'])
             
-            # Convert to symbol-grouped parquet files
-            stats = api.convert_dbn_to_unlabeled_parquet(
-                config,
-                'data.dbn', 
-                '/data/unlabeled/'
+            # Build comprehensive datasets from multiple DBN files
+            results = api.build_comprehensive_symbol_datasets(
+                config=config,
+                dbn_files=[
+                    'data/AUDUSD-20240101.dbn.zst',
+                    'data/AUDUSD-20240102.dbn.zst',
+                    'data/AUDUSD-20240103.dbn.zst'
+                ],
+                output_dir='/data/symbol_datasets/'
             )
+            
+            # Results contain comprehensive symbol datasets ready for ML training
+            print(f"Created {results['phase_2_stats']['datasets_created']} comprehensive datasets")
+            print(f"Total samples: {results['phase_2_stats']['total_samples']:,}")
         """
-        return convert_dbn_to_parquet(
+        if dataset_config is None:
+            dataset_config = DatasetBuildConfig(
+                currency=config.currency,
+                features=config.features
+            )
+        
+        return build_datasets_from_dbn_files(
             config=config,
-            dbn_path=dbn_path,
+            dbn_files=dbn_files,
             output_dir=output_dir,
-            **kwargs,
+            dataset_config=dataset_config,
+            intermediate_dir=intermediate_dir,
+            verbose=verbose
         )
-
-    def batch_convert_dbn_to_unlabeled_parquet(
+    
+    def build_datasets_from_directory(
         self,
         config: RepresentConfig,
         input_directory: Union[str, Path],
-        output_directory: Union[str, Path],
-        pattern: str = "*.dbn*",
-        **kwargs,
-    ) -> List[Dict[str, Any]]:
+        output_dir: Union[str, Path],
+        file_pattern: str = "*.dbn*",
+        dataset_config: Optional[DatasetBuildConfig] = None,
+        intermediate_dir: Optional[Union[str, Path]] = None,
+        verbose: bool = True,
+    ) -> Dict[str, Any]:
         """
-        Stage 1: Batch convert multiple DBN files to unlabeled parquet datasets.
-
+        Build comprehensive symbol datasets from all DBN files in a directory.
+        
         Args:
             config: RepresentConfig with currency-specific configuration
             input_directory: Directory containing DBN files
-            output_directory: Directory for output parquet files
-            pattern: File pattern to match
-            **kwargs: Additional arguments for converter
-
-        Returns:
-            List of conversion statistics for each file
-        """
-        return batch_convert_unlabeled(
-            config=config,
-            input_directory=input_directory,
-            output_directory=output_directory,
-            pattern=pattern,
-            **kwargs,
-        )
-
-    def classify_symbol_parquet(
-        self,
-        config: RepresentConfig,
-        parquet_path: Union[str, Path],
-        output_path: Optional[Union[str, Path]] = None,
-        force_uniform: bool = True,
-        **kwargs,
-    ) -> Dict[str, Any]:
-        """
-        Stage 2: Apply uniform classification to unlabeled symbol parquet file.
-
-        Args:
-            config: RepresentConfig with currency-specific configuration
-            parquet_path: Path to unlabeled parquet file
-            output_path: Path for classified output file
-            force_uniform: Apply optimization for uniform distribution
-            **kwargs: Additional arguments for classifier
-
-        Returns:
-            Classification statistics dictionary
-
-        Examples:
-            api = RepresentAPI()
-            config = create_represent_config("AUDUSD")
-            
-            # Classify single symbol parquet file
-            stats = api.classify_symbol_parquet(
-                config,
-                '/data/unlabeled/AUDUSD_M6AM4.parquet',
-                '/data/classified/AUDUSD_M6AM4_classified.parquet'
-            )
-        """
-        return classify_parquet_file(
-            config=config,
-            parquet_path=parquet_path,
-            output_path=output_path,
-            force_uniform=force_uniform,
-            **kwargs,
-        )
-
-    def batch_classify_symbol_parquets(
-        self,
-        config: RepresentConfig,
-        input_directory: Union[str, Path],
-        output_directory: Union[str, Path],
-        pattern: str = "*_*.parquet",
-        **kwargs,
-    ) -> List[Dict[str, Any]]:
-        """
-        Stage 2: Batch apply classification to multiple symbol parquet files.
-
-        Args:
-            config: RepresentConfig with currency-specific configuration
-            input_directory: Directory containing unlabeled parquet files
-            output_directory: Directory for classified parquet files
-            pattern: File pattern to match
-            **kwargs: Additional arguments for classifier
-
-        Returns:
-            List of classification statistics for each file
-
-        Examples:
-            api = RepresentAPI()
-            config = create_represent_config("AUDUSD")
-            
-            # Classify all symbol parquet files in directory
-            results = api.batch_classify_symbol_parquets(
-                config,
-                '/data/unlabeled/',
-                '/data/classified/'
-            )
-        """
-        return batch_classify_parquet_files(
-            config=config,
-            input_directory=input_directory,
-            output_directory=output_directory,
-            pattern=pattern,
-            **kwargs,
-        )
-
-
-    def run_complete_pipeline(
-        self,
-        config: RepresentConfig,
-        dbn_path: Union[str, Path],
-        output_base_dir: Union[str, Path],
-        force_uniform: bool = True,
-        verbose: bool = True,
-    ) -> Dict[str, Any]:
-        """
-        Run the complete 3-stage pipeline from DBN to ML-ready dataset.
-
-        Args:
-            config: RepresentConfig with currency-specific configuration
-            dbn_path: Path to input DBN file
-            output_base_dir: Base directory for all outputs
-            force_uniform: Apply uniform distribution optimization
-            verbose: Print progress information
-
-        Returns:
-            Complete pipeline statistics
-
-        Examples:
-            api = RepresentAPI()
-            config = create_represent_config("AUDUSD", features=['volume', 'variance'])
-            
-            # Run complete pipeline
-            results = api.run_complete_pipeline(
-                config,
-                'data.dbn',
-                '/data/pipeline_output/'
-            )
-        """
-        output_base = Path(output_base_dir)
-        unlabeled_dir = output_base / "unlabeled"
-        classified_dir = output_base / "classified"
-        
-        if verbose:
-            print("🚀 Running Complete 3-Stage Pipeline")
-            print(f"   📁 Output base: {output_base}")
-            print(f"   💱 Currency: {config.currency}")
-            print(f"   📊 Features: {config.features}")
-
-        # Stage 1: DBN to unlabeled parquet
-        if verbose:
-            print("\n🔄 Stage 1: DBN → Unlabeled Parquet...")
-        
-        stage_1_stats = self.convert_dbn_to_unlabeled_parquet(
-            config=config,
-            dbn_path=dbn_path,
-            output_dir=unlabeled_dir,
-        )
-
-        # Stage 2: Classify parquet files
-        if verbose:
-            print("\n🔄 Stage 2: Post-Processing Classification...")
-        
-        stage_2_stats = self.batch_classify_symbol_parquets(
-            config=config,
-            input_directory=unlabeled_dir,
-            output_directory=classified_dir,
-            force_uniform=force_uniform,
-        )
-
-        pipeline_results = {
-            "pipeline_version": "v2.0.0 - 3-Stage Architecture",
-            "input_file": str(dbn_path),
-            "output_base_directory": str(output_base),
-            "currency": config.currency,
-            "features": config.features,
-            "stage_1_stats": stage_1_stats,
-            "stage_2_stats": stage_2_stats,
-            "unlabeled_directory": str(unlabeled_dir),
-            "classified_directory": str(classified_dir),
-            "total_symbols": stage_1_stats.get("symbols_processed", 0),
-            "total_samples": stage_1_stats.get("total_processed_samples", 0),
-            "classified_files": len(stage_2_stats),
-        }
-
-        if verbose:
-            print("\n✅ Complete Pipeline Finished!")
-            print(f"   📊 Symbols processed: {pipeline_results['total_symbols']}")
-            print(f"   📊 Total samples: {pipeline_results['total_samples']:,}")
-            print(f"   📁 Classified data: {classified_dir}")
-            print("   🚀 Ready for ML training!")
-
-        return pipeline_results
-
-    def process_dbn_to_classified_parquets(
-        self,
-        config: RepresentConfig,
-        dbn_path: Union[str, Path],
-        output_dir: Union[str, Path],
-        force_uniform: bool = True,
-        verbose: bool = True,
-    ) -> Dict[str, Any]:
-        """
-        Streamlined approach: Process DBN file directly to classified parquet files.
-        
-        This is the new streamlined method that eliminates intermediate files by
-        processing DBN data directly to classified parquet files, one per symbol.
-        
-        Args:
-            config: RepresentConfig with currency-specific configuration
-            dbn_path: Path to input DBN file
-            output_dir: Directory for output classified parquet files
-            force_uniform: Whether to enforce uniform class distribution
+            output_dir: Directory for final comprehensive symbol datasets
+            file_pattern: Pattern to match DBN files (default: "*.dbn*")
+            dataset_config: Configuration for dataset building process
+            intermediate_dir: Directory for intermediate split files (temp if None)
             verbose: Whether to print progress information
             
         Returns:
-            Processing statistics dictionary
-            
-        Examples:
-            api = RepresentAPI()
-            config = create_represent_config("AUDUSD", features=['volume', 'variance'])
-            
-            # Streamlined processing: DBN → Classified Parquet (one step)
-            results = api.process_dbn_to_classified_parquets(
-                config,
-                'market_data.dbn',
-                '/data/classified/',
-                force_uniform=True
-            )
-            
-            # Files are immediately ready for ML training
-            print(f"Generated {results['symbols_processed']} classified files")
-        """
-        return process_dbn_to_classified_parquets(
-            config=config,
-            dbn_path=dbn_path,
-            output_dir=output_dir,
-            force_uniform=force_uniform,
-            verbose=verbose,
-        )
-
-    def create_parquet_classifier(
-        self,
-        config: RepresentConfig,
-        force_uniform: bool = True,
-        verbose: bool = True,
-    ) -> ParquetClassifier:
-        """
-        Create a DBN-to-parquet classifier instance.
-        
-        Args:
-            config: RepresentConfig with currency-specific configuration
-            force_uniform: Whether to enforce uniform class distribution
-            verbose: Whether to print progress information
-            
-        Returns:
-            ParquetClassifier instance
+            Processing statistics and comprehensive dataset information
             
         Examples:
             api = RepresentAPI()
             config = create_represent_config("AUDUSD", features=['volume'])
             
-            # Create classifier with custom settings
-            classifier = api.create_parquet_classifier(
-                config,
-                force_uniform=True
+            # Build datasets from all DBN files in directory
+            results = api.build_datasets_from_directory(
+                config=config,
+                input_directory='data/audusd_dbn_files/',
+                output_dir='/data/symbol_datasets/'
             )
             
-            # Process multiple files
-            for dbn_file in dbn_files:
-                results = classifier.process_dbn_to_classified_parquets(
-                    dbn_file, 
-                    '/data/classified/'
+            print(f"Processed {len(results['input_files'])} DBN files")
+            print(f"Created {results['phase_2_stats']['datasets_created']} symbol datasets")
+        """
+        if dataset_config is None:
+            dataset_config = DatasetBuildConfig(
+                currency=config.currency,
+                features=config.features
+            )
+        
+        return batch_build_datasets_from_directory(
+            config=config,
+            input_directory=input_directory,
+            output_dir=output_dir,
+            file_pattern=file_pattern,
+            dataset_config=dataset_config,
+            intermediate_dir=intermediate_dir,
+            verbose=verbose
+        )
+    
+    def create_dataset_builder(
+        self,
+        config: RepresentConfig,
+        dataset_config: Optional[DatasetBuildConfig] = None,
+        verbose: bool = True,
+    ) -> DatasetBuilder:
+        """
+        Create a DatasetBuilder instance for advanced symbol-split-merge processing.
+        
+        Args:
+            config: RepresentConfig with currency-specific configuration
+            dataset_config: Configuration for dataset building process
+            verbose: Whether to print progress information
+            
+        Returns:
+            DatasetBuilder instance for advanced processing
+            
+        Examples:
+            api = RepresentAPI()
+            config = create_represent_config("AUDUSD", features=['volume'])
+            
+            # Create builder for custom processing
+            builder = api.create_dataset_builder(
+                config=config,
+                dataset_config=DatasetBuildConfig(min_symbol_samples=5000)
+            )
+            
+            # Use builder for multiple operations
+            for batch_of_files in dbn_file_batches:
+                results = builder.build_datasets_from_dbn_files(
+                    batch_of_files, 
+                    f'/data/batch_{i}_datasets/'
                 )
         """
-        return ParquetClassifier(
+        if dataset_config is None:
+            dataset_config = DatasetBuildConfig(
+                currency=config.currency,
+                features=config.features
+            )
+            
+        return DatasetBuilder(
             config=config,
-            force_uniform=force_uniform,
-            verbose=verbose,
+            dataset_config=dataset_config,
+            verbose=verbose
         )
 
     def list_available_currencies(self) -> List[str]:
@@ -444,16 +280,16 @@ class RepresentAPI:
             # Calculate global thresholds from first 50% of files
             thresholds = api.calculate_global_thresholds(
                 config,
-                "/Users/danielfisher/data/databento/AUDUSD-micro",
+                "/data/databento/AUDUSD-micro",
                 sample_fraction=0.5
             )
             
             # Use thresholds for consistent classification
-            results = api.process_dbn_to_classified_parquets(
+            results = api.build_comprehensive_symbol_datasets(
                 config,
-                "data.dbn",
-                "/data/classified/",
-                global_thresholds=thresholds
+                dbn_files=["data.dbn"],
+                output_dir="/data/datasets/",
+                dataset_config=DatasetBuildConfig(global_thresholds=thresholds)
             )
         """
         return calculate_global_thresholds(
@@ -475,19 +311,33 @@ class RepresentAPI:
 
         return {
             "version": __version__,
-            "architecture": "Multi-approach: Classic 3-stage + Streamlined 2-stage (v4.0.0+)",
+            "architecture": "Symbol-Split-Merge (v5.0.0+)",
             "available_currencies": self.list_available_currencies(),
             "supported_features": ["volume", "variance", "trade_counts"],
             "tensor_shape": "(402, 500) - market depth representation",
+            "pipeline_approach": "Symbol-Split-Merge: Split DBN Files by Symbol → Merge Symbol Data Across Files → Comprehensive Symbol Datasets → ML Training",
             "pipeline_approaches": {
-                "classic_3_stage": ["DBN → Unlabeled Parquet", "Post-Processing Classification", "ML Training"],
-                "streamlined_2_stage": ["DBN → Classified Parquet (Direct)", "ML Training"]
+                "symbol_split_merge": "Symbol-Split-Merge Dataset Building (Primary approach v5.0.0+)",
+                "first_half_training": "Per-symbol classification using first-half data for bin definition",
+                "comprehensive_datasets": "Multi-DBN symbol datasets for comprehensive ML training",
+                "uniform_distribution": "Quantile-based uniform class distribution per symbol",
+                "classic_3_stage": "Legacy 3-stage approach (deprecated in v5.0.0+)",
+                "streamlined_2_stage": "Legacy 2-stage approach (replaced by symbol-split-merge)"
             },
-            "dynamic_features": [
+            "key_features": [
+                "Symbol-Split-Merge Dataset Building",
+                "Comprehensive Multi-File Symbol Datasets", 
+                "Per-Symbol First-Half Classification",
                 "Quantile-based Config Generation", 
                 "Automatic Threshold Optimization",
-                "Streamlined Direct Processing",
-                "On-demand Feature Generation"
+                "Two-Phase Processing with Cleanup",
+                "Performance-Optimized ML Training Datasets"
+            ],
+            "dynamic_features": [
+                "Per-symbol first-half training classification",
+                "Symbol-specific quantile boundaries",
+                "Uniform distribution enforcement",
+                "Multi-DBN comprehensive datasets"
             ],
         }
 
@@ -497,10 +347,16 @@ api = RepresentAPI()
 
 
 # Convenience functions that use the default API instance
-def load_training_dataset(config: RepresentConfig, *args, **kwargs):
-    """Deprecated: Dataloader functionality moved to ML training repos."""
+def load_training_dataset(*args, **kwargs):
+    """
+    DataLoader functionality has been moved to ML training repositories.
+    
+    See examples/symbol_split_merge_demo.py for comprehensive dataset creation,
+    then implement custom dataloaders in your ML training repository.
+    """
     raise NotImplementedError(
-        "Dataloader functionality has been moved out of the represent package. "
-        "Please see DATALOADER_MIGRATION_GUIDE.md for instructions on rebuilding "
-        "the dataloader in your ML training repository."
+        "DataLoader functionality has been moved out of the represent package. "
+        "Use build_datasets_from_dbn_files() to create comprehensive symbol datasets, "
+        "then implement custom dataloaders in your ML training repository. "
+        "See examples/symbol_split_merge_demo.py for complete workflow."
     )

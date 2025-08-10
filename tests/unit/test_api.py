@@ -253,38 +253,29 @@ class TestAPIIntegration:
             assert result > 0  # Should have some currencies available
 
 
-class TestAPIClassification:
-    """Test API classification functionality."""
+class TestSymbolSplitMergeAPI:
+    """Test Symbol-Split-Merge API functionality."""
     
     @pytest.mark.skipif(not API_AVAILABLE, reason="API imports not available")
-    def test_batch_classify_symbol_parquets_method_exists(self):
-        """Test that batch_classify_symbol_parquets method exists."""
+    def test_build_comprehensive_symbol_datasets_method_exists(self):
+        """Test that build_comprehensive_symbol_datasets method exists."""
         api = RepresentAPI()
-        assert hasattr(api, 'batch_classify_symbol_parquets')
-        assert callable(api.batch_classify_symbol_parquets)
+        assert hasattr(api, 'build_comprehensive_symbol_datasets')
+        assert callable(api.build_comprehensive_symbol_datasets)
     
     @pytest.mark.skipif(not API_AVAILABLE, reason="API imports not available") 
-    def test_classify_symbol_parquet_method_exists(self):
-        """Test that classify_symbol_parquet method exists."""
+    def test_build_datasets_from_directory_method_exists(self):
+        """Test that build_datasets_from_directory method exists."""
         api = RepresentAPI()
-        assert hasattr(api, 'classify_symbol_parquet')
-        assert callable(api.classify_symbol_parquet)
+        assert hasattr(api, 'build_datasets_from_directory')
+        assert callable(api.build_datasets_from_directory)
     
     @pytest.mark.skipif(not API_AVAILABLE, reason="API imports not available")
-    def test_batch_classify_symbol_parquets_signature(self):
-        """Test batch_classify_symbol_parquets method signature."""
+    def test_create_dataset_builder_method_exists(self):
+        """Test that create_dataset_builder method exists."""
         api = RepresentAPI()
-        import inspect
-        sig = inspect.signature(api.batch_classify_symbol_parquets)
-        
-        # Check required parameters
-        assert 'config' in sig.parameters
-        assert 'input_directory' in sig.parameters
-        assert 'output_directory' in sig.parameters
-        
-        # Check default pattern parameter
-        assert 'pattern' in sig.parameters
-        assert sig.parameters['pattern'].default == "*_*.parquet"
+        assert hasattr(api, 'create_dataset_builder')
+        assert callable(api.create_dataset_builder)
 
 
 class TestAPIUtilities:
@@ -332,45 +323,46 @@ class TestAPIUtilities:
 
 
 @pytest.mark.skipif(not API_AVAILABLE, reason="API imports not available")
-class TestRepresentAPIMethods:
-    """Test RepresentAPI pipeline methods with mocking."""
+class TestSymbolSplitMergeAPIMethods:
+    """Test Symbol-Split-Merge API methods with mocking."""
 
-    def test_create_parquet_classifier_method(self):
-        """Test API create_parquet_classifier method."""
+    def test_create_dataset_builder_method(self):
+        """Test API create_dataset_builder method."""
         api = RepresentAPI()
         
         # Test that method exists and is callable
-        assert hasattr(api, 'create_parquet_classifier')
-        assert callable(api.create_parquet_classifier)
+        assert hasattr(api, 'create_dataset_builder')
+        assert callable(api.create_dataset_builder)
         
-        # Test classifier creation with default parameters
+        # Test dataset builder creation with default parameters
         config = create_represent_config("AUDUSD")
-        classifier = api.create_parquet_classifier(config, verbose=False)
-        assert classifier is not None
-        assert hasattr(classifier, 'config')
-        assert classifier.config.currency == "AUDUSD"  # Default
-        assert classifier.config.features == ["volume"]  # Default
+        builder = api.create_dataset_builder(config, verbose=False)
+        assert builder is not None
+        assert hasattr(builder, 'represent_config')
+        assert builder.represent_config.currency == "AUDUSD"
+        assert builder.represent_config.features == ["volume"]
         
-        # Test classifier creation with custom parameters
+        # Test dataset builder creation with custom parameters
+        from represent.dataset_builder import DatasetBuildConfig
         custom_config = create_represent_config("EURUSD", features=["volume", "variance"], nbins=7)
-        classifier = api.create_parquet_classifier(
+        dataset_config = DatasetBuildConfig(currency="EURUSD", features=["volume", "variance"], nbins=7)
+        builder = api.create_dataset_builder(
             custom_config,
+            dataset_config=dataset_config,
             verbose=False
         )
-        assert classifier.config.currency == "EURUSD"
-        assert classifier.config.features == ["volume", "variance"]
-        assert classifier.config.nbins == 7
+        assert builder.represent_config.currency == "EURUSD"
+        assert builder.represent_config.features == ["volume", "variance"]
+        assert builder.represent_config.nbins == 7
 
     def test_api_method_signatures(self):
         """Test that all expected API methods exist."""
         api = RepresentAPI()
         
-        # Test existence of all main API methods (excluding removed dataloader methods)
+        # Test existence of current symbol-split-merge API methods
         expected_methods = [
-            'convert_dbn_to_unlabeled_parquet', 'batch_convert_dbn_to_unlabeled_parquet',
-            'classify_symbol_parquet', 'batch_classify_symbol_parquets',
-            'run_complete_pipeline',
-            'process_dbn_to_classified_parquets', 'create_parquet_classifier',
+            'build_comprehensive_symbol_datasets', 'build_datasets_from_directory',
+            'create_dataset_builder',
             'list_available_currencies', 'generate_classification_config',
             'calculate_global_thresholds', 'get_package_info'
         ]
@@ -391,32 +383,39 @@ class TestRepresentAPIMethods:
             assert config.currency == currency
             assert config.nbins > 0
             
-            # Test classifier creation for each currency
-            classifier = api.create_parquet_classifier(config, verbose=False)
-            assert classifier.config.currency == currency
+            # Test dataset builder creation for each currency
+            builder = api.create_dataset_builder(config, verbose=False)
+            assert builder.represent_config.currency == currency
 
     def test_api_parameter_validation(self):
         """Test API parameter handling."""
         api = RepresentAPI()
         
         # Test with various parameter combinations
+        from represent.dataset_builder import DatasetBuildConfig
         config = create_represent_config(
             currency="AUDUSD",
             features=["volume", "variance"],
-            min_symbol_samples=500,
             nbins=13
         )
-        classifier = api.create_parquet_classifier(
-            config,
+        dataset_config = DatasetBuildConfig(
+            currency="AUDUSD",
+            features=["volume", "variance"],
+            min_symbol_samples=500,
             force_uniform=True,
+            nbins=13
+        )
+        builder = api.create_dataset_builder(
+            config,
+            dataset_config=dataset_config,
             verbose=False
         )
         
-        assert classifier.config.currency == "AUDUSD"
-        assert classifier.config.features == ["volume", "variance"]
-        assert classifier.config.min_symbol_samples == 500
-        assert classifier.config.force_uniform is True
-        assert classifier.config.nbins == 13
+        assert builder.represent_config.currency == "AUDUSD"
+        assert builder.represent_config.features == ["volume", "variance"]
+        assert builder.dataset_config.min_symbol_samples == 500
+        assert builder.dataset_config.force_uniform is True
+        assert builder.dataset_config.nbins == 13
 
     def test_api_convenience_functions(self):
         """Test the module-level convenience functions."""
@@ -429,6 +428,5 @@ class TestRepresentAPIMethods:
         with pytest.raises(NotImplementedError) as exc_info:
             load_training_dataset(None)
         
-        # Verify the error message mentions the migration guide
-        assert "DATALOADER_MIGRATION_GUIDE.md" in str(exc_info.value)
-        assert callable(load_training_dataset)
+        # Verify the error message mentions the symbol-split-merge demo
+        assert "symbol_split_merge_demo.py" in str(exc_info.value)

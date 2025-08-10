@@ -1,34 +1,33 @@
 """
 Represent: High-performance market depth ML pipeline.
 
-This package provides flexible multi-stage architectures (v4.0.0):
+This package provides a symbol-split-merge architecture (v5.0.0) for creating
+comprehensive symbol datasets from multiple DBN files:
 
-STREAMLINED 2-STAGE APPROACH (NEW):
-1. DBN → Classified Parquet (Direct, Symbol-by-Symbol)
-2. ML Training with On-demand Feature Generation
+SYMBOL-SPLIT-MERGE APPROACH:
+1. Split multiple DBN files by symbol into intermediate files
+2. Merge each symbol across all files into comprehensive datasets
+3. ML Training with comprehensive symbol-specific datasets
 
-CLASSIC 3-STAGE APPROACH:
-1. DBN to unlabeled symbol-grouped parquet conversion
-2. Post-processing classification with uniform distribution  
-3. Lazy loading parquet dataloader for ML training
-
-Both approaches support:
+Key Features:
 - Currency-specific market configurations
 - High-performance PyTorch integration
 - Quantile-based uniform distribution
 - Multi-feature extraction (volume, variance, trade_counts)
+- Comprehensive symbol coverage across multiple files
+- Performance-optimized two-phase processing
 """
 
-__version__ = "1.12.0"
+__version__ = "1.13.0"
 
-# V4.0.0 - Multi-approach Architecture API
+# V5.0.0 - Symbol-Split-Merge Architecture API
 
-# Streamlined DBN-to-Classified-Parquet Approach
-from .parquet_classifier import (
-    ParquetClassifier,
-    classify_parquet_file, 
-    batch_classify_parquet_files,
-    process_dbn_to_classified_parquets
+# Symbol-Split-Merge Dataset Building (Primary Approach v5.0.0+)
+from .dataset_builder import (
+    DatasetBuilder,
+    DatasetBuildConfig, 
+    build_datasets_from_dbn_files,
+    batch_build_datasets_from_directory
 )
 
 # Global Threshold Calculation
@@ -37,9 +36,6 @@ from .global_threshold_calculator import (
     GlobalThresholdCalculator,
     calculate_global_thresholds
 )
-
-# Alternative: Unlabeled conversion approach
-from .unlabeled_converter import convert_dbn_to_parquet, batch_convert_dbn_files as batch_convert_unlabeled
 
 # Dynamic classification configuration
 from .classification_config_generator import (
@@ -71,18 +67,15 @@ from .config import (
 
 # Public API
 __all__ = [
-    # Streamlined DBN-to-Classified-Parquet Approach
-    "ParquetClassifier",
-    "process_dbn_to_classified_parquets",
-    "classify_parquet_file",
-    "batch_classify_parquet_files",
+    # Symbol-Split-Merge Dataset Building (Primary Approach)
+    "DatasetBuilder",
+    "DatasetBuildConfig",
+    "build_datasets_from_dbn_files", 
+    "batch_build_datasets_from_directory",
     # Global Threshold Calculation
     "GlobalThresholds",
     "GlobalThresholdCalculator",
     "calculate_global_thresholds",
-    # Alternative: Unlabeled conversion approach
-    "convert_dbn_to_parquet",
-    "batch_convert_unlabeled",
     # Core processing
     "process_market_data",
     "create_processor",
