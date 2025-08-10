@@ -15,3 +15,5 @@ wheels/
 
 # Test conversion outputs
 test_conversion/
+
+.DS_Store
