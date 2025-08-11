@@ -18,7 +18,7 @@ import polars as pl
 
 from represent.config import create_represent_config
 from represent.data_structures import OutputBuffer
-from represent.pipeline import process_market_data
+from represent.market_depth_processor import process_market_data
 
 
 class TestSignedNormalization:

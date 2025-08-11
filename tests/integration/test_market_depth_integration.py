@@ -1,5 +1,5 @@
 """
-Integration tests to verify the complete pipeline works as expected.
+Integration tests to verify the complete market depth processing works as expected.
 """
 
 import numpy as np
@@ -7,7 +7,7 @@ import polars as pl
 
 from represent.config import create_represent_config
 from represent.constants import PRICE_LEVELS
-from represent.pipeline import process_market_data
+from represent.market_depth_processor import process_market_data
 from tests.unit.fixtures.sample_data import generate_realistic_market_data
 
 
@@ -182,7 +182,7 @@ class TestConfigurationIntegration:
 
     def test_config_consistency_across_components(self):
         """Test that all components use consistent configuration."""
-        from represent.pipeline import MarketDepthProcessor
+        from represent.market_depth_processor import MarketDepthProcessor
 
         currency = "AUDUSD"
         config = create_represent_config(currency)

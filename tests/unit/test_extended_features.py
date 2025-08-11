@@ -14,7 +14,11 @@ from represent.constants import (
     DEFAULT_FEATURES,
     PRICE_LEVELS,
 )
-from represent.pipeline import MarketDepthProcessor, create_processor, process_market_data
+from represent.market_depth_processor import (
+    MarketDepthProcessor,
+    create_processor,
+    process_market_data,
+)
 from tests.unit.fixtures.sample_data import generate_realistic_market_data
 
 
@@ -332,3 +336,39 @@ class TestBackwardCompatibility:
 
         assert np.allclose(result_default, result_explicit)
         assert result_default.shape == result_explicit.shape == (PRICE_LEVELS, self.config.time_bins)
+
+    def test_processor_initialization_edge_cases(self):
+        """Test processor initialization edge cases and validation."""
+        # Test with empty features list
+        with pytest.raises(ValueError, match="At least one feature must be specified"):
+            MarketDepthProcessor(config=self.config, features=[])
+
+        # Test with too many features
+        too_many_features = ["volume", "variance", "trade_counts", "invalid"]
+        with pytest.raises(ValueError, match="Invalid features"):
+            MarketDepthProcessor(config=self.config, features=too_many_features)
+
+    def test_input_validation(self):
+        """Test input validation for market depth processor."""
+        processor = MarketDepthProcessor(config=self.config, features=["volume"])
+
+        # Test with insufficient samples
+        small_data = generate_realistic_market_data(100)  # Too small
+        with pytest.raises(ValueError, match="Input must have at least 500 samples"):
+            processor.process(small_data)
+
+    def test_processor_state_isolation(self):
+        """Test that processor instances maintain isolated state."""
+        data = generate_realistic_market_data(50000)
+
+        processor1 = MarketDepthProcessor(config=self.config, features=["volume"])
+        processor2 = MarketDepthProcessor(config=self.config, features=["variance"])
+
+        result1 = processor1.process(data)
+        result2 = processor2.process(data)
+
+        # Results should be different due to different features
+        assert not np.array_equal(result1, result2)
+
+        # Processors should have different internal state objects (even if values might be the same)
+        assert processor1._price_lookup is not processor2._price_lookup

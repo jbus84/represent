@@ -23,12 +23,7 @@ __version__ = "1.13.0"
 # V5.0.0 - Symbol-Split-Merge Architecture API
 
 # Symbol-Split-Merge Dataset Building (Primary Approach v5.0.0+)
-# Dynamic classification configuration
-from .classification_config_generator import (
-    ClassificationConfigGenerator,
-    classify_with_generated_config,
-    generate_classification_config_from_parquet,
-)
+# Dynamic classification functionality moved to global_threshold_calculator
 from .config import (
     RepresentConfig,
     create_represent_config,
@@ -62,7 +57,7 @@ from .global_threshold_calculator import (
 )
 
 # Core processing and configuration
-from .pipeline import MarketDepthProcessor, create_processor, process_market_data
+from .market_depth_processor import MarketDepthProcessor, create_processor, process_market_data
 
 # Public API
 __all__ = [
@@ -95,20 +90,12 @@ __all__ = [
     "FEATURE_INDEX_MAP",
     "MAX_FEATURES",
     "get_output_shape",
-    # Dynamic classification configuration
-    "ClassificationConfigGenerator",
-    "generate_classification_config_from_parquet",
-    "classify_with_generated_config",
-    # High-level convenience API
-    "RepresentAPI",
-    "api",
-    "load_training_dataset",
+    # Dynamic classification functionality moved to global_threshold_calculator
+    # High-level convenience API removed - use direct function imports instead
 ]
 
 
-# High-level API imports
-from .api import (
-    RepresentAPI,
-    api,
-    load_training_dataset,
-)
+# Removed redundant high-level API wrapper - use direct imports instead:
+# - build_datasets_from_dbn_files() for symbol dataset building
+# - DatasetBuilder() for advanced processing
+# - calculate_global_thresholds() for threshold calculation

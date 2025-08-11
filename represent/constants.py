@@ -76,7 +76,7 @@ FEATURE_INDEX_MAP: Final[dict[str, int]] = {
     FeatureType.TRADE_COUNTS.value: 2,
 }
 
-# NOTE: Variance feature is calculated dynamically from volume data in pipeline.py
+# NOTE: Variance feature is calculated dynamically from volume data in market_depth_processor.py
 # No separate variance column is needed - variance is computed via .var() on volume columns
 
 
