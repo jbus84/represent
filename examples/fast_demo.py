@@ -138,10 +138,12 @@ def main():
 
                 print(f"      ⚖️  Uniform distribution: {'✅ Yes' if uniform_achieved else '❌ No'} (ratio: {uniformity_ratio:.3f})")
 
-            # Check features
+            # Check features (now generated on-demand, not stored)
             feature_cols = [col for col in df.columns if col.endswith('_representation')]
             if feature_cols:
                 print(f"      🎨 Features: {len(feature_cols)} ({', '.join([col.replace('_representation', '') for col in feature_cols])})")
+            else:
+                print("      🎨 Features: Generated on-demand (no storage overhead)")
 
                 # Create feature visualization
                 try:

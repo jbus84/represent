@@ -28,7 +28,7 @@ class DatasetBuildConfig:
     """Configuration for the symbol-split-merge dataset building process."""
     currency: str = "AUDUSD"
     features: list[str] | None = None
-    min_symbol_samples: int = 55000  # Must be >= config.samples + lookforward_input + lookforward_offset
+    min_symbol_samples: int = 10500  # Must be >= lookback_rows + lookforward_input + lookforward_offset
     force_uniform: bool = True
     nbins: int = 13
     global_thresholds: GlobalThresholds | None = None
@@ -38,6 +38,15 @@ class DatasetBuildConfig:
     def __post_init__(self):
         if self.features is None:
             self.features = ["volume"]
+
+        # Validate that classification method is properly specified
+        if not self.force_uniform and self.global_thresholds is None:
+            raise ValueError(
+                "DatasetBuildConfig requires either force_uniform=True or global_thresholds to be provided. "
+                "Fixed threshold fallback has been removed. Please either:\n"
+                "  1. Set force_uniform=True for quantile-based classification, or\n"
+                "  2. Provide global_thresholds for consistent cross-symbol classification"
+            )
 
 
 class DatasetBuilder:
@@ -71,19 +80,18 @@ class DatasetBuilder:
             features=config.features
         )
 
-        # Calculate minimum required samples based on config requirements
+        # Calculate minimum required samples - only need lookback window size for processing
         required_samples = (
-            config.samples +  # Base samples needed (default 50K, min 25K)
-            config.lookback_rows +  # Historical data needed (default 5K)
-            config.lookforward_input +  # Future data needed (default 5K)
-            config.lookforward_offset  # Offset before future window (default 500)
+            config.lookback_rows +  # Historical data needed for lookback window
+            config.lookforward_input +  # Future data needed for lookforward window
+            config.lookforward_offset  # Offset before future window starts
         )
 
         # Update min_symbol_samples if it's too low
         if self.dataset_config.min_symbol_samples < required_samples:
             if verbose:
                 print(f"⚠️  Updating min_symbol_samples from {self.dataset_config.min_symbol_samples:,} to {required_samples:,}")
-                print(f"    Required: {config.samples:,} samples + {config.lookback_rows:,} lookback + {config.lookforward_input:,} lookforward + {config.lookforward_offset:,} offset")
+                print(f"    Required: {config.lookback_rows:,} lookback + {config.lookforward_input:,} lookforward + {config.lookforward_offset:,} offset")
             self.dataset_config.min_symbol_samples = required_samples
         self.verbose = verbose
 
@@ -183,7 +191,8 @@ class DatasetBuilder:
         if self.verbose:
             print(f"🔄 Merging symbol: {symbol}")
             print(f"   📁 Files: {len(symbol_files)}")
-            print("   📊 Classification approach: First-half bin definition")
+            print("   📊 Processing: Lookback → Lookforward → Percentage Change → Classification")
+            print("   🎯 Features: Generated on-demand during ML training (no storage overhead)")
 
         # Load all symbol data from intermediate files
         all_dfs = []
@@ -225,11 +234,8 @@ class DatasetBuilder:
         # Apply classification
         classified_df = self._apply_classification(merged_df)
 
-        # Generate features
-        featured_df = self._generate_features(classified_df)
-
-        # Filter to processable rows only
-        final_df = self._filter_processable_rows(featured_df)
+        # Filter to processable rows only (no feature generation needed for dataset building)
+        final_df = self._filter_processable_rows(classified_df)
 
         if len(final_df) == 0:
             if self.verbose:
@@ -276,7 +282,7 @@ class DatasetBuilder:
             print(f"      Lookback: {self.represent_config.lookback_rows} rows")
             print(f"      Lookforward: {self.represent_config.lookforward_input} rows")
             print(f"      Lookforward offset: {self.represent_config.lookforward_offset} rows")
-            print(f"      Jump size: {self.represent_config.jump_size} rows")
+            print("      Processing: Every valid row (no jumping)")
 
         # Calculate mid prices using polars vectorized operations
         symbol_df = symbol_df.with_columns([
@@ -310,8 +316,7 @@ class DatasetBuilder:
 
         for stop_row in range(
             self.represent_config.lookback_rows,
-            total_rows - (self.represent_config.lookforward_input + self.represent_config.lookforward_offset),
-            self.represent_config.jump_size
+            total_rows - (self.represent_config.lookforward_input + self.represent_config.lookforward_offset)
         ):
             # Define window boundaries
             lookback_start = stop_row - self.represent_config.lookback_rows
@@ -343,53 +348,8 @@ class DatasetBuilder:
             pl.Series('price_movement', price_movements).cast(pl.Float64)
         ])
 
-    def _generate_features(self, symbol_df: pl.DataFrame) -> pl.DataFrame:
-        """
-        Generate feature representations for the given symbol DataFrame.
-
-        Args:
-            symbol_df: DataFrame for a single symbol
-
-        Returns:
-            DataFrame with feature representation columns added
-        """
-        if not self.dataset_config.features:
-            return symbol_df
-
-        from .pipeline import process_market_data
-
-        # In a real implementation, this would call the feature extraction
-        # pipeline from `represent.pipeline`. For this demo, we generate
-        # a small random 2D array to simulate the feature map.
-        try:
-            # Ensure there is enough data for the feature pipeline
-            if len(symbol_df) < 500:
-                raise ValueError(f"Insufficient data for feature generation ({len(symbol_df)} rows)")
-
-            # Generate the feature map once from the entire symbol dataframe
-            feature_maps = process_market_data(
-                symbol_df, self.represent_config, self.dataset_config.features
-            )
-
-            # Add each feature map as a new column
-            for i, feature in enumerate(self.dataset_config.features):
-                col_name = f"{feature}_representation"
-                # Convert the single 2D numpy array to a list of lists for compatibility
-                feature_list = feature_maps[i].tolist()
-                # Create a column where each row contains this same feature map
-                symbol_df = symbol_df.with_columns(
-                    pl.Series(col_name, [feature_list] * len(symbol_df))
-                )
-        except Exception as e:
-            if self.verbose:
-                print(f"   ⚠️  Feature generation failed: {e}")
-            # Fallback to empty columns if feature generation fails
-            for feature in self.dataset_config.features:
-                col_name = f"{feature}_representation"
-                symbol_df = symbol_df.with_columns(
-                    pl.Series(col_name, [None] * len(symbol_df))
-                )
-        return symbol_df
+    # Feature generation removed - features should be generated on-demand during ML training
+    # This eliminates storage overhead and allows flexible feature combinations
 
     def _apply_classification(self, symbol_df: pl.DataFrame) -> pl.DataFrame:
         """
@@ -468,17 +428,13 @@ class DatasetBuilder:
                 print(f"   🌍 Using global thresholds with {len(quantile_boundaries)-1} bins")
 
         else:
-            # Fixed threshold fallback (basic 3-class classification)
-            up_threshold = 0.0001
-            down_threshold = -0.0001
-
-            classification_labels = np.where(
-                all_movements > up_threshold, 2,
-                np.where(all_movements < down_threshold, 0, 1)
+            # No fallback allowed - GlobalThresholds are required
+            raise ValueError(
+                "DatasetBuilder requires either force_uniform=True or global_thresholds to be provided. "
+                "Fixed threshold fallback has been removed. Please either:\n"
+                "  1. Set force_uniform=True in DatasetBuildConfig for quantile-based classification, or\n"
+                "  2. Provide global_thresholds in DatasetBuildConfig for consistent cross-symbol classification"
             )
-
-            if self.verbose:
-                print(f"   📊 Using fixed thresholds: down<{down_threshold:.6f}, up>{up_threshold:.6f}")
 
         # Create classification series and add to dataframe
         classification_series = pl.Series('classification_label', classification_labels, dtype=pl.Int32)

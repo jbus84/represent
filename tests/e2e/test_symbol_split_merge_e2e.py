@@ -140,7 +140,7 @@ class TestSymbolSplitMergeE2E:
             dataset_config = DatasetBuildConfig(
                 currency="AUDUSD",
                 features=["volume"],
-                min_symbol_samples=1000,  # Will be auto-updated to 25110 (25000+50+50+10), so we need larger test datasets
+                min_symbol_samples=1000,  # Will be auto-updated to 110 (50+50+10 lookback/lookforward), but we test with larger datasets
                 force_uniform=True,
                 keep_intermediate=False   # Clean up intermediate files
             )
@@ -261,7 +261,7 @@ class TestSymbolSplitMergeE2E:
 
             dataset_config = DatasetBuildConfig(
                 currency="AUDUSD",
-                min_symbol_samples=1000,  # Will be auto-updated to 25125
+                min_symbol_samples=1000,  # Will be auto-updated to 115 (50+50+15 lookback/lookforward)
                 force_uniform=True
             )
 
@@ -432,7 +432,7 @@ class TestSymbolSplitMergeE2E:
                 )
 
                 dataset_config = DatasetBuildConfig(
-                    min_symbol_samples=1000,  # Will auto-update to 25060
+                    min_symbol_samples=1000,  # Will auto-update to 60 (10+40+10 lookback/lookforward)
                     keep_intermediate=False  # Test cleanup
                 )
 
@@ -511,7 +511,7 @@ class TestDatasetQuality:
             )
 
             dataset_config = DatasetBuildConfig(
-                min_symbol_samples=1000,  # Will auto-update to 25110
+                min_symbol_samples=1000,  # Will auto-update to 110 (50+50+10 lookback/lookforward)
                 force_uniform=True,
                 nbins=5                   # Simpler for testing
             )

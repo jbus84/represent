@@ -80,12 +80,12 @@ class TestDatasetBuilderCoverage:
     def test_init_with_auto_calculation(self, test_config):
         """Test DatasetBuilder initialization with automatic sample calculation."""
         # Test with low min_symbol_samples - should be auto-updated
-        dataset_config = DatasetBuildConfig(min_symbol_samples=1000)
+        dataset_config = DatasetBuildConfig(min_symbol_samples=100)  # Lower than calculated
 
         builder = DatasetBuilder(test_config, dataset_config, verbose=False)
 
-        # Should have updated min_symbol_samples automatically
-        expected_min = test_config.samples + test_config.lookback_rows + test_config.lookforward_input + test_config.lookforward_offset
+        # Should have updated min_symbol_samples automatically (only lookback/lookforward now)
+        expected_min = test_config.lookback_rows + test_config.lookforward_input + test_config.lookforward_offset
         assert builder.dataset_config.min_symbol_samples == expected_min
 
     def test_init_preserves_higher_values(self, test_config):
@@ -474,14 +474,14 @@ class TestDatasetBuilderCoverage:
                 assert any("test2.dbn.zst" in str(f) for f in dbn_files)
 
 
-class TestFeatureGeneration:
-    """Test feature generation functionality."""
+class TestSimplifiedPipeline:
+    """Test that dataset building uses simplified pipeline (no feature generation)."""
 
     @pytest.fixture
     def test_config(self):
         return create_represent_config(
             currency="AUDUSD",
-            features=["volume", "variance"],
+            features=["volume", "variance"],  # Features specified but not generated during building
             samples=25000,
         )
 
@@ -493,59 +493,50 @@ class TestFeatureGeneration:
             min_symbol_samples=1000
         )
 
-    def test_generate_features_success(self, test_config, dataset_config):
-        """Test successful feature generation."""
+    def test_no_feature_generation_method(self, test_config, dataset_config):
+        """Test that _generate_features method no longer exists."""
         builder = DatasetBuilder(test_config, dataset_config, verbose=False)
 
-        # Create sample symbol data
-        symbol_data = pl.DataFrame({
-            'ts_event': [1640995200000000000 + i * 1000000000 for i in range(1000)],
-            'symbol': ['M6AM4'] * 1000,
-            'ask_px_00': np.random.normal(0.67000, 0.0001, 1000),
-            'bid_px_00': np.random.normal(0.66995, 0.0001, 1000),
-            'ask_sz_00': np.random.randint(100000, 1000000, 1000),
-            'bid_sz_00': np.random.randint(100000, 1000000, 1000),
-        })
+        # Should NOT have _generate_features method
+        assert not hasattr(builder, '_generate_features'), "_generate_features method should be removed"
 
-        result_df = builder._generate_features(symbol_data)
-
-        # Check that feature columns were added
-        for feature in dataset_config.features:
-            col_name = f"{feature}_representation"
-            assert col_name in result_df.columns
-
-    def test_generate_features_insufficient_data(self, test_config, dataset_config):
-        """Test feature generation with insufficient data."""
+    def test_simplified_pipeline_only_essential_processing(self, test_config, dataset_config):
+        """Test that pipeline only does essential processing (no feature storage)."""
         builder = DatasetBuilder(test_config, dataset_config, verbose=False)
 
-        # Create very small dataset (< 500 rows)
-        small_data = pl.DataFrame({
-            'ts_event': [1640995200000000000 + i * 1000000000 for i in range(100)],
-            'symbol': ['M6AM4'] * 100,
-            'ask_px_00': [0.67000] * 100,
-            'bid_px_00': [0.66995] * 100,
-        })
-
-        result_df = builder._generate_features(small_data)
-
-        # Should have feature columns but with None values (fallback)
-        for feature in dataset_config.features:
-            col_name = f"{feature}_representation"
-            assert col_name in result_df.columns
-
-    def test_generate_features_no_features(self, test_config):
-        """Test feature generation when no features specified."""
-        empty_config = DatasetBuildConfig(features=[], min_symbol_samples=1000)
-        builder = DatasetBuilder(test_config, empty_config, verbose=False)
-
+        # Create sample data
         symbol_data = pl.DataFrame({
-            'ts_event': [1640995200000000000],
-            'symbol': ['M6AM4'],
-            'ask_px_00': [0.67000],
-            'bid_px_00': [0.66995],
+            'ts_event': [1640995200000000000 + i * 1000000000 for i in range(200)],
+            'symbol': ['M6AM4'] * 200,
+            'ask_px_00': np.random.normal(0.67000, 0.0001, 200),
+            'bid_px_00': np.random.normal(0.66995, 0.0001, 200),
+            'ask_sz_00': np.random.randint(100000, 1000000, 200),
+            'bid_sz_00': np.random.randint(100000, 1000000, 200),
         })
 
-        result_df = builder._generate_features(symbol_data)
+        # Process through pipeline steps
+        df_movements = builder._calculate_price_movements(symbol_data)
+        df_classified = builder._apply_classification(df_movements)
+        df_final = builder._filter_processable_rows(df_classified)
 
-        # Should return original dataframe unchanged
-        assert len(result_df.columns) == len(symbol_data.columns)
+        if len(df_final) > 0:
+            # Should have essential columns only
+            columns = set(df_final.columns)
+
+            # Required columns
+            required = {'ts_event', 'symbol', 'price_movement', 'classification_label'}
+            assert required.issubset(columns)
+
+            # Should NOT have feature representation columns
+            feature_cols = {col for col in columns if col.endswith('_representation')}
+            assert len(feature_cols) == 0, f"Found feature columns that should not exist: {feature_cols}"
+
+    def test_features_for_on_demand_generation_only(self, test_config, dataset_config):
+        """Test that features config is preserved for on-demand generation."""
+        builder = DatasetBuilder(test_config, dataset_config, verbose=False)
+
+        # Features should still be configured (for on-demand generation)
+        assert builder.dataset_config.features == ["volume", "variance"]
+        assert builder.represent_config.features == ["volume", "variance"]
+
+        # But no feature generation should happen during dataset building

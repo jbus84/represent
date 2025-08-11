@@ -31,7 +31,7 @@ class TestDatasetBuildConfig:
 
         assert config.currency == "AUDUSD"
         assert config.features == ["volume"]
-        assert config.min_symbol_samples == 55000
+        assert config.min_symbol_samples == 10500
         assert config.force_uniform is True
         assert config.nbins == 13
         assert config.global_thresholds is None
@@ -44,7 +44,7 @@ class TestDatasetBuildConfig:
             currency="EURUSD",
             features=["volume", "variance"],
             min_symbol_samples=65000,  # Use a value higher than default
-            force_uniform=False,
+            force_uniform=True,  # Changed to True since fallback was removed
             nbins=10,
             keep_intermediate=True
         )
@@ -52,9 +52,20 @@ class TestDatasetBuildConfig:
         assert config.currency == "EURUSD"
         assert config.features == ["volume", "variance"]
         assert config.min_symbol_samples == 65000
-        assert config.force_uniform is False
+        assert config.force_uniform is True
         assert config.nbins == 10
         assert config.keep_intermediate is True
+
+    def test_config_validation_error(self):
+        """Test that DatasetBuildConfig raises error when neither force_uniform nor global_thresholds provided."""
+        with pytest.raises(ValueError) as exc_info:
+            DatasetBuildConfig(
+                currency="EURUSD",
+                force_uniform=False,
+                global_thresholds=None
+            )
+
+        assert "requires either force_uniform=True or global_thresholds" in str(exc_info.value)
 
     def test_automatic_min_samples_calculation(self):
         """Test that DatasetBuilder automatically calculates minimum required samples."""
@@ -73,8 +84,8 @@ class TestDatasetBuildConfig:
         # Initialize builder - should auto-update min_symbol_samples
         builder = DatasetBuilder(represent_config, dataset_config, verbose=False)
 
-        # Check that minimum was automatically increased
-        expected_min = 50000 + 5000 + 5000 + 500  # 60,500
+        # Check that minimum was automatically increased (only lookback/lookforward needed)
+        expected_min = 5000 + 5000 + 500  # 10,500 (no samples parameter needed)
         assert builder.dataset_config.min_symbol_samples == expected_min
 
     def test_respects_higher_min_samples(self):

@@ -115,7 +115,8 @@ class TestDatasetBuilderFocusedCoverage:
             captured = capsys.readouterr()
             assert "Merging symbol: M6AM4" in captured.out
             assert "Files: 2" in captured.out
-            assert "Classification approach: First-half bin definition" in captured.out
+            assert "Processing: Lookback → Lookforward → Percentage Change → Classification" in captured.out
+            assert "Features: Generated on-demand during ML training" in captured.out
 
     def test_price_movement_calculation_verbose(self, simple_config, simple_dataset_config, capsys):
         """Test verbose output during price movement calculation."""
@@ -135,7 +136,7 @@ class TestDatasetBuilderFocusedCoverage:
         assert "Calculating price movements using lookback/lookforward methodology" in captured.out
         assert "Lookback:" in captured.out
         assert "Lookforward:" in captured.out
-        assert "Jump size:" in captured.out
+        assert "Processing: Every valid row (no jumping)" in captured.out
         assert "Calculated" in captured.out and "price movements" in captured.out
 
     def test_price_movement_insufficient_data_verbose(self, simple_config, simple_dataset_config, capsys):
@@ -207,22 +208,12 @@ class TestDatasetBuilderFocusedCoverage:
         captured = capsys.readouterr()
         assert "Insufficient data for reliable bin calculation:" in captured.out
 
-    def test_feature_generation_verbose_failure(self, simple_config, simple_dataset_config, capsys):
-        """Test verbose output when feature generation fails."""
+    def test_no_feature_generation_in_simplified_pipeline(self, simple_config, simple_dataset_config):
+        """Test that simplified pipeline doesn't generate features during building."""
         builder = DatasetBuilder(simple_config, simple_dataset_config, verbose=True)
 
-        # Create insufficient data for feature generation
-        small_data = pl.DataFrame({
-            "ts_event": [1640995200000000000 + i * 1000000000 for i in range(10)],
-            "symbol": ["M6AM4"] * 10,
-            "ask_px_00": [0.67000] * 10,
-            "bid_px_00": [0.66995] * 10,
-        })
-
-        builder._generate_features(small_data)
-
-        captured = capsys.readouterr()
-        assert "Feature generation failed:" in captured.out
+        # Should not have _generate_features method
+        assert not hasattr(builder, '_generate_features'), "_generate_features should not exist in simplified pipeline"
 
     def test_merge_missing_files_verbose(self, simple_config, simple_dataset_config, capsys):
         """Test verbose output when symbol files are missing."""
