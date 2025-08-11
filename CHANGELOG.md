@@ -2,6 +2,32 @@
 
 <!-- version list -->
 
+## v1.13.0 (2025-08-11)
+
+### Features
+
+- Add missing files
+  ([`6404da5`](https://github.com/jbus84/represent/commit/6404da538039c70e17e83b3e8b57f3a8204343b9))
+
+- **classifcation**: Clean it up
+  ([`799cbad`](https://github.com/jbus84/represent/commit/799cbad149b8550fdcd3261175d54a286470e066))
+
+- **example**: Clean up the examples
+  ([`f5b47e9`](https://github.com/jbus84/represent/commit/f5b47e941383bf9dc86c4d012fa2f11c40e73870))
+
+- **examples**: Update all the examples
+  ([`955824f`](https://github.com/jbus84/represent/commit/955824fd63fb64e8b09c534803fe5f5a9d8d7c00))
+
+- **examples**: Update examples and tests
+  ([`538a69a`](https://github.com/jbus84/represent/commit/538a69aeb19610ade55fd7ca8ff6a9c5ae8b036e))
+
+- **prodcution**: Script added
+  ([`f9570cb`](https://github.com/jbus84/represent/commit/f9570cb889fa788455d8fe01f756450ce3a6d7b0))
+
+- **refactor**: Remove outdated logic and consilidate
+  ([`115cde3`](https://github.com/jbus84/represent/commit/115cde3cff91e5a42e6a131e16427381d0719502))
+
+
 ## v1.12.0 (2025-08-10)
 
 ### Features
