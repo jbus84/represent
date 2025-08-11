@@ -4,90 +4,130 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a **high-performance** Python package called "represent" that creates normalized market depth representations from limit order book (LOB) data using a **parquet-based machine learning pipeline**. The core objective is to produce market depth arrays with pre-computed classification labels for efficient ML training.
+This is a **high-performance** Python package called "represent" that creates normalized market depth representations from limit order book (LOB) data using a **parquet-based machine learning pipeline**. The core objective is to produce comprehensive symbol datasets from multiple DBN files for efficient ML training.
 
 **CRITICAL: This system must be extremely performance-optimized for ML training applications. Every millisecond matters.**
 
-### Streamlined 2-Stage Architecture (v4.0.0) - DBN→Classified-Parquet→ML Pipeline
+### Symbol-Split-Merge Architecture (v5.0.0) - Multi-DBN→Comprehensive-Datasets→ML Pipeline
 
-The package follows a **streamlined two-stage pipeline** for maximum performance and uniform distribution:
+The package now follows a **symbol-split-merge architecture** for creating comprehensive symbol datasets from multiple DBN files:
 
-1. **Stage 1: Direct DBN-to-Classified-Parquet**: Load DBN file, split by symbol, apply classification, save symbol-specific classified parquet files
-2. **Stage 2: ML Training**: Lazy loading from classified parquet for memory-efficient ML training
+1. **Phase 1: Symbol Splitting**: For each DBN file, split by symbol into intermediate parquet files
+2. **Phase 2: Symbol Merging**: Merge all instances of each symbol across files into comprehensive datasets
+3. **Phase 3: ML Training**: Lazy loading from comprehensive symbol datasets for memory-efficient ML training
 
-**Key Performance Improvements:**
-- **No Intermediate Files**: Direct conversion eliminates I/O overhead
-- **Symbol-Level Processing**: Each symbol processed independently with full history
-- **True Uniform Distribution**: Classification applied with full dataset context
-- **Faster Loading**: Single parquet files per symbol load much faster
+**Key Architecture Benefits:**
+- **Comprehensive Symbol Coverage**: Each symbol's complete history across multiple files
+- **Large Dataset Creation**: Merge symbol data from multiple DBN files for robust training
+- **Symbol-Specific Datasets**: Each symbol gets its own comprehensive parquet dataset
+- **Optimized Storage**: Symbol datasets are much larger and more comprehensive than individual file splits
+- **Better ML Training**: Train on symbol's complete history rather than fragmented data
 
-**Streamlined Processing Logic:**
-1. **Load DBN File**: Read entire DBN file into polars DataFrame
-2. **Split by Symbol**: Group data by symbol column
-3. **Filter by Thresholds**: Keep symbols with ≥ (input_rows + lookforward_rows) samples
-4. **Apply Classification**: For each symbol, add classification_label column based on price movement
-5. **Filter Rows**: Drop rows without sufficient historical (input_rows) or future (lookforward_rows) data
-6. **Save Symbol Parquets**: Save each symbol's DataFrame as {currency}_{symbol}_classified.parquet
+**Symbol-Split-Merge Processing Logic:**
+1. **Split Phase**: For each DBN file, split by symbol → `{dbn_name}_{symbol}.parquet`
+2. **Registry Phase**: Track all symbol files across all DBN inputs
+3. **Merge Phase**: For each symbol, merge all its files → `{currency}_{symbol}_dataset.parquet`
+4. **Classification**: Apply uniform classification during merge with full symbol context
+5. **Dataset Ready**: Comprehensive symbol datasets ready for ML training
 
 ## Core Workflow
 
-### Stage 1: Direct DBN-to-Classified-Parquet Conversion
+### New Primary Workflow: Symbol-Split-Merge Dataset Building
 
 ```python
-from represent import ParquetClassifier
+from represent import DatasetBuilder, DatasetBuildConfig, build_datasets_from_dbn_files
 
-# Process DBN file directly to classified parquet files by symbol
-classifier = ParquetClassifier(
+# Build comprehensive symbol datasets from multiple DBN files
+config = create_represent_config("AUDUSD", features=['volume', 'variance'])
+dataset_config = DatasetBuildConfig(
     currency="AUDUSD",
-    features=['volume', 'variance'],       # Multi-feature extraction
-    input_rows=5000,                       # Historical data required for features
-    lookforward_rows=500,                  # Future data required for classification
-    min_symbol_samples=1000,               # Minimum samples per symbol
-    force_uniform=True                     # Guarantee uniform class distribution
+    features=['volume', 'variance'],
+    min_symbol_samples=60500,          # Must be >= samples + lookback + lookforward + offset (50K + 5K + 5K + 500)
+    force_uniform=True,                # Ensure uniform class distribution
+    keep_intermediate=False            # Clean up intermediate split files
 )
 
-stats = classifier.process_dbn_to_classified_parquets(
-    dbn_path="market_data.dbn.zst",
-    output_dir="/data/classified/",        # Directory for symbol-specific classified files
+# Process multiple DBN files into comprehensive symbol datasets
+# Use at least 10 DBN files to ensure sufficient data for minimum sample requirements
+results = build_datasets_from_dbn_files(
+    config=config,
+    dbn_files=[
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240101.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240102.dbn.zst", 
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240103.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240104.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240105.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240106.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240107.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240108.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240109.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240110.dbn.zst"
+    ],
+    output_dir="/data/symbol_datasets/",
+    dataset_config=dataset_config
 )
 
-# Output: /data/classified/AUDUSD_M6AM4_classified.parquet, /data/classified/AUDUSD_M6AM5_classified.parquet, etc.
+# Output: /data/symbol_datasets/AUDUSD_M6AM4_dataset.parquet
+#         /data/symbol_datasets/AUDUSD_M6AM5_dataset.parquet (comprehensive symbol datasets)
+```
+
+**Processing Flow:**
+```
+DBN File 1 → Split by Symbol → M6AM4.parquet, M6AM5.parquet, ...
+DBN File 2 → Split by Symbol → M6AM4.parquet, M6AM5.parquet, ...
+DBN File 3 → Split by Symbol → M6AM4.parquet, M6AM5.parquet, ...
+                                        ↓
+Merge Phase: M6AM4_dataset.parquet ← All M6AM4.parquet files
+             M6AM5_dataset.parquet ← All M6AM5.parquet files
 ```
 
 **Key Features:**
-- **Single-Pass Processing**: DBN → Classified Parquet in one step
-- **Symbol Isolation**: Each symbol processed independently with full context
-- **Uniform Distribution**: True uniform distribution using full dataset
-- **Row Filtering**: Automatic filtering of rows without sufficient history/future
-- **Preserved Schema**: Original DBN columns + classification_label column
-- **Fast Loading**: Optimized parquet files for ML training
+- **Two-Phase Processing**: Split all DBN files, then merge by symbol
+- **Comprehensive Coverage**: Each symbol dataset contains data from all input files
+- **Large Dataset Creation**: Symbol datasets are much larger than individual file processing
+- **Symbol Registry**: Automatic tracking of which symbols appear in which files
+- **Configurable Storage**: Keep or cleanup intermediate split files
+- **Uniform Distribution**: True uniform classification using full symbol context
 
-### Stage 2: ML Training (External Implementation)
+### Alternative Workflow: Directory-Based Processing
 
-The classified parquet files are ready for ML training. **Dataloader functionality has been moved out of the represent package** to allow for customization in your ML training repository.
+```python
+from represent import batch_build_datasets_from_directory
 
-**See `DATALOADER_MIGRATION_GUIDE.md` for comprehensive instructions on rebuilding the dataloader with Claude.**
+# Process all DBN files in a directory
+results = batch_build_datasets_from_directory(
+    config=config,
+    input_directory="data/dbn_files/",
+    output_dir="/data/symbol_datasets/",
+    file_pattern="*.dbn*",
+    dataset_config=dataset_config
+)
+```
+
+### ML Training (External Implementation)
+
+The comprehensive symbol datasets are ready for ML training. **Dataloader functionality has been moved out of the represent package** to allow for customization in your ML training repository.
 
 **Expected Workflow:**
 ```python
 # In your ML training repository, implement a custom dataloader
-# that reads the classified parquet files from Stage 1
+# that reads the comprehensive symbol datasets
 
 # Standard PyTorch training loop structure:
 for features, labels in your_custom_dataloader:
     # features: torch.Tensor shape (batch_size, [N_features,] 402, 500)  
-    # labels: torch.Tensor shape (batch_size,) with uniform distribution (7.69% each class)
+    # labels: torch.Tensor shape (batch_size,) with uniform distribution
     outputs = model(features)
     loss = criterion(outputs, labels)
     # ... training logic
 ```
 
 **Key Benefits:**
-- **Guaranteed Uniform Distribution**: Each class has equal representation from Stage 1
-- **Symbol Flexibility**: Train on specific symbols or all available symbols
-- **Custom Implementation**: Tailor dataloader to your specific ML framework needs
-- **Faster Loading**: Single parquet files per symbol load much faster
-- **No Intermediate Processing**: Files are ready for ML training immediately
+- **Comprehensive Training Data**: Each symbol's full history for robust training
+- **Large Dataset Support**: Train on multi-GB symbol datasets efficiently
+- **Symbol-Specific Training**: Focus on specific symbols or use all available
+- **Uniform Distribution**: Guaranteed class balance within each symbol dataset
+- **Memory Efficient**: Lazy loading supports datasets larger than RAM
 
 ## Core Data Structures
 
@@ -132,38 +172,75 @@ TICKS_PER_BIN = 100      # Tick aggregation for time bins
 
 ## Classification System
 
-### Pre-computed Classification Labels
+### Symbol-Specific Classification with First-Half Training
 
-Labels are computed during DBN→parquet conversion based on price movement:
+**NEW APPROACH (v5.0.0+)**: Classification is now performed on individual symbol datasets using the first half of each symbol's data to define classification bins, then applying those bins to the entire symbol dataset.
+
+**Key Benefits:**
+- **Symbol-Specific Boundaries**: Each symbol gets classification thresholds tailored to its price movement distribution
+- **First-Half Training**: Uses first 50% of symbol data to define bins, preventing data leakage
+- **Consistent Boundaries**: Same classification boundaries applied to entire symbol dataset
+- **Uniform Distribution**: Quantile-based approach ensures balanced class distribution
+- **Full Context**: Classification uses symbol's complete merged dataset from all DBN files
+
+### Classification Process
 
 ```python
-# Classification logic (applied during conversion)
-def classify_price_movement(start_price, end_price, thresholds):
-    movement = (end_price - start_price) / MICRO_PIP_SIZE
-    if movement > thresholds.up_threshold:
-        return 2  # UP
-    elif movement < thresholds.down_threshold:  
-        return 0  # DOWN
-    else:
-        return 1  # NEUTRAL
+# New classification logic (applied per symbol during dataset creation)
+def apply_symbol_classification(symbol_df, nbins=13, force_uniform=True):
+    """
+    Apply classification using first half of symbol data to define bins:
+    
+    1. Calculate price movements using lookback vs lookforward methodology
+    2. Use first half of data to determine quantile boundaries
+    3. Apply those boundaries to classify the entire symbol dataset
+    4. Ensure uniform distribution across all classes
+    """
+    
+    # Step 1: Calculate price movements for entire symbol dataset
+    for stop_row in range(lookback_rows, len(data) - (lookforward_input + lookforward_offset)):
+        lookback_mean = mean(mid_prices[stop_row - lookback_rows:stop_row])
+        lookforward_mean = mean(mid_prices[stop_row + 1 + lookforward_offset:stop_row + lookforward_input])
+        price_movements[stop_row] = (lookforward_mean - lookback_mean) / lookback_mean
+    
+    # Step 2: Use first half of data to define classification bins
+    first_half_size = len(valid_movements) // 2
+    training_movements = valid_movements[:first_half_size]
+    
+    # Step 3: Create quantile boundaries from first half
+    quantiles = np.linspace(0, 1, nbins + 1)
+    quantile_boundaries = np.quantile(training_movements, quantiles)
+    
+    # Step 4: Apply classification to ALL data using first-half boundaries
+    classification_labels = np.digitize(valid_movements, quantile_boundaries[1:-1])
+    classification_labels = np.clip(classification_labels, 0, nbins - 1)
+    
+    return classified_symbol_data
 ```
+
+**Advantages over Previous Approaches:**
+- **No Data Leakage**: First-half training prevents future information bleeding into classification
+- **Symbol Adaptation**: Each symbol gets boundaries fitted to its specific movement characteristics  
+- **Uniform Distribution**: True uniform distribution achieved using quantile-based binning
+- **Full Symbol Context**: Uses complete merged symbol data (not individual DBN file fragments)
+- **Polars Optimized**: Vectorized operations for high-performance processing
 
 ### Currency-Specific Configuration
 
-Each currency has optimized classification thresholds:
+Each currency uses RepresentConfig for standardized configuration:
 
 ```python
-# AUDUSD Configuration (represent/configs/audusd.json)
-{
-  "classification": {
-    "nbins": 13,
-    "up_threshold": 5.0,     # micro-pips
-    "down_threshold": -5.0,   # micro-pips
-    "lookforward_input": 5000,
-    "lookback_rows": 5000,
-    "lookforward_offset": 500
-  }
-}
+from represent import create_represent_config
+
+config = create_represent_config(
+    currency="AUDUSD",
+    features=['volume', 'variance'],
+    lookback_rows=5000,        # Historical data for price movement calculation
+    lookforward_input=5000,    # Future data for price movement calculation  
+    lookforward_offset=500,    # Offset before future window starts
+    jump_size=100,            # Sampling interval for performance
+    nbins=13                  # Number of classification bins
+)
 ```
 
 ## Development Setup
@@ -203,19 +280,25 @@ uv build
 
 ### Data Processing (Performance Critical)
 
+#### Symbol-Split-Merge Processing Requirements:
+- **Streaming DBN Processing**: Handle large DBN files efficiently during split phase
+- **Intermediate File Management**: Efficient creation and cleanup of symbol split files
+- **Symbol Registry Tracking**: Track symbol files across multiple DBN inputs efficiently
+- **Large Dataset Merging**: Efficiently merge multiple symbol files using polars concat
+- **Memory Management**: Process large symbol merges without excessive RAM usage
+
 #### Parquet-Based Processing Requirements:
-- **Lazy Loading**: Load only required data chunks from parquet
+- **Lazy Loading**: Load only required data chunks from comprehensive datasets
 - **Vectorized Operations**: Use polars for high-performance data operations
 - **Pre-allocated Buffers**: No dynamic memory allocation in hot paths
 - **Feature-agnostic Pipeline**: Same processing handles volume, variance, trade counts
-- **Memory Pre-allocation**: Allocate buffers for maximum enabled features at initialization
 - **Schema Validation**: Validate feature availability at startup, not runtime
 
 #### DBN Processing Requirements:
 - **Streaming Decompression**: Handle zstandard compression efficiently
-- **Batch Processing**: Process large DBN files in configurable chunks
-- **Price Mapping**: Map prices to 402-level grid using lookup tables
-- **Multi-feature Extraction**: Extract all enabled features in single pass
+- **Multi-file Processing**: Process multiple DBN files in sequence efficiently
+- **Symbol Splitting**: Extract symbols from each DBN file in single pass
+- **Multi-feature Extraction**: Extract all enabled features during split phase
 
 ### Testing (Performance Focused)
 - Organize tests by domain matching source structure
@@ -223,45 +306,46 @@ uv build
 - Test error conditions and recovery scenarios
 - **MANDATORY: 80% code coverage minimum** - all PRs must maintain this threshold
 - **MANDATORY: Performance test critical paths with benchmarks**
-- **Benchmark against target latencies: <10ms for array generation, <50ms for batch processing**
+- **Test Symbol-Split-Merge performance with multiple large DBN files**
 - **Memory usage tests** - ensure no memory leaks in long-running processes
 - **Coverage reporting** - use `make test-coverage` and `make coverage-html` for detailed reports
 
 ## Performance Requirements (NON-NEGOTIABLE)
 
 **CRITICAL LATENCY TARGETS:**
-- **DBN Conversion**: <1000 samples/second sustained processing
-- **Parquet Loading**: <10ms for single sample loading (with caching)
-- **Batch Processing**: <50ms for 32-sample batch generation
-- **Feature Processing**: <2ms additional latency per additional feature (linear scaling)
-- **Memory Usage**: <4GB RAM for training on multi-GB parquet datasets
+- **DBN Split Phase**: <500 samples/second per DBN file during symbol splitting
+- **Symbol Merge Phase**: <2000 samples/second during symbol dataset merging
+- **Dataset Loading**: <10ms for single sample loading from comprehensive datasets
+- **Batch Processing**: <50ms for 32-sample batch generation from symbol datasets
+- **Memory Usage**: <8GB RAM for processing multiple large DBN files
 
 **THROUGHPUT REQUIREMENTS:**
-- **Training**: 1000+ samples/second during ML training
-- **Conversion**: 500+ samples/second during DBN→parquet conversion
+- **Split Processing**: 300+ samples/second per DBN during split phase
+- **Merge Processing**: 1500+ samples/second during symbol merging
+- **Training**: 1000+ samples/second during ML training from comprehensive datasets
 - **Parallel Processing**: Must scale linearly with CPU cores
 
 **MEMORY CONSTRAINTS:**
-- **Training Memory**: <4GB RAM regardless of parquet dataset size
-- **Conversion Memory**: <8GB RAM during DBN processing
+- **Split Phase Memory**: <4GB RAM per DBN file during splitting
+- **Merge Phase Memory**: <8GB RAM during symbol dataset creation
+- **Training Memory**: <4GB RAM regardless of comprehensive dataset size
 - **Cache Efficiency**: >90% cache hit rate for frequently accessed samples
-- **Feature Scaling**: Linear memory usage per additional feature
 
 ## Key Components
 
-### ParquetClassifier (`represent/parquet_classifier.py`)
+### DatasetBuilder (`represent/dataset_builder.py`)
 
-Primary streamlined DBN-to-classified-parquet processor.
+Primary symbol-split-merge dataset builder for creating comprehensive symbol datasets.
 
 ```python
-class ParquetClassifier:
+class DatasetBuilder:
     """
-    Process DBN files directly to classified parquet files with:
-    - Single-pass DBN → Classified Parquet processing
-    - Symbol-level processing with full context
-    - True uniform distribution using quantile-based classification
-    - Row filtering for insufficient history/future data
-    - Preserved schema with added classification_label column
+    Symbol-Split-Merge Dataset Builder:
+    - Phase 1: Split multiple DBN files by symbol into intermediate files
+    - Phase 2: Merge each symbol across all files into comprehensive datasets
+    - Symbol registry tracks which symbols appear in which files
+    - Configurable intermediate file cleanup
+    - Pre-computed classification labels using full symbol context
     """
 ```
 
@@ -270,8 +354,8 @@ class ParquetClassifier:
 **Dataloader functionality moved to ML training repositories.**
 
 See `DATALOADER_MIGRATION_GUIDE.md` for comprehensive instructions on rebuilding with:
-- Multi-symbol dataset support
-- Guaranteed uniform class distribution  
+- Comprehensive symbol dataset support
+- Guaranteed uniform class distribution within each symbol
 - Memory usage independent of dataset size
 - Symbol-specific sampling strategies
 
@@ -295,160 +379,167 @@ class MarketDepthProcessor:
 ### Main Entry Points
 
 ```python
-# Primary: Streamlined DBN-to-Classified-Parquet Processing
-from represent import ParquetClassifier, process_dbn_to_classified_parquets
-from represent import classify_parquet_file, batch_classify_parquet_files
+# Primary: Symbol-Split-Merge Dataset Building
+from represent import DatasetBuilder, DatasetBuildConfig
+from represent import build_datasets_from_dbn_files, batch_build_datasets_from_directory
 
-# ML Training DataLoader (implement in your ML repo)
-# See DATALOADER_MIGRATION_GUIDE.md for implementation instructions
+# Alternative: Streamlined DBN-to-Classified-Parquet Processing  
+from represent import ParquetClassifier, process_dbn_to_classified_parquets
+
+# Legacy: Unlabeled conversion approach (if needed)
+from represent import convert_dbn_to_parquet, batch_convert_unlabeled
 
 # Core Processing  
 from represent import MarketDepthProcessor, process_market_data
 
 # Configuration
 from represent import create_represent_config
-
-# Alternative: Unlabeled conversion approach (if needed)
-from represent import convert_dbn_to_parquet, batch_convert_unlabeled
 ```
 
 ### Dynamic Configuration Generation
 
-The represent package now uses **dynamic configuration generation** instead of static files:
+The represent package uses **RepresentConfig** for standardized configuration:
 
 ```python
-from represent import generate_classification_config_from_parquet
+from represent import create_represent_config
 
-# Generate optimized config from actual parquet data
-config, metrics = generate_classification_config_from_parquet(
-    parquet_files="/path/to/data.parquet",
-    currency="AUDUSD"
+# Create standardized configuration
+config = create_represent_config(
+    currency="AUDUSD",
+    features=['volume', 'variance'],
+    lookback_rows=5000,
+    lookforward_input=5000,
+    lookforward_offset=500
 )
 
-print(f"Quality: {metrics['validation_metrics']['quality']}")
-print(f"Average deviation: {metrics['validation_metrics']['avg_deviation']:.1f}%")
+print(f"Currency: {config.currency}")
+print(f"Features: {config.features}")
+print(f"Lookback rows: {config.lookback_rows}")
 ```
-
-**Benefits of Dynamic Configuration:**
-- ✅ **No Static Files**: Eliminates need for `represent/configs/` directory
-- ✅ **Data-Driven**: Optimized thresholds based on actual price movements
-- ✅ **Uniform Distribution**: Quantile-based approach ensures balanced classes
-- ✅ **Quality Assessment**: Real-time validation and quality metrics
 
 ## Instructions for Claude
 
 When working on this codebase:
 
-1. **PARQUET-FIRST ARCHITECTURE** - All data processing should assume parquet-based lazy loading
+1. **SYMBOL-SPLIT-MERGE FIRST** - All new data processing should use the symbol-split-merge architecture
 2. **PERFORMANCE FIRST** - Every code change must be evaluated for performance impact
 3. **80% COVERAGE MANDATORY** - All code must maintain 80% test coverage minimum
-4. **NO RING BUFFERS** - The old ring buffer architecture has been completely replaced
+4. **COMPREHENSIVE DATASETS** - Focus on creating large, comprehensive symbol datasets
 5. **TYPE SAFETY** - Fix all type annotations for better IDE support and runtime safety
 6. **LAZY LOADING ONLY** - Remove any references to streaming/real-time data ingestion
-7. **PRE-COMPUTED LABELS** - Classification happens during conversion, not training
-8. **MEMORY EFFICIENCY** - Optimize for training on datasets larger than RAM
+7. **PRE-COMPUTED LABELS** - Classification happens during dataset creation, not training
+8. **MEMORY EFFICIENCY** - Optimize for processing multiple large DBN files
 9. **VECTORIZED OPERATIONS** - Use polars/numpy for all data operations
 10. **VALIDATE AT STARTUP** - Pre-validate schemas, use lookup tables over calculations
 11. **TEST THOROUGHLY** - Include performance regression tests with every change
-12. **DOCUMENT PERFORMANCE** - Explain performance implications of design decisions
+12. **NO BACKWARDS COMPATIBILITY** - Remove old approaches that don't fit new architecture
 
-## Migration from v1.x
+## Migration from Previous Versions
 
-**CURRENT ARCHITECTURE COMPONENTS:**
+**NEW v5.0.0 ARCHITECTURE COMPONENTS:**
 
-✅ **ACTIVE COMPONENTS:**
-- `converter.py` - DBN to labeled parquet conversion with classification
-- `dataloader.py` - Lazy parquet loading for ML training  
-- `config.py` - Currency-specific configurations with YAML support
-- `api.py` - High-level convenience API for common workflows
-- `constants.py` - Feature definitions and output shape calculations
+✅ **PRIMARY COMPONENTS:**
+- `dataset_builder.py` - Symbol-split-merge dataset builder for comprehensive datasets
+- `config.py` - Standardized RepresentConfig for all processing
+- `api.py` - High-level convenience API updated for new architecture
 
 **WORKFLOW INTEGRATION:**
-- Use `convert_dbn_file()` for offline preprocessing
+- Use `build_datasets_from_dbn_files()` for comprehensive dataset creation
+- Use `batch_build_datasets_from_directory()` for directory processing  
 - Implement custom dataloader in your ML repository (see DATALOADER_MIGRATION_GUIDE.md)
-- Leverage currency configs for market-specific optimizations
+- Leverage RepresentConfig for standardized configurations
 - Pre-computed labels eliminate runtime classification overhead
 
 ## Example Workflows
 
-### Complete ML Pipeline (3-Stage)
+### Complete Symbol-Split-Merge Pipeline
 
 ```python
-from represent import convert_dbn_to_parquet, classify_parquet_file
-# Note: Dataloader functionality moved to your ML training repo
+from represent import create_represent_config, DatasetBuildConfig
+from represent import build_datasets_from_dbn_files
 
-# Stage 1: Convert DBN to unlabeled parquet with symbol grouping
-print("Stage 1: Converting DBN to parquet...")
-conversion_stats = convert_dbn_to_parquet(
-    dbn_path="data/AUDUSD-20240101.dbn.zst",
-    output_dir="/data/parquet/",
-    features=['volume', 'variance'],
-    group_by_symbol=True
-)
-
-# Stage 2: Apply uniform classification to common symbols
-print("Stage 2: Applying uniform classification...")
-classification_stats = apply_classification_to_parquet(
-    parquet_dir="/data/parquet/",
-    output_dir="/data/classified/",
+# Create configuration
+config = create_represent_config(
     currency="AUDUSD",
-    min_samples=10000,                    # Only symbols with sufficient data
-    target_distribution="uniform"         # Guarantee uniform class distribution
+    features=['volume', 'variance'],
+    lookback_rows=5000,
+    lookforward_input=5000,
+    lookforward_offset=500
 )
 
-# Stage 3: ML Training (implement custom dataloader in your ML repo)
-print("Stage 3: Ready for ML training...")
-print("Classified parquet files available in /data/classified/")
-print("See DATALOADER_MIGRATION_GUIDE.md to implement custom dataloader")
+# Create dataset building configuration  
+dataset_config = DatasetBuildConfig(
+    currency="AUDUSD",
+    features=['volume', 'variance'], 
+    min_symbol_samples=60500,     # Auto-calculated: samples + lookback + lookforward + offset
+    force_uniform=True,           # Guarantee uniform class distribution
+    keep_intermediate=False       # Clean up intermediate split files
+)
 
-# Example training structure (implement custom_dataloader):
-# for features, labels in your_custom_dataloader:
-#     # features: (32, 2, 402, 500) for volume+variance
-#     # labels: (32,) with uniform distribution (7.69% each class 0-12)
-#     outputs = model(features)
-#     loss = criterion(outputs, labels)
-#     
-#     optimizer.zero_grad()
-#     loss.backward()
-#     optimizer.step()
+# Build comprehensive symbol datasets from multiple DBN files
+# Use at least 10 DBN files to ensure sufficient data for each symbol
+print("Building comprehensive symbol datasets...")
+results = build_datasets_from_dbn_files(
+    config=config,
+    dbn_files=[
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240101.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240102.dbn.zst", 
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240103.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240104.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240105.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240106.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240107.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240108.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240109.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240110.dbn.zst"
+    ],
+    output_dir="/data/symbol_datasets/",
+    dataset_config=dataset_config,
+    verbose=True
+)
+
+print(f"Created {results['phase_2_stats']['datasets_created']} comprehensive symbol datasets")
+print(f"Total samples: {results['phase_2_stats']['total_samples']:,}")
+print("Ready for ML training with comprehensive symbol data!")
+
+# ML Training (implement custom dataloader in your ML repo)
+# See DATALOADER_MIGRATION_GUIDE.md for implementation instructions
 ```
 
-### Symbol-Specific Analysis
+### Directory-Based Dataset Building
 
 ```python
-from represent import ParquetClassifier
+from represent import batch_build_datasets_from_directory
+
+# Build datasets from all DBN files in a directory
+results = batch_build_datasets_from_directory(
+    config=config,
+    input_directory="data/audusd_dbn_files/",
+    output_dir="/data/symbol_datasets/",
+    file_pattern="*.dbn*",
+    dataset_config=dataset_config
+)
+
+print(f"Processed {len(results['input_files'])} DBN files")
+print(f"Generated {results['phase_2_stats']['datasets_created']} symbol datasets")
+```
+
+### Symbol-Specific Dataset Analysis
+
+```python
 import polars as pl
 
-# Load specific symbol data for analysis
-symbol_data = pl.read_parquet("/data/parquet/AUDUSD_M6AM4.parquet")
-print(f"Symbol M6AM4 has {len(symbol_data):,} samples")
+# Load comprehensive symbol dataset for analysis
+symbol_dataset = pl.read_parquet("/data/symbol_datasets/AUDUSD_M6AM4_dataset.parquet")
 
-# Analyze price movement distribution for this symbol
-classifier = ParquetClassifier(currency="AUDUSD")
-movement_stats = classifier.analyze_symbol_distribution(symbol_data)
+print(f"Symbol M6AM4 comprehensive dataset:")
+print(f"  Total samples: {len(symbol_dataset):,}")
+print(f"  Date range: {symbol_dataset['ts_event'].min()} to {symbol_dataset['ts_event'].max()}")
 
-print(f"Price movement characteristics for M6AM4:")
-print(f"  Mean: {movement_stats['mean']:.6f}")
-print(f"  Std: {movement_stats['std']:.6f}")
-print(f"  Suitable for classification: {movement_stats['sufficient_data']}")
+# Analyze class distribution
+class_dist = symbol_dataset['classification_label'].value_counts().sort('classification_label')
+print(f"  Class distribution: {class_dist}")
+print(f"  Uniform distribution achieved: {class_dist['count'].std() < 0.1 * class_dist['count'].mean()}")
 ```
 
-### Batch Processing Multiple Files
-
-```python
-from represent import batch_convert_dbn_files
-
-# Convert all DBN files to symbol-grouped parquet
-results = batch_convert_dbn_files(
-    input_directory="data/dbn_files/",
-    output_directory="/data/parquet/", 
-    features=['volume', 'variance'],
-    group_by_symbol=True,
-    pattern="*.dbn*"
-)
-
-print(f"Converted {len(results)} files successfully")
-print(f"Generated parquet files in /data/parquet/ grouped by symbol")
-```
-
-This architecture provides maximum performance for ML training while maintaining flexibility for different market configurations and feature combinations.
+This architecture provides maximum performance and comprehensive data coverage for ML training while maintaining efficiency through the two-phase symbol-split-merge approach.

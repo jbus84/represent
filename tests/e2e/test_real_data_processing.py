@@ -3,18 +3,19 @@ End-to-end tests using real market data from the data directory.
 These tests validate the entire pipeline with actual market data.
 """
 
-import pytest
-import numpy as np
-import polars as pl
 import time
 
-from represent import process_market_data, create_processor, MarketDepthProcessor
+import numpy as np
+import polars as pl
+import pytest
+
+from represent import MarketDepthProcessor, create_processor, process_market_data
 from represent.config import create_represent_config
 
 
 class TestRealDataProcessing:
     """Test processing with real market data."""
-    
+
     def setup_method(self):
         """Setup config for each test."""
         self.config = create_represent_config("AUDUSD")
@@ -118,7 +119,7 @@ class TestRealDataProcessing:
 
 class TestRealDataValidation:
     """Test data validation with real market data."""
-    
+
     def setup_method(self):
         """Setup config for each test."""
         self.config = create_represent_config("AUDUSD")
@@ -231,7 +232,7 @@ class TestRealDataValidation:
 
 class TestRealDataPerformance:
     """Performance tests with real market data."""
-    
+
     def setup_method(self):
         """Setup config for each test."""
         self.config = create_represent_config("AUDUSD")
@@ -299,8 +300,9 @@ class TestRealDataPerformance:
         if sample_real_data is None:
             pytest.skip("Real market data not available")
 
-        import psutil
         import os
+
+        import psutil
 
         process = psutil.Process(os.getpid())
 
@@ -325,7 +327,7 @@ class TestRealDataPerformance:
 
 class TestRealDataEdgeCases:
     """Test edge cases with real market data."""
-    
+
     def setup_method(self):
         """Setup config for each test."""
         self.config = create_represent_config("AUDUSD")

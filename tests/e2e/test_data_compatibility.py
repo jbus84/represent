@@ -3,17 +3,17 @@ End-to-end tests for data format compatibility and validation.
 Tests various data formats and edge cases with real data.
 """
 
-import pytest
 import numpy as np
 import pandas as pd
+import pytest
 
-from represent import process_market_data, create_processor
+from represent import create_processor, process_market_data
 from represent.config import create_represent_config
 
 
 class TestDataFormatCompatibility:
     """Test compatibility with different data formats and sources."""
-    
+
     def setup_method(self):
         """Setup config for each test."""
         self.config = create_represent_config("AUDUSD")
@@ -97,7 +97,7 @@ class TestDataFormatCompatibility:
 
 class TestRealDataQuality:
     """Test data quality aspects with real market data."""
-    
+
     def setup_method(self):
         """Setup config for each test."""
         self.config = create_represent_config("AUDUSD")
@@ -225,7 +225,7 @@ class TestRealDataQuality:
 
 class TestRealDataIntegration:
     """Integration tests with real data and different processing scenarios."""
-    
+
     def setup_method(self):
         """Setup config for each test."""
         self.config = create_represent_config("AUDUSD")
@@ -260,7 +260,7 @@ class TestRealDataIntegration:
 
         # Process the same data multiple times
         results = []
-        for i in range(3):
+        for _i in range(3):
             result = processor.process(sample_real_data)
             results.append(result)
 

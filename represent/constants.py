@@ -3,9 +3,10 @@ Performance-critical constants for market depth processing.
 These values are tuned for optimal cache performance and vectorization.
 """
 
-import numpy as np
-from typing import Final, Union
 from enum import Enum
+from typing import Final
+
+import numpy as np
 
 # NOTE: Core processing constants have been moved to RepresentConfig:
 # - MICRO_PIP_SIZE → config.micro_pip_size
@@ -75,14 +76,14 @@ FEATURE_INDEX_MAP: Final[dict[str, int]] = {
     FeatureType.TRADE_COUNTS.value: 2,
 }
 
-# NOTE: Variance feature is calculated dynamically from volume data in pipeline.py
+# NOTE: Variance feature is calculated dynamically from volume data in market_depth_processor.py
 # No separate variance column is needed - variance is computed via .var() on volume columns
 
 
 # Extended output shapes
-def get_output_shape(features: Union[list[str], list[FeatureType]], time_bins: int = 500) -> tuple[int, ...]:
+def get_output_shape(features: list[str] | list[FeatureType], time_bins: int = 500) -> tuple[int, ...]:
     """Get output shape based on feature selection.
-    
+
     Args:
         features: List of features
         time_bins: Number of time bins (defaults to 500 for backward compatibility)

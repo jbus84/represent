@@ -1,88 +1,75 @@
 """
 Represent: High-performance market depth ML pipeline.
 
-This package provides flexible multi-stage architectures (v4.0.0):
+This package provides a symbol-split-merge architecture (v5.0.0) for creating
+comprehensive symbol datasets from multiple DBN files:
 
-STREAMLINED 2-STAGE APPROACH (NEW):
-1. DBN → Classified Parquet (Direct, Symbol-by-Symbol)
-2. ML Training with On-demand Feature Generation
+SYMBOL-SPLIT-MERGE APPROACH:
+1. Split multiple DBN files by symbol into intermediate files
+2. Merge each symbol across all files into comprehensive datasets
+3. ML Training with comprehensive symbol-specific datasets
 
-CLASSIC 3-STAGE APPROACH:
-1. DBN to unlabeled symbol-grouped parquet conversion
-2. Post-processing classification with uniform distribution  
-3. Lazy loading parquet dataloader for ML training
-
-Both approaches support:
+Key Features:
 - Currency-specific market configurations
 - High-performance PyTorch integration
 - Quantile-based uniform distribution
 - Multi-feature extraction (volume, variance, trade_counts)
+- Comprehensive symbol coverage across multiple files
+- Performance-optimized two-phase processing
 """
 
-__version__ = "1.12.0"
+__version__ = "1.13.0"
 
-# V4.0.0 - Multi-approach Architecture API
+# V5.0.0 - Symbol-Split-Merge Architecture API
 
-# Streamlined DBN-to-Classified-Parquet Approach
-from .parquet_classifier import (
-    ParquetClassifier,
-    classify_parquet_file, 
-    batch_classify_parquet_files,
-    process_dbn_to_classified_parquets
-)
-
-# Global Threshold Calculation
-from .global_threshold_calculator import (
-    GlobalThresholds,
-    GlobalThresholdCalculator,
-    calculate_global_thresholds
-)
-
-# Alternative: Unlabeled conversion approach
-from .unlabeled_converter import convert_dbn_to_parquet, batch_convert_dbn_files as batch_convert_unlabeled
-
-# Dynamic classification configuration
-from .classification_config_generator import (
-    ClassificationConfigGenerator,
-    generate_classification_config_from_parquet,
-    classify_with_generated_config,
-)
-
-# Core processing and configuration
-from .pipeline import process_market_data, create_processor, MarketDepthProcessor
-from .constants import (
-    PRICE_LEVELS,
-    ASK_PRICE_COLUMNS,
-    BID_PRICE_COLUMNS,
-    ASK_VOL_COLUMNS,
-    BID_VOL_COLUMNS,
-    FeatureType,
-    FEATURE_TYPES,
-    DEFAULT_FEATURES,
-    FEATURE_INDEX_MAP,
-    MAX_FEATURES,
-    get_output_shape,
-)
+# Symbol-Split-Merge Dataset Building (Primary Approach v5.0.0+)
+# Dynamic classification functionality moved to global_threshold_calculator
 from .config import (
     RepresentConfig,
     create_represent_config,
     list_available_currencies,
 )
+from .constants import (
+    ASK_PRICE_COLUMNS,
+    ASK_VOL_COLUMNS,
+    BID_PRICE_COLUMNS,
+    BID_VOL_COLUMNS,
+    DEFAULT_FEATURES,
+    FEATURE_INDEX_MAP,
+    FEATURE_TYPES,
+    MAX_FEATURES,
+    PRICE_LEVELS,
+    FeatureType,
+    get_output_shape,
+)
+from .dataset_builder import (
+    DatasetBuildConfig,
+    DatasetBuilder,
+    batch_build_datasets_from_directory,
+    build_datasets_from_dbn_files,
+)
+
+# Global Threshold Calculation
+from .global_threshold_calculator import (
+    GlobalThresholdCalculator,
+    GlobalThresholds,
+    calculate_global_thresholds,
+)
+
+# Core processing and configuration
+from .market_depth_processor import MarketDepthProcessor, create_processor, process_market_data
 
 # Public API
 __all__ = [
-    # Streamlined DBN-to-Classified-Parquet Approach
-    "ParquetClassifier",
-    "process_dbn_to_classified_parquets",
-    "classify_parquet_file",
-    "batch_classify_parquet_files",
+    # Symbol-Split-Merge Dataset Building (Primary Approach)
+    "DatasetBuilder",
+    "DatasetBuildConfig",
+    "build_datasets_from_dbn_files",
+    "batch_build_datasets_from_directory",
     # Global Threshold Calculation
     "GlobalThresholds",
     "GlobalThresholdCalculator",
     "calculate_global_thresholds",
-    # Alternative: Unlabeled conversion approach
-    "convert_dbn_to_parquet",
-    "batch_convert_unlabeled",
     # Core processing
     "process_market_data",
     "create_processor",
@@ -103,20 +90,12 @@ __all__ = [
     "FEATURE_INDEX_MAP",
     "MAX_FEATURES",
     "get_output_shape",
-    # Dynamic classification configuration  
-    "ClassificationConfigGenerator",
-    "generate_classification_config_from_parquet",
-    "classify_with_generated_config",
-    # High-level convenience API
-    "RepresentAPI",
-    "api",
-    "load_training_dataset",
+    # Dynamic classification functionality moved to global_threshold_calculator
+    # High-level convenience API removed - use direct function imports instead
 ]
 
 
-# High-level API imports
-from .api import (
-    RepresentAPI,
-    api,
-    load_training_dataset,
-)
+# Removed redundant high-level API wrapper - use direct imports instead:
+# - build_datasets_from_dbn_files() for symbol dataset building
+# - DatasetBuilder() for advanced processing
+# - calculate_global_thresholds() for threshold calculation

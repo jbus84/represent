@@ -1,19 +1,19 @@
+import io
+import json
 import os
 import tarfile
-import io
-import numpy as np
-import json
-from tqdm import tqdm
-import zstandard as zstd
+import uuid
+
 import databento as db
+import numpy as np
+import numpy.typing as npt
 import pandas as pd
 import polars as pl
-import numpy.typing as npt
-import uuid
-from streaming import MDSWriter
+import zstandard as zstd
 from scipy.stats import pearsonr
-from sklearn.metrics import root_mean_squared_error, mean_absolute_error
-
+from sklearn.metrics import mean_absolute_error, root_mean_squared_error
+from streaming import MDSWriter
+from tqdm import tqdm
 
 DATA_DIR = "/Users/danielfisher/data/databento/"
 IMAGE_DIR = "/Users/danielfisher/data/market_depths"
@@ -504,7 +504,7 @@ def create_mosiac_dataset(files_to_process):
     compression = None
 
     # Save the samples as shards using MDSWriter
-    for target, files in zip(["train", "val", "test"], [train_files, val_files, test_files]):
+    for target, files in zip(["train", "val", "test"], [train_files, val_files, test_files], strict=False):
         mean_list = []
         sample_list = []
         point_list = []

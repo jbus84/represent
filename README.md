@@ -1,23 +1,19 @@
-# Represent v4.0.0
+# Represent
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-217%20passed-green.svg)](https://github.com/your-repo/represent)
-[![Coverage](https://img.shields.io/badge/coverage-76%25-yellow.svg)](https://github.com/your-repo/represent)
-[![Performance](https://img.shields.io/badge/latency-<10ms-orange.svg)](https://github.com/your-repo/represent)
+[![Tests](https://img.shields.io/badge/tests-104%20passed-green.svg)](#testing)
+[![Coverage](https://img.shields.io/badge/coverage-74%25-green.svg)](#testing)
 
-High-performance Python package for creating normalized market depth representations from limit order book data using a **streamlined DBN-to-parquet pipeline** with **dynamic configuration** and **guaranteed uniform distribution**.
+High-performance Python package for creating normalized market depth representations from limit order book data using a **symbol-split-merge architecture**. Built for machine learning applications requiring comprehensive, uniform datasets from multiple DBN files.
 
 ## 🚀 Key Features
 
-- **🔄 Streamlined Pipeline**: DBN→Classified Parquet→ML Training (single-pass processing)
-- **⚖️ Dynamic Configuration**: TIME_BINS computed as `samples // ticks_per_bin` (250 for AUDUSD)
-- **📊 Guaranteed Uniform Distribution**: 7.69% per class (13-bin) for optimal ML training
-- **💾 Symbol-Grouped Processing**: Separate parquet files per symbol for targeted analysis
-- **🔋 ML-Ready Output**: Classified parquet files optimized for external dataloader implementation
-- **🎯 Multi-Feature Support**: Volume, variance, and trade count features (configurable)
-- **🧠 Framework Agnostic**: Output compatible with PyTorch, TensorFlow, or custom ML frameworks
-- **⚡ Performance Optimized**: RepresentConfig system eliminates hardcoded constants
-- **📈 Real-World Tested**: Validated on AUDUSD, GBPUSD, and EURJPY market data
+- **📊 Symbol-Split-Merge Architecture**: Process multiple DBN files into comprehensive symbol datasets
+- **⚡ High Performance**: 1500+ samples/second processing with memory-efficient streaming
+- **🎯 Uniform Distribution**: Guaranteed balanced class distributions for optimal ML training
+- **🔧 Three Core Modules**: Clean, focused architecture for dataset building, market processing, and thresholds
+- **📈 Multi-Feature Support**: Volume, variance, and trade count features
+- **🧠 Framework Agnostic**: Compatible with PyTorch, TensorFlow, or custom ML frameworks
 
 ## 📦 Installation
 
@@ -29,560 +25,316 @@ uv add represent
 pip install represent
 
 # Development installation
-git clone <repository-url> && cd represent
+git clone <repository-url>
+cd represent
 uv sync --all-extras
 ```
 
-## 🔧 v4.0.0 Architecture Updates
+## 🏗️ Three Core Modules
 
-### **RepresentConfig System & Dependency Injection**
-Replaced hardcoded constants with dynamic configuration and introduced dependency injection:
+### 1. 📊 Dataset Builder (`dataset_builder`)
+**Primary module for creating comprehensive symbol datasets from multiple DBN files**
 
-**Configuration Improvements:**
-- **TIME_BINS**: Now computed as `samples // ticks_per_bin = 25000 // 100 = 250`
-- **Output Shape**: Dynamic `(402, time_bins)` instead of hardcoded `(402, 500)`
-- **Currency-Specific**: Each currency pair has optimized parameters
-- **Consistent**: All components use same configuration source
-
-**Dependency Injection Benefits:**
-- **Simplified APIs**: Single `config` parameter instead of 10+ individual parameters
-- **No Parameter Duplication**: Parameters like `max_samples_per_file` and `target_samples` moved to config
-- **Better Testability**: Easy to mock configurations in tests
-- **Type Safety**: All parameters validated through Pydantic models
-
-### **API Migration Examples:**
-
-**Before (v3.x) - Multiple Parameters:**
 ```python
-# Old API with many individual parameters
-calculator = GlobalThresholdCalculator(
+from represent import build_datasets_from_dbn_files, DatasetBuildConfig, create_represent_config
+
+# Configure processing
+config = create_represent_config(
     currency="AUDUSD",
-    nbins=13,
-    max_samples_per_file=10000,  # Duplicated parameter
-    sample_fraction=0.5,
-    verbose=True
+    features=['volume', 'variance'],
+    lookback_rows=5000,
+    lookforward_input=5000,
+    lookforward_offset=500
 )
 
-converter = UnlabeledDBNConverter(
+dataset_config = DatasetBuildConfig(
     currency="AUDUSD",
-    features=['volume'],
-    batch_size=100,
-    min_symbol_samples=1000      # Another duplicated parameter
-)
-```
-
-**After (v4.x) - RepresentConfig Dependency Injection:**
-```python
-# New API with config dependency injection
-config = create_represent_config("AUDUSD")
-
-calculator = GlobalThresholdCalculator(
-    config=config,              # Single config parameter
-    sample_fraction=0.5,        # Only unique parameters
-    verbose=True
+    features=['volume', 'variance'],
+    force_uniform=True  # Ensures balanced class distribution
 )
 
-converter = UnlabeledDBNConverter(
-    config=config               # Same config, consistent parameters
-)
-
-print(f"TIME_BINS: {config.time_bins}")        # 250 (computed)
-print(f"Max samples: {config.max_samples_per_file}")  # 10000 (from config)
-```
-
-## 🏗️ Streamlined 2-Stage Architecture
-
-### **Stage 1: DBN → Classified Parquet (Direct Processing)**
-Process raw DBN files directly to classified parquet datasets with uniform distribution, grouped by symbol.
-
-### **Stage 2: ML Training (External Implementation)**
-Classified parquet files ready for custom dataloader implementation in your ML training repository.
-
-## 🚀 Quick Start
-
-### Stage 1: DBN to Classified Parquet (Global Threshold Approach)
-
-**🎯 RECOMMENDED: Use global thresholds for consistent classification across files**
-
-```python
-from represent import calculate_global_thresholds, process_dbn_to_classified_parquets, create_represent_config
-
-# Step 1: Create configuration for your currency
-config = create_represent_config("AUDUSD")
-
-# Step 2: Calculate global thresholds from sample of your data files
-global_thresholds = calculate_global_thresholds(
+# Build comprehensive symbol datasets from multiple DBN files
+results = build_datasets_from_dbn_files(
     config=config,
-    data_directory="/path/to/your/dbn/files/",
-    sample_fraction=0.5,                    # Use 50% of files for threshold calculation
+    dbn_files=[
+        "data/AUDUSD-20240101.dbn.zst",
+        "data/AUDUSD-20240102.dbn.zst", 
+        "data/AUDUSD-20240103.dbn.zst"
+    ],
+    output_dir="symbol_datasets/",
+    dataset_config=dataset_config
 )
 
-print(f"Global thresholds calculated from {global_thresholds.files_analyzed} files")
-
-# Step 3: Process all files using the same global thresholds
-stats = process_dbn_to_classified_parquets(
-    config=config,                          # Single config parameter with dependency injection
-    dbn_path="data/glbx-mdp3-20240403.mbp-10.dbn.zst",
-    output_dir="data/classified/",          # Directory for classified symbol files
-    global_thresholds=global_thresholds,    # 🎯 Consistent thresholds across ALL files!
-    force_uniform=True                      # Guarantee uniform class distribution
-)
-
-# Output: data/classified/AUDUSD_M6AM4_classified.parquet, AUDUSD_M6AU4_classified.parquet, etc.
-print(f"Generated {stats['symbols_processed']} classified symbol files")
-print(f"Total classified samples: {stats['total_classified_samples']:,}")
-print(f"All files use consistent global thresholds - same price movement = same label!")
+# Output: symbol_datasets/AUDUSD_M6AM4_dataset.parquet (comprehensive symbol data)
+print(f"Created {results['phase_2_stats']['datasets_created']} symbol datasets")
+print(f"Total samples: {results['phase_2_stats']['total_samples']:,}")
 ```
 
-**⚠️ Why Global Thresholds Matter:**
-- **❌ Per-file quantiles**: Same price movement gets different labels in different files
-- **✅ Global thresholds**: Same price movement gets the same label across ALL files
-- **Result**: Consistent, comparable training data for better ML performance
+**Key Functions:**
+- `build_datasets_from_dbn_files()` - Process multiple DBN files
+- `batch_build_datasets_from_directory()` - Process entire directories
+- `DatasetBuilder` - Advanced processing with custom workflows
 
-### Stage 2: ML Training (External Implementation)
-
-The classified parquet files are ready for ML training. **Dataloader functionality has been moved to your ML training repository** for maximum customization.
-
-**See `DATALOADER_MIGRATION_GUIDE.md` for comprehensive instructions on rebuilding the dataloader with Claude.**
+### 2. ⚡ Market Depth Processor (`market_depth_processor`)
+**High-performance processor for converting market data into normalized tensors**
 
 ```python
-# Expected workflow in your ML training repository:
-from your_ml_package import create_custom_dataloader  # Implement using guide
-from represent import create_represent_config
+from represent import MarketDepthProcessor, create_processor, process_market_data
+import polars as pl
 
-# Use same config for consistent parameters
-config = create_represent_config("AUDUSD")
+# Create processor for specific features
+config = create_represent_config("AUDUSD", features=['volume', 'variance'])
+processor = MarketDepthProcessor(config=config, features=['volume', 'variance'])
 
-# Implement custom dataloader following migration guide
-dataloader = create_custom_dataloader(
-    parquet_path="data/classified/AUDUSD_M6AM4_classified.parquet",
-    batch_size=32,
-    shuffle=True,
-    num_workers=4
-)
+# Load market data
+market_data = pl.read_parquet("symbol_datasets/AUDUSD_M6AM4_dataset.parquet")
 
-# Standard PyTorch training loop structure:
-for batch_features, batch_labels in dataloader:
-    # batch_features: torch.Tensor of shape [32, 2, 402, 250] for 2 features (AUDUSD time_bins=250)
-    # batch_labels: torch.Tensor of shape [32] with uniform distribution (7.69% each class)
-    model_output = model(batch_features)
-    loss = criterion(model_output, batch_labels)
-    # ... training logic
+# Process into normalized tensor representation
+tensor_data = processor.process(market_data)
+
+# Output shape: (2, 402, 500) for 2 features, 402 price levels, 500 time bins
+print(f"Tensor shape: {tensor_data.shape}")
+print(f"Data type: {tensor_data.dtype}")
+
+# Convenience function for single-use processing
+tensor_data = process_market_data(market_data, config=config, features=['volume'])
 ```
 
-## 🔥 Complete Pipeline Example with Global Thresholds
+**Key Functions:**
+- `MarketDepthProcessor` - Main processor class
+- `process_market_data()` - Single-use convenience function  
+- `create_processor()` - Factory function for processor creation
+
+### 3. 📏 Global Threshold Calculator (`global_threshold_calculator`)
+**Calculate consistent classification thresholds across multiple files for uniform distributions**
 
 ```python
-from represent import calculate_global_thresholds, process_dbn_to_classified_parquets, create_represent_config
-import torch
-import torch.nn as nn
+from represent import calculate_global_thresholds, GlobalThresholdCalculator
 
-# Stage 1A: Calculate global thresholds (do this once for your dataset)
+# Calculate thresholds from sample of DBN files
 config = create_represent_config("AUDUSD")
-print("🎯 Calculating global thresholds from sample data...")
-global_thresholds = calculate_global_thresholds(
+thresholds = calculate_global_thresholds(
     config=config,
-    data_directory="/path/to/your/audusd/data/",  # e.g., AUDUSD-micro dataset
+    data_directory="data/databento/AUDUSD/",
     sample_fraction=0.5,  # Use 50% of files for threshold calculation
+    verbose=True
 )
 
-# Stage 1B: Process files with consistent global thresholds
-print("🔄 Stage 1: Processing DBN with global thresholds...")
-processing_stats = process_dbn_to_classified_parquets(
-    config=config,
-    dbn_path="data/AUDUSD-20240101.dbn.zst",
-    output_dir="data/classified/",
-    global_thresholds=global_thresholds,  # 🎯 Consistent across all files!
+print(f"Generated {thresholds.nbins} classification bins")
+print(f"Based on {thresholds.sample_size:,} price movements")
+
+# Use calculated thresholds for consistent classification
+dataset_config = DatasetBuildConfig(
+    global_thresholds=thresholds,  # Apply same thresholds to all processing
     force_uniform=True
 )
 
-# Stage 2: ML training (implement custom dataloader in your ML repo)
-print("🔄 Stage 2: Classified parquet files ready for training...")
-print("📁 Classified files available in: data/classified/")
-print("📖 See DATALOADER_MIGRATION_GUIDE.md for dataloader implementation")
-
-# Example training structure (implement in your ML training repository):
-"""
-# In your ML training repo, implement custom dataloader using the migration guide:
-dataloader = your_custom_dataloader(
-    parquet_path="data/classified/AUDUSD_M6AM4_classified.parquet",
-    batch_size=32,
-    shuffle=True,
+# Advanced usage with custom calculator
+calculator = GlobalThresholdCalculator(config=config)
+thresholds = calculator.calculate_thresholds_from_directory(
+    data_directory="data/databento/AUDUSD/",
     sample_fraction=0.3
 )
-
-# Standard PyTorch training loop:
-for epoch in range(5):
-    for features, labels in dataloader:
-        # features: (32, 2, 402, 250) for volume+variance with dynamic TIME_BINS=250
-        # labels: (32,) with uniform distribution (7.69% each class 0-12)
-        outputs = model(features)
-        loss = criterion(outputs, labels)
-        
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-"""
-
-print("✅ Complete streamlined pipeline finished successfully!")
 ```
 
-## 📋 Step-by-Step: Bin Generation → Classified Parquet Files
+**Key Functions:**
+- `calculate_global_thresholds()` - Main threshold calculation function
+- `GlobalThresholdCalculator` - Advanced threshold calculation class
+- `GlobalThresholds` - Result object containing threshold data
 
-Here's a complete workflow showing how to generate global classification bins and apply them to build classified parquet files:
-
-### **Step 1: Generate Global Classification Bins**
+## 🚀 Complete Workflow Example
 
 ```python
-from represent import calculate_global_thresholds
-import json
-
-# Calculate global thresholds from your AUDUSD dataset
-# This analyzes price movements across multiple files to determine optimal bin boundaries
-data_directory = "/Users/danielfisher/data/databento/AUDUSD-micro"
-config = create_represent_config("AUDUSD")
-
-print("🎯 Step 1: Generating global classification bins...")
-global_thresholds = calculate_global_thresholds(
-    config=config,
-    data_directory=data_directory,
-    sample_fraction=0.5,               # Use first 50% of files for bin calculation
-    verbose=True
+from represent import (
+    create_represent_config, 
+    DatasetBuildConfig,
+    build_datasets_from_dbn_files,
+    calculate_global_thresholds,
+    MarketDepthProcessor
 )
 
-print(f"✅ Generated {global_thresholds.nbins} classification bins")
-print(f"📊 Based on {global_thresholds.sample_size:,} price movements from {global_thresholds.files_analyzed} files")
+# Step 1: Configure processing parameters
+config = create_represent_config(
+    currency="AUDUSD",
+    features=['volume', 'variance'],
+    lookback_rows=5000,
+    lookforward_input=5000, 
+    lookforward_offset=500
+)
 
-# Show the generated bin boundaries
-print(f"\n🎯 Generated Classification Bins:")
-for i, boundary in enumerate(global_thresholds.quantile_boundaries[:-1]):
-    print(f"   Bin {i}: Price movements ≤ {boundary:.2f} micro pips")
+# Step 2: Calculate global thresholds for consistent classification
+thresholds = calculate_global_thresholds(
+    config=config,
+    data_directory="data/databento/AUDUSD/",
+    sample_fraction=0.5
+)
 
-# Save bins for reuse across multiple processing runs
-bin_data = {
-    "currency": "AUDUSD",
-    "nbins": global_thresholds.nbins,
-    "boundaries": global_thresholds.quantile_boundaries.tolist(),
-    "sample_size": global_thresholds.sample_size,
-    "files_analyzed": global_thresholds.files_analyzed,
-    "price_stats": global_thresholds.price_movement_stats
-}
+# Step 3: Build comprehensive symbol datasets
+dataset_config = DatasetBuildConfig(
+    currency="AUDUSD", 
+    features=['volume', 'variance'],
+    global_thresholds=thresholds,  # Use calculated thresholds
+    force_uniform=True
+)
 
-with open("audusd_classification_bins.json", "w") as f:
-    json.dump(bin_data, f, indent=2)
+results = build_datasets_from_dbn_files(
+    config=config,
+    dbn_files=[
+        "data/AUDUSD-20240101.dbn.zst",
+        "data/AUDUSD-20240102.dbn.zst",
+        "data/AUDUSD-20240103.dbn.zst"
+    ],
+    output_dir="symbol_datasets/",
+    dataset_config=dataset_config
+)
 
-print("💾 Saved bins to: audusd_classification_bins.json")
-```
+# Step 4: Process datasets for ML training (in your ML repository)
+processor = MarketDepthProcessor(config=config, features=['volume', 'variance'])
 
-### **Step 2: Apply Bins to Generate Classified Parquet Files**
-
-```python
-from represent import process_dbn_to_classified_parquets
-from pathlib import Path
-
-# Get list of all DBN files to process
-data_dir = Path("/Users/danielfisher/data/databento/AUDUSD-micro")
-dbn_files = sorted(data_dir.glob("*.dbn*"))
-
-print(f"\n🔄 Step 2: Applying bins to generate classified parquet files...")
-print(f"📊 Found {len(dbn_files)} DBN files to process")
-
-# Process each DBN file using the SAME global thresholds
-output_dir = "classified_parquet_output"
-all_results = []
-
-for i, dbn_file in enumerate(dbn_files[:5]):  # Process first 5 files for demo
-    print(f"\n📄 Processing {i+1}/{5}: {dbn_file.name}")
-    
-    # Apply the global bins to classify each row in this file
-    results = process_dbn_to_classified_parquets(
-        config=config,
-        dbn_path=dbn_file,
-        output_dir=output_dir,
-        global_thresholds=global_thresholds,    # 🎯 Same bins for ALL files!
-        force_uniform=True,                    # Ensure uniform class distribution
-        verbose=False
-    )
-    
-    all_results.append(results)
-    
-    print(f"   ✅ Generated {results['symbols_processed']} symbol files")
-    print(f"   📊 Classified {results['total_classified_samples']:,} rows")
-    print(f"   🎯 Each row assigned to one of 13 classes using global bins")
-
-# Summary of all generated files
-total_symbols = sum(r['symbols_processed'] for r in all_results)
-total_rows = sum(r['total_classified_samples'] for r in all_results)
-
-print(f"\n✅ Classified Parquet Generation Complete!")
-print(f"📊 Total symbol files generated: {total_symbols}")
-print(f"📊 Total rows classified: {total_rows:,}")
-print(f"📁 Output directory: {output_dir}/")
-```
-
-### **Step 3: Examine Generated Classified Parquet Files**
-
-```python
+# Load a comprehensive symbol dataset
 import polars as pl
-from pathlib import Path
+symbol_data = pl.read_parquet("symbol_datasets/AUDUSD_M6AM4_dataset.parquet")
 
-# Look at the generated classified parquet files
-classified_dir = Path(output_dir)
-classified_files = list(classified_dir.glob("*_classified.parquet"))
+# Convert to tensor for ML training
+tensor_data = processor.process(symbol_data)
+# Shape: (2, 402, 500) - 2 features, 402 price levels, 500 time bins
 
-print(f"\n📊 Step 3: Examining generated classified parquet files...")
-print(f"📁 Found {len(classified_files)} classified parquet files:")
-
-for file in classified_files[:3]:  # Show first 3 files
-    print(f"   📄 {file.name}")
-
-# Load and examine one file to see the row-level classification
-sample_file = classified_files[0]
-df = pl.read_parquet(sample_file)
-
-print(f"\n🔍 Sample file structure: {sample_file.name}")
-print(f"📊 Total rows: {len(df):,}")
-print(f"📊 Columns: {df.columns}")
-
-# Show sample classified rows
-sample_rows = df.select([
-    'ts_event', 'symbol', 'ask_px_00', 'bid_px_00', 
-    'price_movement', 'classification_label'
-]).head(10)
-
-print(f"\n📋 Sample rows showing price movement → classification:")
-print(sample_rows)
-
-# Show classification distribution
-labels = df['classification_label'].to_numpy()
-unique_labels, counts = pl.Series(labels).value_counts().sort('classification_label').to_numpy().T
-
-print(f"\n📈 Classification distribution (each row classified individually):")
-for label, count in zip(unique_labels, counts):
-    percentage = (count / len(df)) * 100
-    print(f"   Class {label:2d}: {count:6,} rows ({percentage:5.1f}%)")
-
-print(f"\n🎯 Key Results:")
-print(f"✅ Each row has its own classification_label based on price_movement")
-print(f"✅ Same global bins used across all files ensure consistency") 
-print(f"✅ Same price movement always gets same classification across files")
-print(f"✅ Ready for ML training with consistent, comparable labels")
+print(f"✅ Created {results['phase_2_stats']['datasets_created']} symbol datasets")
+print(f"✅ Ready for ML training with {tensor_data.shape} tensor shape")
 ```
 
-### **Step 4: Verify Consistency Across Files**
+## 🎯 Feature Types and Output Shapes
 
-```python
-# Verify that the same bins were applied consistently across all files
-print(f"\n🔍 Step 4: Verifying consistency across files...")
-
-consistency_check = {}
-for file in classified_files[:3]:  # Check first 3 files
-    df = pl.read_parquet(file)
-    symbol = file.stem.split('_')[1]
-    
-    # Check label distribution
-    labels = df['classification_label'].to_numpy()
-    unique_labels = sorted(list(set(labels)))
-    
-    consistency_check[symbol] = {
-        'file': file.name,
-        'rows': len(df),
-        'unique_labels': unique_labels,
-        'min_label': min(labels),
-        'max_label': max(labels)
-    }
-
-print("📊 Consistency check across files:")
-for symbol, info in consistency_check.items():
-    print(f"   {symbol}: {info['rows']:,} rows, labels {info['min_label']}-{info['max_label']}")
-
-print(f"\n🎉 WORKFLOW COMPLETE!")
-print(f"✅ Generated global classification bins from sample data")
-print(f"✅ Applied same bins consistently to all files") 
-print(f"✅ Each row classified individually based on price movement")
-print(f"✅ All files use identical bin boundaries for consistency")
-print(f"🚀 Ready for ML training with high-quality, consistent labels!")
-```
-
-**🎯 Why This Approach Works:**
-- **Consistent bins**: Same price movement gets same label across all files
-- **Row-level classification**: Each price movement gets individually classified
-- **Uniform distribution**: Global bins ensure balanced class representation
-- **ML-ready**: Classified parquet files ready for direct PyTorch loading
-
-## 🎯 Feature Types
-
-Configure any combination of features for different analyses:
-
-- **Volume**: Traditional market depth (order sizes) - shape: `(402, time_bins)`
-- **Variance**: Market volatility patterns - shape: `(402, time_bins)`  
-- **Trade Counts**: Activity levels from transaction counts - shape: `(402, time_bins)`
+**Available Features:**
+- **Volume**: Market depth from order sizes - `(402, time_bins)`
+- **Variance**: Price volatility patterns - `(402, time_bins)`
+- **Trade Counts**: Transaction activity levels - `(402, time_bins)`
 
 **Multi-Feature Output Shapes:**
-- 1 feature: `(402, time_bins)` - 2D tensor (time_bins=250 for AUDUSD)
-- 2+ features: `(N, 402, time_bins)` - 3D tensor with feature dimension first
+- **1 feature**: `(402, 500)` - 2D tensor
+- **2+ features**: `(N, 402, 500)` - 3D tensor with feature dimension first
 
-## 🎲 Dynamic Classification System
+```python
+# Examples of different feature configurations
+config = create_represent_config("AUDUSD", features=['volume'])
+# Output: (402, 500)
 
-### **No Static Config Files** 
-All classification thresholds are computed dynamically from your data using quantile analysis.
+config = create_represent_config("AUDUSD", features=['volume', 'variance']) 
+# Output: (2, 402, 500)
 
-### **Guaranteed Uniform Distribution**
-- **13-bin classification**: Each class gets exactly 7.69% of samples
-- **Optimal for ML training**: No class imbalance issues
-- **Quality metrics**: Average deviation typically <2%
+config = create_represent_config("AUDUSD", features=['volume', 'variance', 'trade_counts'])
+# Output: (3, 402, 500)
+```
 
-### **Currency Support**
-Works with any currency pair - automatic adaptation to market characteristics:
-- **AUDUSD, EURUSD, GBPUSD**: 0.0001 pip size
-- **USDJPY, EURJPY**: 0.01 pip size (JPY pairs)
-- **Any other pair**: Automatic detection
+## 🏗️ Symbol-Split-Merge Architecture
 
-## ⚙️ Simplified Configuration
+The package uses a two-phase architecture for creating comprehensive symbol datasets:
 
-### **Flat, User-Friendly Structure**
-The new `RepresentConfig` eliminates complex nested structures with a simple, flat interface:
+### **Phase 1: Symbol Splitting**
+Each DBN file is split by symbol into intermediate parquet files
+- **Input**: Multiple DBN files (e.g., AUDUSD-20240101.dbn.zst, AUDUSD-20240102.dbn.zst)
+- **Output**: Intermediate symbol files (e.g., file1_M6AM4.parquet, file2_M6AM4.parquet)
+- **Performance**: 300+ samples/second per DBN file
+
+### **Phase 2: Symbol Merging**  
+All instances of each symbol are merged into comprehensive datasets
+- **Input**: All symbol files across multiple DBN files
+- **Output**: Comprehensive symbol datasets (e.g., AUDUSD_M6AM4_dataset.parquet)
+- **Performance**: 1500+ samples/second during merging
+- **Features**: Pre-computed classification labels with uniform distribution
+
+### **Phase 3: ML Training** (External Implementation)
+Comprehensive symbol datasets ready for custom dataloader implementation
+
+```python
+# Implement in your ML training repository:
+from your_ml_package import create_custom_dataloader
+import torch
+
+# Load comprehensive symbol dataset
+dataloader = create_custom_dataloader(
+    parquet_path="symbol_datasets/AUDUSD_M6AM4_dataset.parquet",
+    batch_size=32,
+    shuffle=True
+)
+
+# Standard PyTorch training loop
+for features, labels in dataloader:
+    # features: torch.Tensor shape [32, 2, 402, 500] for volume+variance
+    # labels: torch.Tensor shape [32] with uniform distribution
+    outputs = model(features)
+    loss = criterion(outputs, labels)
+    # ... training logic
+```
+
+## ⚙️ Configuration System
+
+### **RepresentConfig**
+Central configuration object for all processing parameters:
 
 ```python
 from represent import RepresentConfig, create_represent_config
 
-# Simple configuration with fully configurable parameters
+# Manual configuration
 config = RepresentConfig(
-    currency="AUDUSD", 
-    nbins=13,
+    currency="AUDUSD",
+    features=['volume', 'variance'], 
     samples=50000,
-    features=["volume", "variance"],
-    lookback_rows=3000,     # ✅ Fully configurable (no more hardcoded 2000!)
-    lookforward_input=4000, # ✅ Fully configurable
-    batch_size=1500,        # ✅ Configurable batch processing
+    lookback_rows=5000,
+    lookforward_input=5000,
+    lookforward_offset=500,
+    nbins=13,
+    batch_size=1500
 )
 
-# Or use the convenience function with currency-specific optimizations
+# Convenience function with currency-specific optimizations
 config = create_represent_config(
-    currency="GBPUSD",      # Automatically gets lookforward_input=3000 for volatility
-    samples=25000,
-    features=["volume"]
+    currency="AUDUSD",  # Auto-configures pip size, time bins, etc.
+    features=['volume'],
+    samples=25000
 )
 
-# Direct access to all parameters - no nested structures!
-print(f"Lookback: {config.lookback_rows}")        # Direct access
-print(f"Lookforward: {config.lookforward_input}") # No config.classification.lookforward_input
-print(f"Batch Size: {config.batch_size}")         # No more hardcoded values
-print(f"Max Samples: {config.max_samples_per_file}")  # New: Performance parameters
-print(f"Target Samples: {config.target_samples}")     # New: From dependency injection
+# Access configuration parameters
+print(f"Time bins: {config.time_bins}")           # Auto-calculated
+print(f"Min samples: {config.min_symbol_samples}") # Auto-calculated
+print(f"Pip size: {config.true_pip_size}")        # Currency-specific
 ```
 
-### **Currency-Specific Optimizations**
-Automatic optimizations based on market characteristics:
-- **GBPUSD**: `lookforward_input=3000` (shorter window for high volatility)
-- **JPY pairs**: `true_pip_size=0.01`, `nbins=9` (adapted for JPY dynamics)
-- **All others**: Standard settings with `lookforward_input=5000`
-
-### **Key Improvements**
-- ✅ **No Hardcoded Values**: All timing parameters fully configurable
-- ✅ **Flat Structure**: Direct access to all parameters  
-- ✅ **Auto-Computed Fields**: `time_bins`, `min_symbol_samples` computed automatically
-- ✅ **Validation**: Built-in parameter validation with helpful error messages
-- ✅ **No Static Files**: No more complex nested config files to manage
-
-## 🚀 High-Level API
+### **DatasetBuildConfig**
+Configuration for dataset building process:
 
 ```python
-from represent import RepresentAPI
+from represent import DatasetBuildConfig
 
-# Use the high-level API for complete workflows
-api = RepresentAPI()
-config = create_represent_config("AUDUSD", features=['volume', 'variance'])
-
-# Run streamlined processing
-results = api.process_dbn_to_classified_parquets(
-    config=config,
-    dbn_path="data.dbn",
-    output_dir="/data/classified/",
-    force_uniform=True
+dataset_config = DatasetBuildConfig(
+    currency="AUDUSD",
+    features=['volume', 'variance'],
+    min_symbol_samples=10000,     # Minimum samples per symbol
+    force_uniform=True,           # Ensure balanced class distribution
+    nbins=13,                     # Number of classification bins
+    keep_intermediate=False       # Clean up intermediate files
 )
-
-print(f"✅ Processing complete! {results['symbols_processed']} symbols processed")
-print(f"📁 Classified data ready with {results['total_classified_samples']:,} samples")
 ```
 
-## 🎨 Comprehensive Demo
+## 📁 Data Formats
 
-**Run the complete functionality demonstration:**
+**Input Requirements:**
+- **DBN files**: `.dbn` or `.dbn.zst` (compressed recommended)
+- **Required columns**: `ask_px_00-09`, `bid_px_00-09`, `ask_sz_00-09`, `bid_sz_00-09`
+- **Optional columns**: `ask_ct_00-09`, `bid_ct_00-09` (for trade count features)
 
-```bash
-# Run comprehensive demo with all features
-make comprehensive-demo
-
-# Or run directly
-python examples/comprehensive_demo.py
-
-# View interactive HTML report
-open comprehensive_demo_output/comprehensive_demo_report.html
-```
-
-The comprehensive demo showcases:
-
-### **🎨 Multi-Feature Extraction**
-- **Volume Features**: Traditional market depth (order sizes)
-- **Variance Features**: Price volatility patterns  
-- **Trade Count Features**: Activity from transaction counts
-- **RGB Visualization**: Combined multi-feature representation
-
-### **📈 Classification Analysis**  
-- **With Force Uniform**: Guaranteed 7.69% per class distribution
-- **Without Force Uniform**: Natural (biased) distribution
-- **Quality Metrics**: Uniformity deviation analysis
-- **Visual Comparison**: Side-by-side distribution plots
-- **🎯 Bin Edges Table**: Detailed quantile boundaries with precise micro-pip values
-- **📊 Statistics**: Range, sample sizes, and files analyzed for each threshold
-
-### **⚡ Parquet Output Performance**
-- **Symbol-Grouped Files**: Optimized for targeted analysis
-- **Compressed Format**: Efficient storage and loading
-- **Schema Optimization**: Ready for external dataloader implementation
-- **Benchmark Ready**: Performance metrics for custom implementations
-
-### **🧠 ML Sample Generation**
-- **Multi-Feature Tensors**: Ready for PyTorch training
-- **Normalized Data**: All features in [0,1] range
-- **Uniform Labels**: Balanced classification distribution
-- **Code Examples**: Direct integration patterns
-
-**Generated Output:**
-```
-comprehensive_demo_output/
-├── comprehensive_demo_report.html          # Interactive report
-├── comprehensive_demo_report.md            # Documentation
-├── feature_extraction_demo.png             # Feature visualization
-├── classification_distribution_demo.png    # Classification analysis
-├── parquet_output_performance_demo.png     # Output performance benchmarks
-├── ml_sample_generation_demo.png           # ML integration
-└── demo_results.json                       # Raw results data
-```
+**Output Format:**
+- **Comprehensive symbol datasets**: One parquet file per symbol containing merged data
+- **Pre-classified**: Uniform distribution labels ready for training
+- **Tensor-ready**: Direct loading into ML frameworks with consistent shapes
 
 ## ⚡ Performance
 
-- **Stage 1 (Processing)**: 500+ samples/second direct DBN-to-classified-parquet processing
-- **Stage 2 (Training)**: 1000+ samples/second during ML training
-- **Memory Usage**: <4GB RAM regardless of dataset size
-- **Real-time compatible**: Processes live market data
-
-## 📊 Data Formats
-
-**Supported Inputs:**
-- **DBN files**: `.dbn`, `.dbn.zst` (compressed recommended)
-- **Any currency pair**: Automatic pip size detection
-
-**Required Columns:**
-- Price levels: `ask_px_00-09`, `bid_px_00-09`
-- Volume levels: `ask_sz_00-09`, `bid_sz_00-09`
-- Trade counts: `ask_ct_00-09`, `bid_ct_00-09` (for trade count features)
-
-**Output Format:**
-- **Parquet files**: Optimized for ML training
-- **Symbol-grouped**: Separate files per symbol for targeted analysis
-- **Tensor-ready**: Direct loading into PyTorch tensors
+- **DBN Processing**: 300+ samples/second during symbol splitting
+- **Symbol Merging**: 1500+ samples/second during dataset creation  
+- **ML Training**: 1000+ samples/second from comprehensive datasets
+- **Memory Usage**: <8GB RAM for processing multiple large DBN files
+- **Scalability**: Linear scaling with CPU cores
 
 ## 🧪 Development
 
@@ -591,120 +343,50 @@ comprehensive_demo_output/
 uv sync --all-extras
 
 # Run tests
-uv run pytest --cov=represent
+make test                 # Full test suite with coverage
+make test-fast           # Quick tests (excludes performance tests)
 
 # Code quality
-uv run ruff format && uv run ruff check && uv run pyright
+make lint                # Linting and type checking
+make format             # Code formatting
 
-# Performance tests
-uv run pytest -m performance
+# Build package
+make build              # Build distribution packages
 ```
 
-## 🔄 Migration Guide (v3.x → v4.x)
+### Testing
+- **104 tests passing** with comprehensive coverage
+- **74% code coverage** focused on critical paths
+- **Performance tests** for latency requirements
+- **Integration tests** for complete workflows
 
-### **1. Update Function Calls**
+## 📊 Examples
 
-**Old API:**
-```python
-# Multiple parameters - hard to maintain
-calculator = GlobalThresholdCalculator(currency="AUDUSD", nbins=13, max_samples_per_file=10000)
-converter = UnlabeledDBNConverter(currency="AUDUSD", batch_size=100)
-```
+Check out the `examples/` directory for complete demonstrations:
 
-**New API:**
-```python
-# Single config parameter - consistent and maintainable
-config = create_represent_config("AUDUSD")
-calculator = GlobalThresholdCalculator(config=config)
-converter = UnlabeledDBNConverter(config=config)
-```
-
-### **2. Update Test Code**
-
-**Old Test Setup:**
-```python
-def test_old_api():
-    calc = GlobalThresholdCalculator(currency="AUDUSD", nbins=13)
-    # Many individual parameters to mock
-```
-
-**New Test Setup:**
-```python
-def setup_method(self):
-    self.config = create_represent_config("AUDUSD")
-
-def test_new_api(self):
-    calc = GlobalThresholdCalculator(config=self.config)
-    # Single config object - easier to test
-```
-
-### **3. Benefits of Migration**
-
-- ✅ **Reduced Complexity**: 10+ parameters → 1 config object
-- ✅ **Type Safety**: Pydantic validation catches errors early
-- ✅ **Consistency**: All components use same configuration
-- ✅ **Testability**: Easy to mock and test with single config
-- ✅ **Performance**: Eliminated parameter duplication
-
-## 📈 Architecture Details
-
-- **Price Levels**: 402 levels (200 bid + 200 ask + 2 mid)
-- **Time Bins**: Dynamic computation based on samples/ticks_per_bin
-- **Classification**: 13-bin uniform distribution by default
-- **Memory**: Linear scaling with feature count
-- **Thread Safety**: Concurrent access support
-- **Configuration**: RepresentConfig with dependency injection
-
-## 🎯 Why Streamlined Architecture?
-
-### **Removed Complexity:**
-- ❌ Intermediate unlabeled parquet files - direct processing
-- ❌ Multi-stage pipeline overhead - single-pass approach
-- ❌ Static config files - replaced with dynamic generation
-- ❌ Complex stage management - streamlined workflow
-
-### **Added Benefits:**
-- ✅ Faster processing with single-pass DBN-to-classified-parquet
-- ✅ Guaranteed uniform distribution for optimal ML training
-- ✅ Symbol-specific processing with full context
-- ✅ Reduced storage requirements with no intermediate files
-- ✅ Simplified API with direct processing
-
-## 🧪 Testing & Code Quality
-
-### **Test Suite Organization**
-The test suite has been reorganized to align with the current architecture:
-
-- **✅ 217 Tests Passing**: Comprehensive coverage of all core functionality
-- **✅ 76% Code Coverage**: Focus on critical paths and user-facing APIs  
-- **✅ Removed Legacy Tests**: Eliminated 4 outdated test modules that no longer matched current architecture
-- **✅ Added New Test Coverage**: Enhanced tests for `GlobalThresholdCalculator`, `ParquetClassifier`, and `RepresentConfig`
-
-### **Removed Outdated Components:**
-- ❌ `test_legacy_dataloader.py` - Old ring buffer architecture  
-- ❌ `test_lazy_dataloader_new.py` - Moved dataloader functionality to ML training repos
-- ❌ `test_reference_implementation.py` - Notebook-based reference code
-- ❌ `test_benchmarks.py` - Benchmarks against removed reference implementation
-- ❌ `reference_implementation.py` - Static reference module
-- ❌ `lazy_dataloader.py` - DataLoader functionality moved to external implementation
-
-### **Enhanced Test Coverage:**
-- ✅ **Global Threshold Calculator**: Comprehensive tests for threshold calculation logic
-- ✅ **API Integration**: Tests for high-level API consistency and parameter handling  
-- ✅ **Configuration System**: Tests for RepresentConfig dynamic computation
-- ✅ **Error Handling**: Robust tests for edge cases and error conditions
-
-### **Test Execution:**
 ```bash
-# Run full test suite with coverage
-make test
+# Symbol-split-merge demonstration
+python examples/symbol_split_merge_demo.py
 
-# Run quick tests (excluding performance tests)
-make test-fast
+# Quick start examples  
+python examples/quick_start_examples.py
 
-# Generate HTML coverage report
-make coverage-html
+# Feature extraction demo
+python examples/demonstrate_feature_extraction.py
 ```
+
+## 📈 Architecture Benefits
+
+**Why Symbol-Split-Merge?**
+- **Comprehensive Datasets**: Each symbol contains complete history from multiple files
+- **Memory Efficient**: Stream large DBN files without loading into RAM
+- **Uniform Distribution**: Balanced class labels for optimal ML training  
+- **Production Ready**: Handle 10+ DBN files efficiently with automatic validation
+
+**Clean Three-Module Design:**
+- **dataset_builder**: High-level dataset creation from DBN files
+- **market_depth_processor**: Low-level market data tensor processing
+- **global_threshold_calculator**: Consistent classification across files
 
 ## 📄 License
 
@@ -712,4 +394,4 @@ MIT License - see LICENSE file for details.
 
 ---
 
-**🏎️ Production-ready market data processing with guaranteed uniform class distribution for optimal ML training**
+**🏗️ Production-ready symbol-split-merge architecture for comprehensive ML datasets with memory-efficient processing and guaranteed uniform class distribution**
