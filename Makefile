@@ -1,4 +1,4 @@
-.PHONY: install test lint typecheck format build clean help test-performance test-fast test-fast-cov test-coverage coverage-report coverage-html test-unit test-e2e test-e2e-fast symbol-split-merge-demo run-fast-demo generate-reports process-dbn process-dbn-fast process-dbn-production process-dbn-demo process-dbn-balanced
+.PHONY: install test lint typecheck format build clean help test-performance test-fast test-fast-cov test-coverage coverage-report coverage-html test-unit test-e2e test-e2e-fast demo examples symbol-split-merge-demo run-fast-demo generate-reports process-dbn process-dbn-fast process-dbn-production process-dbn-demo process-dbn-balanced
 
 # Default target
 help:
@@ -20,6 +20,8 @@ help:
 	@echo "  build                  - Build package"
 	@echo "  clean                  - Clean build artifacts"
 	@echo "  check-commit           - Lints and commits"
+	@echo "  demo                   - Run complete workflow demo (three core modules)"
+	@echo "  examples               - Alias for demo"
 	@echo "  symbol-split-merge-demo - Run symbol-split-merge architecture demo"
 	@echo "  run-fast-demo          - Run fast processing demo"  
 	@echo "  generate-reports       - Generate comprehensive HTML reports for all outputs"
@@ -35,6 +37,14 @@ install:
 check-commit: ## Run pre-commit checks and commit
 	.venv/bin/pre-commit run --all-files
 	.venv/bin/cz commit --all
+
+# Complete workflow demo (three core modules)
+demo:
+	@echo "🚀 Running Complete Workflow Demo"
+	@echo "================================="
+	python examples/complete_workflow_demo.py
+
+examples: demo  ## Alias for demo target
 
 symbol-split-merge-demo:
 	uv run python examples/symbol_split_merge_demo.py
