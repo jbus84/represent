@@ -42,18 +42,26 @@ config = create_represent_config("AUDUSD", features=['volume', 'variance'])
 dataset_config = DatasetBuildConfig(
     currency="AUDUSD",
     features=['volume', 'variance'],
-    min_symbol_samples=10000,          # Higher threshold for comprehensive datasets
+    min_symbol_samples=60500,          # Must be >= samples + lookback + lookforward + offset (50K + 5K + 5K + 500)
     force_uniform=True,                # Ensure uniform class distribution
     keep_intermediate=False            # Clean up intermediate split files
 )
 
 # Process multiple DBN files into comprehensive symbol datasets
+# Use at least 10 DBN files to ensure sufficient data for minimum sample requirements
 results = build_datasets_from_dbn_files(
     config=config,
     dbn_files=[
-        "data/AUDUSD-20240101.dbn.zst",
-        "data/AUDUSD-20240102.dbn.zst", 
-        "data/AUDUSD-20240103.dbn.zst"
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240101.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240102.dbn.zst", 
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240103.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240104.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240105.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240106.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240107.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240108.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240109.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240110.dbn.zst"
     ],
     output_dir="/data/symbol_datasets/",
     dataset_config=dataset_config
@@ -463,19 +471,27 @@ config = create_represent_config(
 dataset_config = DatasetBuildConfig(
     currency="AUDUSD",
     features=['volume', 'variance'], 
-    min_symbol_samples=10000,     # Higher threshold for comprehensive datasets
+    min_symbol_samples=60500,     # Auto-calculated: samples + lookback + lookforward + offset
     force_uniform=True,           # Guarantee uniform class distribution
     keep_intermediate=False       # Clean up intermediate split files
 )
 
 # Build comprehensive symbol datasets from multiple DBN files
+# Use at least 10 DBN files to ensure sufficient data for each symbol
 print("Building comprehensive symbol datasets...")
 results = build_datasets_from_dbn_files(
     config=config,
     dbn_files=[
-        "data/AUDUSD-20240101.dbn.zst",
-        "data/AUDUSD-20240102.dbn.zst", 
-        "data/AUDUSD-20240103.dbn.zst"
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240101.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240102.dbn.zst", 
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240103.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240104.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240105.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240106.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240107.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240108.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240109.dbn.zst",
+        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240110.dbn.zst"
     ],
     output_dir="/data/symbol_datasets/",
     dataset_config=dataset_config,

@@ -4,23 +4,23 @@ Tests volume, variance, and trade_counts features with proper dimensional output
 """
 
 import numpy as np
-import pytest
 import polars as pl
+import pytest
 
-from represent.pipeline import MarketDepthProcessor, process_market_data, create_processor
+from represent.config import create_represent_config
 from represent.constants import (
-    PRICE_LEVELS,
-    DEFAULT_FEATURES,
     ASK_COUNT_COLUMNS,
     BID_COUNT_COLUMNS,
+    DEFAULT_FEATURES,
+    PRICE_LEVELS,
 )
-from represent.config import create_represent_config
+from represent.pipeline import MarketDepthProcessor, create_processor, process_market_data
 from tests.unit.fixtures.sample_data import generate_realistic_market_data
 
 
 class TestExtendedFeatures:
     """Test extended features functionality."""
-    
+
     def setup_method(self):
         """Setup config for each test."""
         self.config = create_represent_config("AUDUSD")
@@ -229,7 +229,7 @@ class TestExtendedFeatures:
 
 class TestFeaturePerformance:
     """Test performance aspects of extended features."""
-    
+
     def setup_method(self):
         """Setup config for each test."""
         self.config = create_represent_config("AUDUSD")
@@ -299,7 +299,7 @@ class TestFeaturePerformance:
 
 class TestBackwardCompatibility:
     """Test backward compatibility with existing code."""
-    
+
     def setup_method(self):
         """Setup config for each test."""
         self.config = create_represent_config("AUDUSD")

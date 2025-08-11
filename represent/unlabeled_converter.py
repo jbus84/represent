@@ -7,13 +7,13 @@ grouped by symbol for later post-processing classification.
 
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Union, Any
+from typing import Any
 
 import databento as db
 import polars as pl
 
-from .pipeline import MarketDepthProcessor
 from .config import RepresentConfig
+from .pipeline import MarketDepthProcessor
 
 
 class UnlabeledDBNConverter:
@@ -53,12 +53,12 @@ class UnlabeledDBNConverter:
 
     def convert_dbn_to_symbol_parquets(
         self,
-        dbn_path: Union[str, Path],
-        output_dir: Union[str, Path],
+        dbn_path: str | Path,
+        output_dir: str | Path,
         currency: str = "AUDUSD",
         chunk_size: int = 100000,
         include_metadata: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Convert DBN file to symbol-grouped unlabeled parquet datasets.
 
@@ -98,7 +98,7 @@ class UnlabeledDBNConverter:
         symbol_counts = df.group_by("symbol").len().sort("len", descending=True)
         print(f"   📊 Found {len(symbol_counts)} unique symbols")
 
-        # Filter to symbols with sufficient data  
+        # Filter to symbols with sufficient data
         min_samples = self.config.samples // 25  # Direct computation to avoid PyRight issue
         valid_symbols = symbol_counts.filter(
             pl.col("len") >= min_samples
@@ -123,7 +123,7 @@ class UnlabeledDBNConverter:
 
         for symbol in valid_symbols:
             print(f"   🔄 Processing symbol: {symbol}")
-            
+
             symbol_data = df.filter(pl.col("symbol") == symbol)
             symbol_samples = []
 
@@ -142,15 +142,15 @@ class UnlabeledDBNConverter:
             if symbol_samples:
                 # Combine all samples for this symbol
                 symbol_df = pl.concat(symbol_samples)
-                
+
                 # Save symbol-specific parquet file
                 symbol_filename = f"{currency}_{symbol}.parquet"
                 symbol_path = output_dir / symbol_filename
-                
+
                 symbol_df.write_parquet(
-                    str(symbol_path), 
-                    compression="snappy", 
-                    statistics=True, 
+                    str(symbol_path),
+                    compression="snappy",
+                    statistics=True,
                     row_group_size=50000
                 )
 
@@ -159,7 +159,7 @@ class UnlabeledDBNConverter:
                     "file_path": str(symbol_path),
                     "file_size_mb": symbol_path.stat().st_size / 1024 / 1024
                 }
-                
+
                 total_processed_samples += len(symbol_df)
                 print(f"      ✅ Saved {len(symbol_df):,} samples to {symbol_filename}")
 
@@ -207,7 +207,7 @@ class UnlabeledDBNConverter:
 
     def _process_symbol_chunk(
         self, chunk: pl.DataFrame, symbol: str
-    ) -> Optional[pl.DataFrame]:
+    ) -> pl.DataFrame | None:
         """
         Process a chunk of symbol-specific data to generate market depth features.
 
@@ -248,7 +248,7 @@ class UnlabeledDBNConverter:
                     features_array = market_depth_representation.numpy()
                 else:
                     features_array = market_depth_representation
-                
+
                 # Ensure we have a numpy array
                 if not hasattr(features_array, 'tobytes'):
                     features_array = np.array(features_array)
@@ -297,11 +297,11 @@ class UnlabeledDBNConverter:
 
 def convert_dbn_to_parquet(
     config: RepresentConfig,
-    dbn_path: Union[str, Path],
-    output_dir: Union[str, Path],
+    dbn_path: str | Path,
+    output_dir: str | Path,
     group_by_symbol: bool = True,
     **kwargs,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Convenience function to convert a single DBN file to symbol-grouped parquet.
 
@@ -320,8 +320,8 @@ def convert_dbn_to_parquet(
         config = create_represent_config("AUDUSD")
         stats = convert_dbn_to_parquet(
             config=config,
-            dbn_path='data.dbn', 
-            output_dir='/data/parquet/', 
+            dbn_path='data.dbn',
+            output_dir='/data/parquet/',
         )
     """
     converter = UnlabeledDBNConverter(config=config)
@@ -336,11 +336,11 @@ def convert_dbn_to_parquet(
 
 def batch_convert_dbn_files(
     config: RepresentConfig,
-    input_directory: Union[str, Path],
-    output_directory: Union[str, Path],
+    input_directory: str | Path,
+    output_directory: str | Path,
     pattern: str = "*.dbn*",
     **kwargs,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Convert multiple DBN files to symbol-grouped parquet datasets.
 

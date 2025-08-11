@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """
 Test script to verify version synchronization across files.
 
@@ -8,7 +8,6 @@ and that the semantic-release configuration is correctly set up.
 
 import re
 from pathlib import Path
-from typing import Dict, List
 
 
 def extract_pyproject_version() -> str:
@@ -52,12 +51,12 @@ def extract_init_version() -> str:
     return match.group(1)
 
 
-def check_semantic_release_config() -> Dict[str, List[str]]:
+def check_semantic_release_config() -> dict[str, list[str]]:
     """Check that semantic release is configured to update both locations."""
     pyproject_path = Path("pyproject.toml")
     content = pyproject_path.read_text()
 
-    result: Dict[str, List[str]] = {}
+    result: dict[str, list[str]] = {}
 
     # Find version_toml configuration
     toml_match = re.search(r"version_toml\s*=\s*\[(.*?)\]", content)

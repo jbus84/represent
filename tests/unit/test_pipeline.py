@@ -2,16 +2,17 @@
 Tests to improve pipeline module coverage.
 """
 
-import pytest
 import numpy as np
 import polars as pl
-from represent import MarketDepthProcessor, create_processor, process_market_data, FeatureType
+import pytest
+
+from represent import FeatureType, MarketDepthProcessor, create_processor, process_market_data
 from represent.config import create_represent_config
 
 
 class TestPipelineCoverage:
     """Test pipeline module to improve coverage."""
-    
+
     def setup_method(self):
         """Setup config for each test."""
         self.config = create_represent_config("AUDUSD")

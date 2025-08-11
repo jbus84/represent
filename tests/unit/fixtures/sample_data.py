@@ -2,19 +2,19 @@
 Sample data generation for testing based on the notebook patterns.
 """
 
+from datetime import UTC, datetime
+
 import numpy as np
 import polars as pl
-from datetime import datetime, timezone
-from typing import Optional
 
 # Import from the actual represent module instead of reference implementation
 from represent.constants import (
-    ASK_PRICE_COLUMNS,
-    BID_PRICE_COLUMNS,
-    ASK_VOL_COLUMNS,
-    BID_VOL_COLUMNS,
     ASK_COUNT_COLUMNS,
+    ASK_PRICE_COLUMNS,
+    ASK_VOL_COLUMNS,
     BID_COUNT_COLUMNS,
+    BID_PRICE_COLUMNS,
+    BID_VOL_COLUMNS,
 )
 
 
@@ -22,7 +22,7 @@ def generate_realistic_market_data(
     n_samples: int = 50000,  # Standard expected dataset size
     base_price: float = 0.6600,
     spread: float = 0.0002,
-    seed: Optional[int] = 42,
+    seed: int | None = 42,
 ) -> pl.DataFrame:
     """
     Generate realistic market data similar to the notebook's AUDUSD data.
@@ -37,7 +37,7 @@ def generate_realistic_market_data(
         np.random.seed(seed)
 
     # Generate timestamps
-    start_time = datetime(2024, 4, 5, tzinfo=timezone.utc)
+    start_time = datetime(2024, 4, 5, tzinfo=UTC)
     timestamps = [
         start_time.timestamp() * 1_000_000_000 + i * 1_000_000  # nanoseconds
         for i in range(n_samples)

@@ -3,12 +3,13 @@ End-to-end tests using synthetic realistic data.
 These tests can run without requiring real market data or API keys.
 """
 
-import pytest
-import numpy as np
-import polars as pl
 import time
 
-from represent import process_market_data, create_processor
+import numpy as np
+import polars as pl
+import pytest
+
+from represent import create_processor, process_market_data
 from represent.config import create_represent_config
 
 
@@ -76,7 +77,7 @@ def create_realistic_synthetic_data(n_samples: int = 50000, seed: int = 42) -> p
 
 class TestSyntheticE2E:
     """End-to-end tests using synthetic realistic data."""
-    
+
     def setup_method(self):
         """Setup config for each test."""
         self.config = create_represent_config("AUDUSD")
@@ -259,7 +260,7 @@ class TestSyntheticE2E:
 
 class TestSyntheticDataCompatibility:
     """Test compatibility features with synthetic data."""
-    
+
     def setup_method(self):
         """Setup config for each test."""
         self.config = create_represent_config("AUDUSD")
@@ -300,8 +301,9 @@ class TestSyntheticDataCompatibility:
     @pytest.mark.e2e
     def test_memory_efficiency_synthetic(self):
         """Test memory efficiency with synthetic data."""
-        import psutil
         import os
+
+        import psutil
 
         process = psutil.Process(os.getpid())
         baseline_memory = process.memory_info().rss / 1024 / 1024  # MB

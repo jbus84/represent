@@ -5,8 +5,8 @@ Integration tests to verify the complete pipeline works as expected.
 import numpy as np
 import polars as pl
 
-from represent.constants import PRICE_LEVELS
 from represent.config import create_represent_config
+from represent.constants import PRICE_LEVELS
 from represent.pipeline import process_market_data
 from tests.unit.fixtures.sample_data import generate_realistic_market_data
 
@@ -83,7 +83,7 @@ class TestIntegration:
         """Test pipeline stability with edge cases."""
         # Test with constant prices (no variation)
         constant_data = generate_realistic_market_data(n_samples=50000, seed=42)
-        
+
         # Make prices constant
         for col in constant_data.columns:
             if "px_" in col:
@@ -132,13 +132,13 @@ class TestIntegration:
             assert np.all(np.isfinite(result))
 
         # All currencies should use same time_bins (250) but may have different processing
-        for currency, result in results.items():
+        for _currency, result in results.items():
             assert result.shape[1] == 250  # time_bins = 25000 // 100 = 250
 
     def test_pipeline_performance(self):
         """Test pipeline meets performance requirements."""
         import time
-        
+
         data = generate_realistic_market_data(n_samples=50000, seed=42)
 
         # Measure processing time
@@ -157,8 +157,9 @@ class TestIntegration:
 
     def test_pipeline_memory_efficiency(self):
         """Test pipeline memory usage."""
-        import psutil
         import os
+
+        import psutil
 
         process = psutil.Process(os.getpid())
         initial_memory = process.memory_info().rss / 1024 / 1024  # MB
@@ -182,7 +183,7 @@ class TestConfigurationIntegration:
     def test_config_consistency_across_components(self):
         """Test that all components use consistent configuration."""
         from represent.pipeline import MarketDepthProcessor
-        
+
         currency = "AUDUSD"
         config = create_represent_config(currency)
         processor = MarketDepthProcessor(config=config)
@@ -195,7 +196,7 @@ class TestConfigurationIntegration:
     def test_time_bins_calculation(self):
         """Test that TIME_BINS is calculated correctly."""
         config = create_represent_config("AUDUSD")
-        
+
         # Verify the calculation
         expected_time_bins = config.samples // config.ticks_per_bin
         assert config.time_bins == expected_time_bins
@@ -205,9 +206,9 @@ class TestConfigurationIntegration:
         """Test that output_shape matches actual processing results."""
         data = generate_realistic_market_data(n_samples=50000, seed=42)
         config = create_represent_config("AUDUSD")
-        
+
         result = process_market_data(data, config=config)
-        
+
         # Result shape should match config output_shape
         assert result.shape == config.output_shape
         assert result.shape == (PRICE_LEVELS, config.time_bins)

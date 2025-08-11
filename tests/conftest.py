@@ -2,11 +2,11 @@
 Pytest configuration and shared fixtures for all tests.
 """
 
-import pytest
-import polars as pl
-import databento as db
 from pathlib import Path
-from typing import Optional
+
+import databento as db
+import polars as pl
+import pytest
 
 # Path to the data directory
 DATA_DIR = Path(__file__).parent.parent / "data"
@@ -57,7 +57,7 @@ def pytest_runtest_setup(item):
 
 
 @pytest.fixture(scope="session")
-def real_market_data() -> Optional[pl.DataFrame]:
+def real_market_data() -> pl.DataFrame | None:
     """Load real market data from the databento file."""
     dbn_file = DATA_DIR / "glbx-mdp3-20240403.mbp-10.dbn.zst"
 
@@ -81,7 +81,7 @@ def real_market_data() -> Optional[pl.DataFrame]:
 
 
 @pytest.fixture(scope="session")
-def sample_real_data(real_market_data) -> Optional[pl.DataFrame]:
+def sample_real_data(real_market_data) -> pl.DataFrame | None:
     """Get a sample of real market data for testing."""
     if real_market_data is None:
         return None
@@ -95,7 +95,7 @@ def sample_real_data(real_market_data) -> Optional[pl.DataFrame]:
 
 
 @pytest.fixture(scope="session")
-def small_real_data(real_market_data) -> Optional[pl.DataFrame]:
+def small_real_data(real_market_data) -> pl.DataFrame | None:
     """Get a small sample of real market data for quick tests."""
     if real_market_data is None:
         return None

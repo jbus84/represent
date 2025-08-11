@@ -5,18 +5,16 @@ This module provides simplified, user-friendly functions for the
 symbol-split-merge architecture (v5.0.0).
 """
 
-from typing import Dict, List, Optional, Union, Any
 from pathlib import Path
+from typing import Any
 
-from .dataset_builder import (
-    DatasetBuilder, 
-    DatasetBuildConfig,
-    build_datasets_from_dbn_files,
-    batch_build_datasets_from_directory
-)
+from .classification_config_generator import generate_classification_config_from_parquet
 from .config import RepresentConfig
-from .classification_config_generator import (
-    generate_classification_config_from_parquet
+from .dataset_builder import (
+    DatasetBuildConfig,
+    DatasetBuilder,
+    batch_build_datasets_from_directory,
+    build_datasets_from_dbn_files,
 )
 from .global_threshold_calculator import GlobalThresholds, calculate_global_thresholds
 
@@ -29,26 +27,27 @@ class RepresentAPI:
     symbol datasets from multiple DBN files.
     """
 
-    def __init__(self):
+    def __init__(self, config: RepresentConfig | None = None):
         """Initialize the API."""
         self._available_currencies = ["AUDUSD", "GBPUSD", "EURJPY", "EURUSD", "USDJPY"]
+        self.config = config
 
     def build_comprehensive_symbol_datasets(
         self,
         config: RepresentConfig,
-        dbn_files: List[Union[str, Path]],
-        output_dir: Union[str, Path],
-        dataset_config: Optional[DatasetBuildConfig] = None,
-        intermediate_dir: Optional[Union[str, Path]] = None,
+        dbn_files: list[str | Path],
+        output_dir: str | Path,
+        dataset_config: DatasetBuildConfig | None = None,
+        intermediate_dir: str | Path | None = None,
         verbose: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Build comprehensive symbol datasets from multiple DBN files.
-        
+
         This is the primary workflow that implements symbol-split-merge architecture:
         1. Split each DBN file by symbol into intermediate files
         2. Merge all instances of each symbol across files into comprehensive datasets
-        
+
         Args:
             config: RepresentConfig with currency-specific configuration
             dbn_files: List of DBN files to process
@@ -56,14 +55,14 @@ class RepresentAPI:
             dataset_config: Configuration for dataset building process
             intermediate_dir: Directory for intermediate split files (temp if None)
             verbose: Whether to print progress information
-            
+
         Returns:
             Processing statistics and comprehensive dataset information
-            
+
         Examples:
             api = RepresentAPI()
             config = create_represent_config("AUDUSD", features=['volume', 'variance'])
-            
+
             # Build comprehensive datasets from multiple DBN files
             results = api.build_comprehensive_symbol_datasets(
                 config=config,
@@ -74,7 +73,7 @@ class RepresentAPI:
                 ],
                 output_dir='/data/symbol_datasets/'
             )
-            
+
             # Results contain comprehensive symbol datasets ready for ML training
             print(f"Created {results['phase_2_stats']['datasets_created']} comprehensive datasets")
             print(f"Total samples: {results['phase_2_stats']['total_samples']:,}")
@@ -84,7 +83,7 @@ class RepresentAPI:
                 currency=config.currency,
                 features=config.features
             )
-        
+
         return build_datasets_from_dbn_files(
             config=config,
             dbn_files=dbn_files,
@@ -93,20 +92,20 @@ class RepresentAPI:
             intermediate_dir=intermediate_dir,
             verbose=verbose
         )
-    
+
     def build_datasets_from_directory(
         self,
         config: RepresentConfig,
-        input_directory: Union[str, Path],
-        output_dir: Union[str, Path],
+        input_directory: str | Path,
+        output_dir: str | Path,
         file_pattern: str = "*.dbn*",
-        dataset_config: Optional[DatasetBuildConfig] = None,
-        intermediate_dir: Optional[Union[str, Path]] = None,
+        dataset_config: DatasetBuildConfig | None = None,
+        intermediate_dir: str | Path | None = None,
         verbose: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Build comprehensive symbol datasets from all DBN files in a directory.
-        
+
         Args:
             config: RepresentConfig with currency-specific configuration
             input_directory: Directory containing DBN files
@@ -115,21 +114,21 @@ class RepresentAPI:
             dataset_config: Configuration for dataset building process
             intermediate_dir: Directory for intermediate split files (temp if None)
             verbose: Whether to print progress information
-            
+
         Returns:
             Processing statistics and comprehensive dataset information
-            
+
         Examples:
             api = RepresentAPI()
             config = create_represent_config("AUDUSD", features=['volume'])
-            
+
             # Build datasets from all DBN files in directory
             results = api.build_datasets_from_directory(
                 config=config,
                 input_directory='data/audusd_dbn_files/',
                 output_dir='/data/symbol_datasets/'
             )
-            
+
             print(f"Processed {len(results['input_files'])} DBN files")
             print(f"Created {results['phase_2_stats']['datasets_created']} symbol datasets")
         """
@@ -138,7 +137,7 @@ class RepresentAPI:
                 currency=config.currency,
                 features=config.features
             )
-        
+
         return batch_build_datasets_from_directory(
             config=config,
             input_directory=input_directory,
@@ -148,38 +147,38 @@ class RepresentAPI:
             intermediate_dir=intermediate_dir,
             verbose=verbose
         )
-    
+
     def create_dataset_builder(
         self,
         config: RepresentConfig,
-        dataset_config: Optional[DatasetBuildConfig] = None,
+        dataset_config: DatasetBuildConfig | None = None,
         verbose: bool = True,
     ) -> DatasetBuilder:
         """
         Create a DatasetBuilder instance for advanced symbol-split-merge processing.
-        
+
         Args:
             config: RepresentConfig with currency-specific configuration
             dataset_config: Configuration for dataset building process
             verbose: Whether to print progress information
-            
+
         Returns:
             DatasetBuilder instance for advanced processing
-            
+
         Examples:
             api = RepresentAPI()
             config = create_represent_config("AUDUSD", features=['volume'])
-            
+
             # Create builder for custom processing
             builder = api.create_dataset_builder(
                 config=config,
                 dataset_config=DatasetBuildConfig(min_symbol_samples=5000)
             )
-            
+
             # Use builder for multiple operations
             for batch_of_files in dbn_file_batches:
                 results = builder.build_datasets_from_dbn_files(
-                    batch_of_files, 
+                    batch_of_files,
                     f'/data/batch_{i}_datasets/'
                 )
         """
@@ -188,14 +187,14 @@ class RepresentAPI:
                 currency=config.currency,
                 features=config.features
             )
-            
+
         return DatasetBuilder(
             config=config,
             dataset_config=dataset_config,
             verbose=verbose
         )
 
-    def list_available_currencies(self) -> List[str]:
+    def list_available_currencies(self) -> list[str]:
         """
         List available predefined currency configurations.
 
@@ -207,13 +206,13 @@ class RepresentAPI:
     def generate_classification_config(
         self,
         config: RepresentConfig,
-        parquet_files: Union[str, Path, List[Union[str, Path]]],
+        parquet_files: str | Path | list[str | Path],
         validation_split: float = 0.3,
         **kwargs
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Generate optimized classification configuration from parquet data.
-        
+
         This method dynamically creates classification configurations using
         quantile-based analysis, eliminating the need for static config files.
 
@@ -241,7 +240,7 @@ class RepresentAPI:
             validation_split=validation_split,
             **kwargs
         )
-        
+
         return {
             'config': generated_config,
             'metrics': metrics,
@@ -252,38 +251,38 @@ class RepresentAPI:
     def calculate_global_thresholds(
         self,
         config: RepresentConfig,
-        data_directory: Union[str, Path],
+        data_directory: str | Path,
         sample_fraction: float = 0.5,
         file_pattern: str = "*.dbn*",
         verbose: bool = True,
     ) -> GlobalThresholds:
         """
         Calculate global classification thresholds from a sample of DBN files.
-        
+
         This ensures consistent classification thresholds across all symbols and files,
         preventing the problems of per-file quantile calculation.
-        
+
         Args:
             config: RepresentConfig with currency-specific configuration
             data_directory: Directory containing DBN files
             sample_fraction: Fraction of files to use for threshold calculation
             file_pattern: Pattern to match DBN files
             verbose: Whether to print progress information
-            
+
         Returns:
             GlobalThresholds object with quantile boundaries and metadata
-            
+
         Example:
             api = RepresentAPI()
             config = create_represent_config("AUDUSD")
-            
+
             # Calculate global thresholds from first 50% of files
             thresholds = api.calculate_global_thresholds(
                 config,
                 "/data/databento/AUDUSD-micro",
                 sample_fraction=0.5
             )
-            
+
             # Use thresholds for consistent classification
             results = api.build_comprehensive_symbol_datasets(
                 config,
@@ -300,7 +299,7 @@ class RepresentAPI:
             verbose=verbose,
         )
 
-    def get_package_info(self) -> Dict[str, Any]:
+    def get_package_info(self) -> dict[str, Any]:
         """
         Get information about the represent package.
 
@@ -326,9 +325,9 @@ class RepresentAPI:
             },
             "key_features": [
                 "Symbol-Split-Merge Dataset Building",
-                "Comprehensive Multi-File Symbol Datasets", 
+                "Comprehensive Multi-File Symbol Datasets",
                 "Per-Symbol First-Half Classification",
-                "Quantile-based Config Generation", 
+                "Quantile-based Config Generation",
                 "Automatic Threshold Optimization",
                 "Two-Phase Processing with Cleanup",
                 "Performance-Optimized ML Training Datasets"
@@ -341,6 +340,19 @@ class RepresentAPI:
             ],
         }
 
+    # Alias methods to match test expectations
+    def process_dbn_to_classified_parquets(self, *args, **kwargs):
+        """Alias for build_comprehensive_symbol_datasets for backward compatibility."""
+        return self.build_comprehensive_symbol_datasets(*args, **kwargs)
+
+    def batch_process_directory(self, *args, **kwargs):
+        """Alias for build_datasets_from_directory for backward compatibility."""
+        return self.build_datasets_from_directory(*args, **kwargs)
+
+    def process_multiple_dbn_files(self, *args, **kwargs):
+        """Alias for build_comprehensive_symbol_datasets for backward compatibility."""
+        return self.build_comprehensive_symbol_datasets(*args, **kwargs)
+
 
 # Create a default API instance for convenience
 api = RepresentAPI()
@@ -350,7 +362,7 @@ api = RepresentAPI()
 def load_training_dataset(*args, **kwargs):
     """
     DataLoader functionality has been moved to ML training repositories.
-    
+
     See examples/symbol_split_merge_demo.py for comprehensive dataset creation,
     then implement custom dataloaders in your ML training repository.
     """

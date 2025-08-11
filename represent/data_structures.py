@@ -5,7 +5,8 @@ but these structures are still needed for the core processing pipeline.
 """
 
 import numpy as np
-from .constants import PRICE_LEVELS, VOLUME_DTYPE, OUTPUT_DTYPE
+
+from .constants import OUTPUT_DTYPE, PRICE_LEVELS, VOLUME_DTYPE
 
 
 class PriceLookupTable:
@@ -67,7 +68,7 @@ class VolumeGrid:
 
     def __init__(self, time_bins: int = 500):
         """Initialize grid with pre-allocated memory.
-        
+
         Args:
             time_bins: Number of time bins (defaults to 500 for backward compatibility)
         """
@@ -120,7 +121,7 @@ class OutputBuffer:
 
     def __init__(self, time_bins: int = 500):
         """Initialize output buffer.
-        
+
         Args:
             time_bins: Number of time bins (defaults to 500 for backward compatibility)
         """
@@ -133,13 +134,13 @@ class OutputBuffer:
         """Prepare normalized combined output using notebook approach."""
         # Calculate combined volume (ask - bid)
         np.subtract(ask_grid, bid_grid, out=self._temp_combined)
-        
+
         # Create mask for negative values (bid > ask)
         neg_mask = self._temp_combined < 0
-        
-        # Take absolute value 
+
+        # Take absolute value
         np.abs(self._temp_combined, out=self._temp_abs)
-        
+
         # Normalize: (abs_combined - 0) / (abs_combined.max() - 0)
         # min is always 0 volume
         max_val = np.max(self._temp_abs)
@@ -147,10 +148,10 @@ class OutputBuffer:
             np.divide(self._temp_abs, max_val, out=self._buffer)
         else:
             self._buffer.fill(0)
-            
+
         # Restore negative sign for values where bid > ask
         self._buffer[neg_mask] *= -1
-        
+
         return self._buffer
 
     @property

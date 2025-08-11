@@ -13,14 +13,16 @@ Key Features:
 """
 
 import time
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Union, Any, Tuple, cast
+from typing import Any, cast
+
+import databento as db
 import numpy as np
 import polars as pl
-import databento as db
-from dataclasses import dataclass
 
 from .config import RepresentConfig
+
 # No longer need hardcoded constants - using RepresentConfig now
 from .global_threshold_calculator import GlobalThresholds
 
@@ -29,12 +31,12 @@ from .global_threshold_calculator import GlobalThresholds
 class ClassificationConfig:
     """Configuration for classification processing using lookback vs lookforward methodology."""
     currency: str = "AUDUSD"
-    features: Optional[List[str]] = None
+    features: list[str] | None = None
     min_symbol_samples: int = 1000
     force_uniform: bool = True
     nbins: int = 13
-    global_thresholds: Optional[GlobalThresholds] = None
-    
+    global_thresholds: GlobalThresholds | None = None
+
     def __post_init__(self):
         if self.features is None:
             self.features = ["volume"]
@@ -43,8 +45,8 @@ class ClassificationConfig:
 class ParquetClassifier:
     """
     DBN-to-Classified-Parquet processor.
-    
-    This class processes DBN files directly to classified parquet files by symbol, 
+
+    This class processes DBN files directly to classified parquet files by symbol,
     ensuring uniform distribution and efficient ML training preparation.
     """
 
@@ -52,10 +54,10 @@ class ParquetClassifier:
         self,
         config: RepresentConfig,
         force_uniform: bool = True,
-        global_thresholds: Optional[GlobalThresholds] = None,
+        global_thresholds: GlobalThresholds | None = None,
         verbose: bool = True,
     ):
-        
+
         """
         Initialize streamlined classifier using RepresentConfig for standardized configuration.
 
@@ -67,10 +69,10 @@ class ParquetClassifier:
         """
         # Store RepresentConfig directly
         self.represent_config = config
-        
+
         # Get computed values to avoid type checker issues
         default_min_samples: int = cast(int, config.min_symbol_samples)
-        
+
         # Create ClassificationConfig with config values as defaults
         self.config = ClassificationConfig(
             currency=config.currency,
@@ -80,9 +82,9 @@ class ParquetClassifier:
             nbins=config.nbins,
             global_thresholds=global_thresholds,
         )
-        
+
         self.verbose = verbose
-        
+
         if self.verbose:
             print("🚀 ParquetClassifier initialized")
             print(f"   💱 Currency: {self.config.currency}")
@@ -99,7 +101,7 @@ class ParquetClassifier:
             else:
                 print("   ⚠️  Global thresholds: Using per-symbol calculation (not recommended)")
 
-    def load_dbn_file(self, dbn_path: Union[str, Path]) -> pl.DataFrame:
+    def load_dbn_file(self, dbn_path: str | Path) -> pl.DataFrame:
         """
         Load DBN file into polars DataFrame.
 
@@ -111,25 +113,25 @@ class ParquetClassifier:
         """
         if self.verbose:
             print(f"📄 Loading DBN file: {dbn_path}")
-        
+
         start_time = time.perf_counter()
-        
+
         # Load DBN data
         data = db.read_dbn(str(dbn_path))
-        
+
         # Convert to polars DataFrame
         df = pl.from_pandas(data.to_df())
-        
+
         load_time = time.perf_counter() - start_time
-        
+
         if self.verbose:
             print(f"   ✅ Loaded {len(df):,} rows in {load_time:.1f}s")
             print(f"   📊 Columns: {df.columns}")
             print(f"   📊 Symbols: {df['symbol'].n_unique()} unique")
-        
+
         return df
 
-    def filter_symbols_by_threshold(self, df: pl.DataFrame) -> Tuple[pl.DataFrame, Dict[str, int]]:
+    def filter_symbols_by_threshold(self, df: pl.DataFrame) -> tuple[pl.DataFrame, dict[str, int]]:
         """
         Filter symbols that have sufficient data for processing.
 
@@ -141,35 +143,35 @@ class ParquetClassifier:
         """
         if self.verbose:
             print("🔍 Filtering symbols by threshold...")
-        
+
         # Calculate minimum required samples using new methodology constants
         min_required = self.represent_config.lookback_rows + self.represent_config.lookforward_input + self.represent_config.lookforward_offset
-        
+
         # Count samples per symbol
         symbol_counts = df.group_by('symbol').len().sort('len', descending=True)
-        
+
         # Filter symbols with sufficient data
         valid_symbols = symbol_counts.filter(
             pl.col('len') >= min_required
         )['symbol'].to_list()
-        
+
         if self.verbose:
             print(f"   📊 Total symbols: {symbol_counts.height}")
             print(f"   📊 Symbols with ≥{min_required} rows: {len(valid_symbols)}")
             print(f"   📊 Valid symbols: {valid_symbols}")
-        
+
         # Filter DataFrame to valid symbols only
         filtered_df = df.filter(pl.col('symbol').is_in(valid_symbols))
-        
+
         # Convert symbol counts to dict
         symbol_count_dict = {
-            row['symbol']: row['len'] 
+            row['symbol']: row['len']
             for row in symbol_counts.to_dicts()
         }
-        
+
         if self.verbose:
             print(f"   ✅ Filtered to {len(filtered_df):,} rows across {len(valid_symbols)} symbols")
-        
+
         return filtered_df, symbol_count_dict
 
     def calculate_price_movements(self, symbol_df: pl.DataFrame) -> pl.DataFrame:
@@ -184,44 +186,44 @@ class ParquetClassifier:
         """
         # Sort by timestamp to ensure proper order
         symbol_df = symbol_df.sort('ts_event')
-        
+
         # Calculate mid prices from bid/ask
         symbol_df = symbol_df.with_columns(
             ((pl.col('ask_px_00') + pl.col('bid_px_00')) / 2).alias('mid_price')
         )
-        
+
         # Extract mid prices as numpy array for efficient calculation
         mid_prices = symbol_df['mid_price'].to_numpy()
-        
+
         # Initialize price movements array with NaN
         price_movements = np.full(len(symbol_df), np.nan, dtype=np.float64)
-        
+
         # Calculate price movements using correct lookback vs lookforward methodology
         # Use JUMP_SIZE sampling for performance and to avoid overly similar adjacent values
         for stop_row in range(self.represent_config.lookback_rows, len(mid_prices) - (self.represent_config.lookforward_input + self.represent_config.lookforward_offset), self.represent_config.jump_size):
             # Define time windows according to the correct methodology
             lookback_start = stop_row - self.represent_config.lookback_rows
             lookback_end = stop_row
-            
+
             target_start_row = stop_row + 1 + self.represent_config.lookforward_offset
             target_stop_row = stop_row + self.represent_config.lookforward_input
-            
+
             # Calculate lookback mean (historical average)
             lookback_mean = np.mean(mid_prices[lookback_start:lookback_end])
-            
+
             # Calculate lookforward mean (future average)
             lookforward_mean = np.mean(mid_prices[target_start_row:target_stop_row])
-            
+
             # Calculate percentage change: (future - past) / past
             if lookback_mean > 0:  # Avoid division by zero
                 mean_change = (lookforward_mean - lookback_mean) / lookback_mean
                 price_movements[stop_row] = mean_change
-        
+
         # Add price movement column back to DataFrame
         symbol_df = symbol_df.with_columns(
             pl.Series('price_movement', price_movements).cast(pl.Float64)
         )
-        
+
         return symbol_df
 
     def apply_quantile_classification(self, symbol_df: pl.DataFrame) -> pl.DataFrame:
@@ -236,67 +238,67 @@ class ParquetClassifier:
         """
         # Filter out rows with null/NaN price movements (not enough future data)
         valid_df = symbol_df.filter(
-            pl.col('price_movement').is_not_null() & 
+            pl.col('price_movement').is_not_null() &
             pl.col('price_movement').is_finite()  # Exclude NaN and Inf
         )
-        
+
         if len(valid_df) == 0:
             # No valid rows, return empty DataFrame with classification column
             return symbol_df.with_columns(
                 pl.lit(None, dtype=pl.Int32).alias('classification_label')
             )
-        
+
         # Extract price movements as numpy array
         price_movements = valid_df['price_movement'].to_numpy()
-        
+
         if self.config.force_uniform:
             # Force uniform distribution: Use quantile-based classification regardless of global thresholds
             # This ensures each bin gets approximately equal number of samples
             quantiles = np.linspace(0, 1, self.config.nbins + 1)
             quantile_boundaries = np.quantile(price_movements, quantiles)
-            
+
             # Ensure unique boundaries (handle edge cases)
             quantile_boundaries = np.unique(quantile_boundaries)
-            
+
             # If we don't have enough unique values, pad with extremes
             if len(quantile_boundaries) < self.config.nbins + 1:
                 min_val, max_val = price_movements.min(), price_movements.max()
                 quantile_boundaries = np.linspace(min_val, max_val, self.config.nbins + 1)
-            
+
             # Apply quantile-based classification for uniform distribution
             classification_labels = np.digitize(price_movements, quantile_boundaries[1:-1])
-            
+
             # Ensure labels are in range [0, nbins-1]
             classification_labels = np.clip(classification_labels, 0, self.config.nbins - 1)
-            
+
         elif self.config.global_thresholds is not None:
             # Use pre-calculated global thresholds for natural distribution
             quantile_boundaries = self.config.global_thresholds.quantile_boundaries
-            
+
             # Apply global threshold-based classification
             classification_labels = np.digitize(price_movements, quantile_boundaries[1:-1])
-            
+
             # Ensure labels are in range [0, nbins-1]
             classification_labels = np.clip(classification_labels, 0, self.config.nbins - 1)
-            
+
         else:
             # Fixed thresholds fallback (percentage-based)
             up_threshold = 0.0001  # 0.01% increase
             down_threshold = -0.0001  # 0.01% decrease
-            
+
             classification_labels = np.where(
                 price_movements > up_threshold, 2,
                 np.where(price_movements < down_threshold, 0, 1)
             )
-        
+
         # Create mapping back to original DataFrame
         classification_series = pl.Series(classification_labels, dtype=pl.Int32)
-        
+
         # Add classification labels back to valid rows
         classified_df = valid_df.with_columns(
             classification_series.alias('classification_label')
         )
-        
+
         return classified_df
 
     def filter_processable_rows(self, symbol_df: pl.DataFrame) -> pl.DataFrame:
@@ -311,30 +313,30 @@ class ParquetClassifier:
         """
         # Sort by timestamp
         symbol_df = symbol_df.sort('ts_event')
-        
+
         # Filter to rows where price_movement was calculated (not null)
         # The calculation only assigns values to rows that have sufficient lookback and lookforward data
         processable_df = symbol_df.filter(pl.col('price_movement').is_not_null())
-        
+
         return processable_df
 
     def _classify_processed_parquet(
-        self, 
-        symbol_df: pl.DataFrame, 
-        parquet_file: Path, 
-        output_path: Optional[Union[str, Path]] = None
-    ) -> Dict[str, Any]:
+        self,
+        symbol_df: pl.DataFrame,
+        parquet_file: Path,
+        output_path: str | Path | None = None
+    ) -> dict[str, Any]:
         """
         Classify processed parquet file from UnlabeledDBNConverter.
-        
+
         This handles the case where the parquet file contains serialized market depth features
         and metadata (from UnlabeledDBNConverter) rather than raw DBN data.
-        
+
         Args:
             symbol_df: DataFrame with processed market depth features
             parquet_file: Path to the input parquet file
             output_path: Optional output path for classified file
-            
+
         Returns:
             Classification statistics
         """
@@ -344,27 +346,27 @@ class ParquetClassifier:
             symbol = '_'.join(filename_parts[1:])
         else:
             symbol = symbol_df['symbol'][0] if 'symbol' in symbol_df.columns else "UNKNOWN"
-        
+
         if self.verbose:
             print(f"🎯 Processing processed parquet for symbol: {symbol}")
             print(f"   📊 Found {len(symbol_df):,} processed samples")
-        
+
         # Check if we have sufficient samples
         if len(symbol_df) < self.config.min_symbol_samples:
             error_msg = f"Insufficient samples: {len(symbol_df)} < {self.config.min_symbol_samples}"
             if self.verbose:
                 print(f"   ❌ {error_msg}")
             raise ValueError(error_msg)
-        
+
         # For processed data, we already have start_mid_price and end_mid_price
         # We can calculate price movements and apply classification
         if 'start_mid_price' not in symbol_df.columns or 'end_mid_price' not in symbol_df.columns:
             raise ValueError("Processed parquet must contain 'start_mid_price' and 'end_mid_price' columns")
-        
+
         # Calculate price movements (in micro-pips)
         price_movements = (symbol_df['end_mid_price'] - symbol_df['start_mid_price']) / self.represent_config.micro_pip_size
         price_movements_array = price_movements.to_numpy()
-        
+
         # Apply classification thresholds
         if self.config.global_thresholds:
             # Use global thresholds if provided
@@ -372,13 +374,13 @@ class ParquetClassifier:
         else:
             # Use quantile-based classification on this data
             class_labels = self._apply_quantile_classification(price_movements_array)
-        
+
         # Add classification labels to the dataframe
         classified_df = symbol_df.with_columns([
             pl.Series("price_movement", price_movements),
             pl.Series("classification_label", class_labels)
         ])
-        
+
         # Determine output path
         if output_path is None:
             output_file = parquet_file.parent / f"{parquet_file.stem}_classified.parquet"
@@ -386,7 +388,7 @@ class ParquetClassifier:
             output_file = Path(output_path)
             if output_file.is_dir():
                 output_file = output_file / f"{parquet_file.stem}_classified.parquet"
-        
+
         # Save classified data
         classified_df.write_parquet(
             str(output_file),
@@ -394,17 +396,17 @@ class ParquetClassifier:
             statistics=True,
             row_group_size=50000
         )
-        
+
         # Generate statistics
         class_distribution = classified_df.group_by("classification_label").len().sort("classification_label")
-        
+
         stats = {
             "input_file": str(parquet_file),
             "output_file": str(output_file),
             "symbol": symbol,
             "total_samples": len(classified_df),
             "class_distribution": {
-                int(row[0]): int(row[1]) 
+                int(row[0]): int(row[1])
                 for row in class_distribution.iter_rows()
             },
             "price_movement_stats": {
@@ -415,39 +417,39 @@ class ParquetClassifier:
             },
             "processing_type": "processed_parquet_from_unlabeled_converter"
         }
-        
+
         if self.verbose:
             print(f"   ✅ Classified {len(classified_df):,} samples")
             print(f"   📁 Saved to: {output_file}")
             print(f"   📊 Class distribution: {stats['class_distribution']}")
-        
+
         return stats
-    
+
     def _apply_quantile_classification(self, price_movements: np.ndarray) -> np.ndarray:
         """Apply quantile-based classification to price movements."""
         # Create quantile boundaries for uniform distribution
         quantiles = np.linspace(0, 1, self.config.nbins + 1)
         thresholds = np.quantile(price_movements, quantiles[1:-1])  # Exclude 0 and 1
-        
+
         # Apply classification
         class_labels = np.zeros(len(price_movements), dtype=int)
         for i, threshold in enumerate(thresholds):
             class_labels[price_movements >= threshold] = i + 1
-            
+
         return class_labels
-    
+
     def _apply_global_classification(self, price_movements: np.ndarray) -> np.ndarray:
         """Apply global threshold-based classification to price movements."""
         if not self.config.global_thresholds:
             raise ValueError("Global thresholds not provided")
-        
+
         class_labels = np.zeros(len(price_movements), dtype=int)
         for i, threshold in enumerate(self.config.global_thresholds.quantile_boundaries[1:-1]):
             class_labels[price_movements >= threshold] = i + 1
-            
+
         return class_labels
 
-    def process_symbol(self, symbol: str, symbol_df: pl.DataFrame) -> Optional[pl.DataFrame]:
+    def process_symbol(self, symbol: str, symbol_df: pl.DataFrame) -> pl.DataFrame | None:
         """
         Process a single symbol's data.
 
@@ -460,35 +462,35 @@ class ParquetClassifier:
         """
         if self.verbose:
             print(f"   🔄 Processing symbol: {symbol}")
-        
+
         # Check if symbol has minimum required samples
         if len(symbol_df) < self.config.min_symbol_samples:
             if self.verbose:
                 print(f"      ❌ Insufficient samples: {len(symbol_df)} < {self.config.min_symbol_samples}")
             return None
-        
+
         # Calculate price movements
         symbol_df = self.calculate_price_movements(symbol_df)
-        
+
         # Apply classification
         classified_df = self.apply_quantile_classification(symbol_df)
-        
+
         # Filter to processable rows only
         final_df = self.filter_processable_rows(classified_df)
-        
+
         if len(final_df) == 0:
             if self.verbose:
                 print("      ❌ No processable rows after filtering")
             return None
-        
+
         # Filter out rows with null classification (edge cases)
         final_df = final_df.filter(pl.col('classification_label').is_not_null())
-        
+
         if len(final_df) == 0:
             if self.verbose:
                 print("      ❌ No valid classifications")
             return None
-        
+
         if self.verbose:
             # Show classification distribution
             class_dist = final_df['classification_label'].value_counts().sort('classification_label')
@@ -496,14 +498,14 @@ class ParquetClassifier:
             print(f"      📊 Classes: {class_dist['classification_label'].to_list()}")
             print(f"      📊 Counts: {class_dist['count'].to_list()}")
             print("      📊 Note: Market depth features generated on-demand during loading")
-        
+
         return final_df
 
     def process_dbn_to_classified_parquets(
         self,
-        dbn_path: Union[str, Path],
-        output_dir: Union[str, Path],
-    ) -> Dict[str, Any]:
+        dbn_path: str | Path,
+        output_dir: str | Path,
+    ) -> dict[str, Any]:
         """
         Process DBN file directly to classified parquet files by symbol.
 
@@ -517,51 +519,51 @@ class ParquetClassifier:
         if self.verbose:
             print("🚀 Starting Streamlined DBN-to-Classified-Parquet Processing")
             print("=" * 70)
-        
+
         start_time = time.perf_counter()
-        
+
         # Ensure output directory exists
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
-        
+
         # Load DBN file
         df = self.load_dbn_file(dbn_path)
-        
+
         # Filter symbols by threshold
         filtered_df, symbol_counts = self.filter_symbols_by_threshold(df)
-        
+
         # Process each symbol
         processed_symbols = {}
         total_classified_samples = 0
-        
+
         if self.verbose:
             print("\n🔄 Processing symbols individually...")
-        
+
         for symbol in filtered_df['symbol'].unique():
             symbol_df = filtered_df.filter(pl.col('symbol') == symbol)
-            
+
             # Process symbol
             processed_df = self.process_symbol(symbol, symbol_df)
-            
+
             if processed_df is not None and len(processed_df) > 0:
                 # Save to parquet
                 output_file = output_path / f"{self.config.currency}_{symbol}_classified.parquet"
                 processed_df.write_parquet(output_file)
-                
+
                 processed_symbols[symbol] = {
                     'samples': len(processed_df),
                     'file_path': str(output_file),
                     'file_size_mb': output_file.stat().st_size / 1024 / 1024,
                 }
-                
+
                 total_classified_samples += len(processed_df)
-                
+
                 if self.verbose:
                     print(f"      💾 Saved: {output_file.name} ({processed_symbols[symbol]['file_size_mb']:.1f} MB)")
-        
+
         end_time = time.perf_counter()
         processing_time = end_time - start_time
-        
+
         # Compile results
         results = {
             'input_file': str(dbn_path),
@@ -585,7 +587,7 @@ class ParquetClassifier:
             },
             'symbol_stats': processed_symbols,
         }
-        
+
         if self.verbose:
             print("\n✅ STREAMLINED PROCESSING COMPLETE!")
             print(f"   📊 Symbols processed: {len(processed_symbols)}")
@@ -594,47 +596,47 @@ class ParquetClassifier:
             print(f"   📈 Processing rate: {results['samples_per_second']:.0f} samples/sec")
             print(f"   📁 Output directory: {output_path}")
             print("   🎯 Files ready for ML training with uniform distribution!")
-        
+
         return results
 
     def classify_symbol_parquet(
         self,
-        parquet_path: Union[str, Path],
-        output_path: Optional[Union[str, Path]] = None,
+        parquet_path: str | Path,
+        output_path: str | Path | None = None,
         **kwargs
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Classify a single symbol parquet file.
-        
+
         Args:
             parquet_path: Path to input parquet file
             output_path: Path for output classified parquet file
             **kwargs: Additional arguments
-            
+
         Returns:
             Processing statistics
         """
         parquet_file = Path(parquet_path)
-        
+
         if not parquet_file.exists():
             raise FileNotFoundError(f"Parquet file not found: {parquet_file}")
-        
+
         if not parquet_file.suffix == '.parquet':
             raise ValueError(f"Input file must be a parquet file, got: {parquet_file.suffix}")
-        
+
         # Load parquet file
         if self.verbose:
             print(f"📄 Loading parquet file: {parquet_file}")
-            
+
         symbol_df = pl.read_parquet(parquet_file)
-        
+
         # Check if this is processed data from UnlabeledDBNConverter vs raw DBN data
         is_processed_data = 'market_depth_features' in symbol_df.columns
-        
+
         if is_processed_data:
             # Handle processed parquet from UnlabeledDBNConverter
             return self._classify_processed_parquet(symbol_df, parquet_file, output_path)
-        
+
         # Extract symbol from filename (format: CURRENCY_SYMBOL.parquet)
         filename_parts = parquet_file.stem.split('_')
         if len(filename_parts) >= 2:
@@ -645,13 +647,13 @@ class ParquetClassifier:
                 symbol = symbol_df['symbol'][0]
             else:
                 symbol = "UNKNOWN"
-        
+
         # Process the raw symbol data
         processed_df = self.process_symbol(symbol, symbol_df)
-        
+
         if processed_df is None or len(processed_df) == 0:
             raise ValueError(f"No processable data found in {parquet_file}")
-        
+
         # Determine output path
         if output_path is None:
             output_file = parquet_file.parent / f"{parquet_file.stem}_classified.parquet"
@@ -659,10 +661,10 @@ class ParquetClassifier:
             output_file = Path(output_path)
             if output_file.is_dir():
                 output_file = output_file / f"{parquet_file.stem}_classified.parquet"
-        
+
         # Save classified data
         processed_df.write_parquet(output_file)
-        
+
         stats = {
             'input_file': str(parquet_file),
             'output_file': str(output_file),
@@ -671,46 +673,46 @@ class ParquetClassifier:
             'output_samples': len(processed_df),
             'file_size_mb': output_file.stat().st_size / 1024 / 1024,
         }
-        
+
         if self.verbose:
             print(f"✅ Classified {symbol}: {len(processed_df):,} samples → {output_file.name}")
-        
+
         return stats
 
     def batch_classify_parquets(
         self,
-        input_directory: Union[str, Path], 
-        output_directory: Union[str, Path],
+        input_directory: str | Path,
+        output_directory: str | Path,
         pattern: str = "*_*.parquet",
         **kwargs
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Batch classify multiple parquet files.
-        
+
         Args:
             input_directory: Directory with unlabeled parquet files from Stage 1
-            output_directory: Directory for classified output files  
+            output_directory: Directory for classified output files
             pattern: File pattern to match parquet files
             **kwargs: Additional arguments
-            
+
         Returns:
             List of processing statistics
         """
         input_dir = Path(input_directory)
         output_dir = Path(output_directory)
-        
+
         if not input_dir.exists():
             raise FileNotFoundError(f"Input directory not found: {input_dir}")
-            
+
         output_dir.mkdir(parents=True, exist_ok=True)
-        
+
         parquet_files = list(input_dir.glob(pattern))
         if not parquet_files:
             raise ValueError(f"No files found matching pattern '{pattern}' in {input_dir}")
-        
+
         if self.verbose:
             print(f"🔄 Found {len(parquet_files)} parquet files to classify")
-        
+
         results = []
         for parquet_file in parquet_files:
             try:
@@ -723,23 +725,23 @@ class ParquetClassifier:
                 if self.verbose:
                     print(f"❌ Failed to process {parquet_file.name}: {e}")
                 continue
-                
+
         if self.verbose:
             total_processed = sum(result.get('output_samples', 0) for result in results)
             print(f"✅ Batch classification complete: {len(results)} files, {total_processed:,} total samples")
-                
+
         return results
 
 
 # Convenience function for direct usage
 def process_dbn_to_classified_parquets(
     config: RepresentConfig,
-    dbn_path: Union[str, Path],
-    output_dir: Union[str, Path],
+    dbn_path: str | Path,
+    output_dir: str | Path,
     force_uniform: bool = True,
-    global_thresholds: Optional[GlobalThresholds] = None,
+    global_thresholds: GlobalThresholds | None = None,
     verbose: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Convenience function to process DBN file directly to classified parquet files using lookback vs lookforward methodology.
 
@@ -760,25 +762,25 @@ def process_dbn_to_classified_parquets(
         global_thresholds=global_thresholds,
         verbose=verbose,
     )
-    
+
     return classifier.process_dbn_to_classified_parquets(dbn_path, output_dir)
 
 
 def classify_parquet_file(
     config: RepresentConfig,
-    parquet_path: Union[str, Path],
-    output_path: Optional[Union[str, Path]] = None,
+    parquet_path: str | Path,
+    output_path: str | Path | None = None,
     **kwargs
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Convenience function to classify a single parquet file.
-    
+
     Args:
         config: RepresentConfig with currency-specific configuration
         parquet_path: Path to input parquet file
         output_path: Path for classified output file
         **kwargs: Additional arguments
-        
+
     Returns:
         Classification statistics
     """
@@ -791,21 +793,21 @@ def classify_parquet_file(
 
 def batch_classify_parquet_files(
     config: RepresentConfig,
-    input_directory: Union[str, Path],
-    output_directory: Union[str, Path], 
+    input_directory: str | Path,
+    output_directory: str | Path,
     pattern: str = "*_*.parquet",
     **kwargs
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Convenience function to classify multiple parquet files.
-    
+
     Args:
         config: RepresentConfig with currency-specific configuration
         input_directory: Directory with unlabeled parquet files
         output_directory: Directory for classified output files
         pattern: File pattern to match parquet files
         **kwargs: Additional arguments
-        
+
     Returns:
         List of classification statistics for each file
     """
