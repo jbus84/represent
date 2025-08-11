@@ -1,8 +1,8 @@
 # Represent v5.0.0
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-217%20passed-green.svg)](https://github.com/your-repo/represent)
-[![Coverage](https://img.shields.io/badge/coverage-76%25-yellow.svg)](https://github.com/your-repo/represent)
+[![Tests](https://img.shields.io/badge/tests-291%20passed-green.svg)](https://github.com/your-repo/represent)
+[![Coverage](https://img.shields.io/badge/coverage-79%25-green.svg)](https://github.com/your-repo/represent)
 [![Performance](https://img.shields.io/badge/latency-<10ms-orange.svg)](https://github.com/your-repo/represent)
 
 High-performance Python package for creating normalized market depth representations from limit order book data using a **symbol-split-merge architecture** for **comprehensive ML datasets** with **memory-efficient processing** and **guaranteed uniform distribution**.
@@ -112,9 +112,28 @@ Comprehensive symbol datasets ready for custom dataloader implementation in your
 
 ## 🚀 Quick Start
 
-### Phase 1-2: Multiple DBN Files to Comprehensive Symbol Datasets
+### 🎯 Option 1: Make Targets (Simplest)
 
-**🎯 RECOMMENDED: Use symbol-split-merge for comprehensive ML datasets**
+**RECOMMENDED: Use make targets for common workflows**
+
+```bash
+# Place DBN files in data/ directory, then:
+
+# Fast processing (development/testing)
+make process-dbn-fast        # 25K samples, keeps intermediate files
+
+# Balanced processing (recommended)
+make process-dbn            # 50K samples, production ready
+
+# High-quality processing (production ML)
+make process-dbn-production  # 100K samples, volume + variance features
+```
+
+See [DBN_PROCESSING_GUIDE.md](DBN_PROCESSING_GUIDE.md) for detailed make target documentation.
+
+### 🎯 Option 2: Python API (Full Control)
+
+**For custom processing with full configuration control:**
 
 ```python
 from represent import create_represent_config, DatasetBuildConfig, batch_build_datasets_from_directory
@@ -238,7 +257,7 @@ print("📖 See DATALOADER_MIGRATION_GUIDE.md for dataloader implementation")
 """
 # In your ML training repo, implement custom dataloader using the migration guide:
 dataloader = your_custom_dataloader(
-    parquet_path="data/classified/AUDUSD_M6AM4_classified.parquet",
+    parquet_path="/data/symbol_datasets/AUDUSD_M6AM4_dataset.parquet",
     batch_size=32,
     shuffle=True,
     sample_fraction=0.3
@@ -710,8 +729,8 @@ def test_new_api(self):
 ### **Test Suite Organization**
 The test suite has been reorganized to align with the current architecture:
 
-- **✅ 217 Tests Passing**: Comprehensive coverage of all core functionality
-- **✅ 76% Code Coverage**: Focus on critical paths and user-facing APIs  
+- **✅ 291 Tests Passing**: Comprehensive coverage of all core functionality
+- **✅ 79% Code Coverage**: Near target threshold with focus on critical paths and user-facing APIs  
 - **✅ Removed Legacy Tests**: Eliminated 4 outdated test modules that no longer matched current architecture
 - **✅ Added New Test Coverage**: Enhanced tests for `GlobalThresholdCalculator`, `ParquetClassifier`, and `RepresentConfig`
 
