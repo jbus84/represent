@@ -43,7 +43,6 @@ def main():
     # Create dataset configuration
     dataset_config = DatasetBuildConfig(
         currency="AUDUSD",
-        features=["volume"],
         min_symbol_samples=5000,  # Lower threshold for testing
         force_uniform=True,
         keep_intermediate=True    # Keep intermediate files for inspection

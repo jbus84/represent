@@ -31,7 +31,6 @@ class TestDatasetBuildConfig:
         config = DatasetBuildConfig()
 
         assert config.currency == "AUDUSD"
-        assert config.features == ["volume"]
         assert config.min_symbol_samples == 10500
         assert config.force_uniform is True
         assert config.nbins == 13
@@ -43,7 +42,6 @@ class TestDatasetBuildConfig:
         """Test custom DatasetBuildConfig creation."""
         config = DatasetBuildConfig(
             currency="EURUSD",
-            features=["volume", "variance"],
             min_symbol_samples=15000,
             force_uniform=True,
             nbins=10,
@@ -51,7 +49,6 @@ class TestDatasetBuildConfig:
         )
 
         assert config.currency == "EURUSD"
-        assert config.features == ["volume", "variance"]
         assert config.min_symbol_samples == 15000
         assert config.force_uniform is True
         assert config.nbins == 10
@@ -108,7 +105,6 @@ class TestDatasetBuilderInitialization:
         captured = capsys.readouterr()
         assert "DatasetBuilder initialized" in captured.out
         assert "Currency: AUDUSD" in captured.out
-        assert "Features: ['volume']" in captured.out
 
 
 class TestSimplifiedPipeline:
@@ -145,14 +141,14 @@ class TestSimplifiedPipeline:
 
     def test_no_feature_generation_method(self, pipeline_config):
         """Test that _generate_features method no longer exists."""
-        dataset_config = DatasetBuildConfig(features=["volume", "variance"])
+        dataset_config = DatasetBuildConfig()
         builder = DatasetBuilder(pipeline_config, dataset_config, verbose=False)
 
         assert not hasattr(builder, '_generate_features'), "_generate_features method should be removed"
 
     def test_simplified_pipeline_only_essential_processing(self, pipeline_config, test_data):
         """Test that pipeline only does essential processing (no feature storage)."""
-        dataset_config = DatasetBuildConfig(features=["volume", "variance"], min_symbol_samples=50)
+        dataset_config = DatasetBuildConfig(min_symbol_samples=50)
         builder = DatasetBuilder(pipeline_config, dataset_config, verbose=False)
 
         # Process through pipeline steps
@@ -172,12 +168,11 @@ class TestSimplifiedPipeline:
             assert len(feature_cols) == 0, f"Found feature columns that should not exist: {feature_cols}"
 
     def test_features_preserved_for_on_demand_generation(self, pipeline_config):
-        """Test that features config is preserved for on-demand generation."""
-        dataset_config = DatasetBuildConfig(features=["volume", "variance"])
+        """Test that features config is preserved in RepresentConfig for on-demand generation."""
+        dataset_config = DatasetBuildConfig()
         builder = DatasetBuilder(pipeline_config, dataset_config, verbose=False)
 
-        # Features should still be configured (for on-demand generation)
-        assert builder.dataset_config.features == ["volume", "variance"]
+        # Features should still be configured in RepresentConfig (for on-demand generation)
         assert builder.represent_config.features == ["volume", "variance"]
 
 

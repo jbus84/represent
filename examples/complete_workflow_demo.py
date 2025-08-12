@@ -301,7 +301,7 @@ class WorkflowDemo:
    • Datasets created: {len(results['datasets_created'])}
    • Total samples: {results['total_samples']:,}
    • Symbols processed: {len(results['symbols'])}
-   • Features: {dataset_config.features}
+   • Classification: {dataset_config.nbins} bins
    • Uniform distribution: {dataset_config.force_uniform}
 
 📁 Output datasets:

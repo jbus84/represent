@@ -139,7 +139,6 @@ class TestSymbolSplitMergeE2E:
 
             dataset_config = DatasetBuildConfig(
                 currency="AUDUSD",
-                features=["volume"],
                 min_symbol_samples=1000,  # Will be auto-updated to 110 (50+50+10 lookback/lookforward), but we test with larger datasets
                 force_uniform=True,
                 keep_intermediate=False   # Clean up intermediate files

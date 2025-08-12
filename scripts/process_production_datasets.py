@@ -62,7 +62,7 @@ def main():
         lookforward_input=5000,      # Production lookforward
         lookforward_offset=500,      # Production offset
         samples=50000,               # Production sample size
-        nbins=13                     # More bins for better classification resolution
+        nbins=13                     # Standard 13 bins (0-12)
     )
 
     print("\n🔧 Production Configuration:")
@@ -114,11 +114,10 @@ def main():
         # Create dataset configuration with calculated thresholds
         dataset_config = DatasetBuildConfig(
             currency="AUDUSD",
-            features=['volume', 'variance', "count"],
-            global_thresholds=thresholds,  # Use calculated thresholds
-            force_uniform=True,            # Enforce uniform distribution
-            min_symbol_samples=50000,      # Higher threshold for production
-            keep_intermediate=False        # Clean up intermediate files
+            global_thresholds=thresholds,     # Use calculated thresholds
+            force_uniform=False,              # CRITICAL: Set to False to use global_thresholds
+            min_symbol_samples=50000,         # Higher threshold for production
+            keep_intermediate=False           # Clean up intermediate files
         )
 
         print("🔧 Dataset Configuration:")

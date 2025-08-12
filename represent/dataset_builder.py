@@ -27,7 +27,6 @@ from .global_threshold_calculator import GlobalThresholds
 class DatasetBuildConfig:
     """Configuration for the symbol-split-merge dataset building process."""
     currency: str = "AUDUSD"
-    features: list[str] | None = None
     min_symbol_samples: int = 10500  # Must be >= lookback_rows + lookforward_input + lookforward_offset
     force_uniform: bool = True
     nbins: int = 13
@@ -36,9 +35,6 @@ class DatasetBuildConfig:
     keep_intermediate: bool = False  # Whether to keep intermediate split files
 
     def __post_init__(self):
-        if self.features is None:
-            self.features = ["volume"]
-
         # Validate that classification method is properly specified
         if not self.force_uniform and self.global_thresholds is None:
             raise ValueError(
@@ -76,8 +72,7 @@ class DatasetBuilder:
         """
         self.represent_config = config
         self.dataset_config = dataset_config or DatasetBuildConfig(
-            currency=config.currency,
-            features=config.features
+            currency=config.currency
         )
 
         # Calculate minimum required samples - only need lookback window size for processing
@@ -101,7 +96,6 @@ class DatasetBuilder:
         if self.verbose:
             print("🏗️  DatasetBuilder initialized")
             print(f"   💱 Currency: {self.dataset_config.currency}")
-            print(f"   📊 Features: {self.dataset_config.features}")
             print(f"   🎯 Min samples per symbol: {self.dataset_config.min_symbol_samples}")
             print(f"   ⚖️  Force uniform: {self.dataset_config.force_uniform}")
 
@@ -604,7 +598,6 @@ class DatasetBuilder:
             'dataset_files': dataset_files,
             'config': {
                 'currency': self.dataset_config.currency,
-                'features': self.dataset_config.features,
                 'min_symbol_samples': self.dataset_config.min_symbol_samples,
                 'force_uniform': self.dataset_config.force_uniform,
                 'nbins': self.dataset_config.nbins,
