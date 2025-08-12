@@ -7,7 +7,7 @@ import numpy as np
 import polars as pl
 import pytest
 
-from represent.config import create_represent_config
+from represent.configs import MarketDepthProcessorConfig
 from represent.constants import (
     ASK_COUNT_COLUMNS,
     BID_COUNT_COLUMNS,
@@ -27,7 +27,12 @@ class TestExtendedFeatures:
 
     def setup_method(self):
         """Setup config for each test."""
-        self.config = create_represent_config("AUDUSD")
+        self.config = MarketDepthProcessorConfig(
+            features=["volume"],
+            samples=50000,
+            ticks_per_bin=100,
+            micro_pip_size=0.00001
+        )
 
     def test_single_feature_volume(self):
         """Test single volume feature extraction."""
@@ -236,7 +241,12 @@ class TestFeaturePerformance:
 
     def setup_method(self):
         """Setup config for each test."""
-        self.config = create_represent_config("AUDUSD")
+        self.config = MarketDepthProcessorConfig(
+            features=["volume"],
+            samples=50000,
+            ticks_per_bin=100,
+            micro_pip_size=0.00001
+        )
 
     def test_single_vs_multiple_feature_performance(self):
         """Test that multiple features don't significantly degrade performance."""
@@ -306,7 +316,12 @@ class TestBackwardCompatibility:
 
     def setup_method(self):
         """Setup config for each test."""
-        self.config = create_represent_config("AUDUSD")
+        self.config = MarketDepthProcessorConfig(
+            features=["volume"],
+            samples=50000,
+            ticks_per_bin=100,
+            micro_pip_size=0.00001
+        )
 
     def test_existing_api_unchanged(self):
         """Test that existing API calls work without modification."""

@@ -21,8 +21,8 @@ from represent import (
     DatasetBuildConfig,
     build_datasets_from_dbn_files,
     calculate_global_thresholds,
-    create_represent_config,
 )
+from represent.configs import create_represent_config
 
 
 def main():
@@ -55,7 +55,7 @@ def main():
     print(f"📁 Output directory: {output_dir}")
 
     # Create production configuration
-    config = create_represent_config(
+    configs = create_represent_config(
         currency="AUDUSD",
         features=['volume', 'variance'],
         lookback_rows=5000,          # Production lookback
@@ -64,15 +64,16 @@ def main():
         samples=50000,               # Production sample size
         nbins=13                     # Standard 13 bins (0-12)
     )
+    dataset_cfg, threshold_cfg, processor_cfg = configs
 
     print("\n🔧 Production Configuration:")
-    print(f"   💱 Currency: {config.currency}")
-    print(f"   📊 Features: {config.features}")
-    print(f"   📈 Lookback rows: {config.lookback_rows}")
-    print(f"   📉 Lookforward input: {config.lookforward_input}")
-    print(f"   ⏭️  Lookforward offset: {config.lookforward_offset}")
-    print(f"   🎯 Classification bins: {config.nbins}")
-    print(f"   📊 Sample size: {config.samples}")
+    print(f"   💱 Currency: {dataset_cfg.currency}")
+    print(f"   📊 Features: {processor_cfg.features}")
+    print(f"   📈 Lookback rows: {dataset_cfg.lookback_rows}")
+    print(f"   📉 Lookforward input: {dataset_cfg.lookforward_input}")
+    print(f"   ⏭️  Lookforward offset: {dataset_cfg.lookforward_offset}")
+    print(f"   🎯 Classification bins: {threshold_cfg.nbins}")
+    print(f"   📊 Sample size: {processor_cfg.samples}")
 
     start_time = time.time()
 
@@ -92,7 +93,7 @@ def main():
         # Calculate thresholds from first half
         phase1_start = time.time()
         thresholds = calculate_global_thresholds(
-            config=config,
+            config=threshold_cfg,
             data_directory=str(input_dir),
             sample_fraction=0.3,  # Use 30% of first half files for speed
             verbose=True
@@ -132,7 +133,7 @@ def main():
 
         phase2_start = time.time()
         results = build_datasets_from_dbn_files(
-            config=config,
+            config=dataset_cfg,
             dbn_files=dbn_files,  # Process ALL files
             output_dir=str(output_dir),
             dataset_config=dataset_config,

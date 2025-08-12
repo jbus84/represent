@@ -22,12 +22,17 @@ __version__ = "1.13.0"
 
 # V5.0.0 - Symbol-Split-Merge Architecture API
 
-# Symbol-Split-Merge Dataset Building (Primary Approach v5.0.0+)
-# Dynamic classification functionality moved to global_threshold_calculator
-from .config import (
-    RepresentConfig,
-    create_represent_config,
-    list_available_currencies,
+# New focused configuration architecture
+from .configs import (
+    DatasetBuilderConfig,
+    GlobalThresholdConfig,
+    MarketDepthProcessorConfig,
+    create_compatible_configs,
+    create_dataset_builder_config,
+    create_processor_config,
+    create_represent_config,  # Legacy compatibility function
+    create_threshold_config,
+    list_available_currencies,  # Legacy compatibility function
 )
 from .constants import (
     ASK_PRICE_COLUMNS,
@@ -74,8 +79,15 @@ __all__ = [
     "process_market_data",
     "create_processor",
     "MarketDepthProcessor",
-    # Configuration
-    "RepresentConfig",
+    # New focused configurations
+    "DatasetBuilderConfig",
+    "GlobalThresholdConfig",
+    "MarketDepthProcessorConfig",
+    "create_dataset_builder_config",
+    "create_threshold_config",
+    "create_processor_config",
+    "create_compatible_configs",
+    # Legacy compatibility functions
     "create_represent_config",
     "list_available_currencies",
     # Constants (TIME_BINS moved to RepresentConfig.time_bins)

@@ -13,9 +13,7 @@ import databento as db
 import numpy as np
 import polars as pl
 
-from .config import RepresentConfig
-
-# JUMP_SIZE now comes from RepresentConfig
+from .configs import GlobalThresholdConfig
 
 
 @dataclass
@@ -38,24 +36,70 @@ class GlobalThresholdCalculator:
 
     def __init__(
         self,
-        config: RepresentConfig,
+        config: GlobalThresholdConfig | None = None,
         sample_fraction: float = 0.5,
         verbose: bool = True,
+        # Legacy support
+        legacy_config = None,
     ):
         """
-        Initialize global threshold calculator using RepresentConfig.
+        Initialize global threshold calculator using GlobalThresholdConfig.
 
         Args:
-            config: RepresentConfig with currency-specific configuration
+            config: GlobalThresholdConfig with focused configuration (new preferred way)
             sample_fraction: Fraction of files to use for threshold calculation
             verbose: Whether to print progress information
+            legacy_config: Legacy RepresentConfig for backward compatibility
         """
+        # Handle legacy usage - legacy_config should now be a tuple from create_represent_config
+        if config is None and legacy_config is not None:
+            if isinstance(legacy_config, tuple) and len(legacy_config) == 3:
+                # New style: tuple of (DatasetBuilderConfig, GlobalThresholdConfig, MarketDepthProcessorConfig)
+                legacy_threshold_config = legacy_config[1]  # Use GlobalThresholdConfig
+                # Override sample_fraction if provided
+                if sample_fraction != 0.5:  # 0.5 is default
+                    config = GlobalThresholdConfig(
+                        currency=legacy_threshold_config.currency,
+                        nbins=legacy_threshold_config.nbins,
+                        lookback_rows=legacy_threshold_config.lookback_rows,
+                        lookforward_input=legacy_threshold_config.lookforward_input,
+                        lookforward_offset=legacy_threshold_config.lookforward_offset,
+                        max_samples_per_file=legacy_threshold_config.max_samples_per_file,
+                        sample_fraction=sample_fraction,
+                        jump_size=legacy_threshold_config.jump_size,
+                    )
+                else:
+                    config = legacy_threshold_config
+            else:
+                # Very old style - create default config
+                config = GlobalThresholdConfig(sample_fraction=sample_fraction)
+
+        # Default config if none provided
+        if config is None:
+            config = GlobalThresholdConfig(sample_fraction=sample_fraction)
+        else:
+            # Override sample_fraction if it was explicitly provided and differs from default
+            if sample_fraction != 0.5:  # 0.5 is the default value
+                config = GlobalThresholdConfig(
+                    currency=config.currency,
+                    nbins=config.nbins,
+                    lookback_rows=config.lookback_rows,
+                    lookforward_input=config.lookforward_input,
+                    lookforward_offset=config.lookforward_offset,
+                    max_samples_per_file=config.max_samples_per_file,
+                    sample_fraction=sample_fraction,
+                    jump_size=config.jump_size,
+                )
+
         self.config = config
         self.currency = config.currency
-        self.sample_fraction = sample_fraction
+        self.sample_fraction = config.sample_fraction
         self.max_samples_per_file = config.max_samples_per_file
         self.verbose = verbose
-        self.nbins = self.config.nbins
+        self.nbins = config.nbins
+
+        # Access jump_size from config if available, otherwise use default
+        self.jump_size = getattr(config, 'jump_size', 100)
 
         if self.verbose:
             print("🌐 GlobalThresholdCalculator initialized")
@@ -120,9 +164,9 @@ class GlobalThresholdCalculator:
             # Calculate price movements using correct lookback vs lookforward methodology
             price_movements = []
 
-            # Iterate through valid sample positions using JUMP_SIZE steps
+            # Iterate through valid sample positions using jump_size steps
             total_lookforward = self.config.lookforward_input + self.config.lookforward_offset
-            for stop_row in range(self.config.lookback_rows, len(mid_prices) - total_lookforward, self.config.jump_size):
+            for stop_row in range(self.config.lookback_rows, len(mid_prices) - total_lookforward, self.jump_size):
                 # Define time windows according to the correct methodology
                 lookback_start = stop_row - self.config.lookback_rows
                 lookback_end = stop_row
@@ -302,17 +346,20 @@ class GlobalThresholdCalculator:
 
 
 def calculate_global_thresholds(
-    config: RepresentConfig,
-    data_directory: str | Path,
+    config: GlobalThresholdConfig | None = None,
+    data_directory: str | Path | None = None,
     sample_fraction: float = 0.5,
     file_pattern: str = "*.dbn*",
     verbose: bool = True,
+    # Legacy support
+    **kwargs,
 ) -> GlobalThresholds:
     """
     Convenience function to calculate global thresholds using lookback vs lookforward methodology.
 
     Args:
-        config: RepresentConfig with currency-specific configuration
+        config: GlobalThresholdConfig with focused configuration (preferred)
+               or legacy RepresentConfig for backward compatibility
         data_directory: Directory containing DBN files
         sample_fraction: Fraction of files to use for threshold calculation
         file_pattern: Pattern to match DBN files
@@ -336,11 +383,32 @@ def calculate_global_thresholds(
             global_thresholds=thresholds
         )
     """
-    calculator = GlobalThresholdCalculator(
-        config=config,
-        sample_fraction=sample_fraction,
-        verbose=verbose,
-    )
+    # Handle different config types
+    if config is None:
+        # Use default config
+        calculator = GlobalThresholdCalculator(
+            config=None,
+            sample_fraction=sample_fraction,
+            verbose=verbose
+        )
+    elif isinstance(config, GlobalThresholdConfig):
+        # New focused config
+        calculator = GlobalThresholdCalculator(
+            config=config,
+            sample_fraction=sample_fraction,
+            verbose=verbose
+        )
+    else:
+        # Legacy RepresentConfig
+        calculator = GlobalThresholdCalculator(
+            config=None,
+            sample_fraction=sample_fraction,
+            verbose=verbose,
+            legacy_config=config
+        )
+
+    if data_directory is None:
+        raise ValueError("data_directory parameter is required")
 
     return calculator.calculate_global_thresholds(
         data_directory=data_directory,

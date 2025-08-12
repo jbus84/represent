@@ -1,317 +1,302 @@
-# Currency Configuration Guide
+# Focused Configuration Guide
 
-This guide demonstrates how to use currency-specific configurations with the PyTorch DataLoader in the represent package.
+This guide demonstrates how to use the new focused configuration models in the represent package.
 
 ## Overview
 
-The represent package supports currency-specific configurations that optimize market depth processing for different currency pairs. Each currency has unique characteristics (pip sizes, volatility patterns, liquidity) that require tailored processing parameters.
+The represent package now uses three focused configuration models instead of a monolithic RepresentConfig:
+- **DatasetBuilderConfig**: For creating comprehensive symbol datasets
+- **GlobalThresholdConfig**: For calculating consistent classification thresholds  
+- **MarketDepthProcessorConfig**: For processing market data into ML tensors
+
+Each configuration model contains only the parameters needed by its respective module.
 
 ## Key Features
 
-- **Automatic Optimization**: Pre-configured settings for major currency pairs
-- **Pip Size Handling**: Correct pip sizes for different currency types (e.g., JPY pairs)
-- **Classification Tuning**: Optimized bin counts and thresholds per currency
-- **Sampling Strategies**: Currency-specific coverage percentages and sampling modes
-- **PyTorch Integration**: Seamless integration with PyTorch DataLoader
+- **Focused Configurations**: Separate configs eliminate parameter pollution between modules
+- **Automatic Optimization**: Currency-specific settings applied automatically
+- **Type Safety**: Pydantic validation ensures correct parameter types and values
+- **Computed Fields**: Auto-calculated values like `min_required_samples` and `time_bins`
+- **Factory Functions**: Convenient functions for creating compatible configurations
 
 ## Quick Start
 
-### Basic Usage with Currency Configuration
+### Individual Configuration Creation
 
 ```python
-from represent.dataloader import MarketDepthDataset
-from torch.utils.data import DataLoader
+from represent import DatasetBuilderConfig, GlobalThresholdConfig, MarketDepthProcessorConfig
 
-# Create dataset with currency-specific configuration
-dataset = MarketDepthDataset(
-    data_source="path/to/your/data.dbn",
-    currency="AUDUSD",  # Automatically loads AUDUSD optimizations
-    features=['volume']
+# Dataset Builder - for creating symbol datasets
+dataset_config = DatasetBuilderConfig(
+    currency="AUDUSD",
+    lookback_rows=5000,
+    lookforward_input=5000,
+    lookforward_offset=500
 )
 
-# Create PyTorch DataLoader
-dataloader = DataLoader(dataset, batch_size=8, shuffle=False)
-
-# Use in training loop
-for features, targets in dataloader:
-    # features shape: (8, 402, 500) for single feature
-    # targets shape: (8, 1) for classification
-    pass
-```
-
-### Multi-Feature with Currency Configuration
-
-```python
-# Multi-feature dataset with currency optimization
-dataset = MarketDepthDataset(
-    data_source="path/to/your/data.dbn",
-    currency="EURUSD",
-    features=['volume', 'variance']  # Multiple features
+# Global Threshold - for consistent classification
+threshold_config = GlobalThresholdConfig(
+    currency="AUDUSD", 
+    nbins=13,
+    lookback_rows=5000,
+    lookforward_input=5000,
+    lookforward_offset=500,
+    jump_size=100
 )
 
-# features shape will be: (batch_size, 2, 402, 500)
-```
-
-## Supported Currencies
-
-### Major Pairs (USD-based)
-- **AUDUSD**: Australian Dollar / US Dollar
-- **EURUSD**: Euro / US Dollar  
-- **GBPUSD**: British Pound / US Dollar
-- **NZDUSD**: New Zealand Dollar / US Dollar
-
-### JPY Pairs (Special pip sizing)
-- **USDJPY**: US Dollar / Japanese Yen
-- **EURJPY**: Euro / Japanese Yen
-- **GBPJPY**: British Pound / Japanese Yen
-
-## Currency-Specific Optimizations
-
-### AUDUSD Configuration
-```python
-{
-    "true_pip_size": 0.0001,        # Standard pip size
-    "nbins": 13,                    # 13-bin classification
-    "lookforward_input": 5000,      # 5000 ticks lookforward
-    "coverage_percentage": 0.8,     # Process 80% of data
-    "sampling_mode": "random"       # Random sampling
-}
-```
-
-### USDJPY Configuration  
-```python
-{
-    "true_pip_size": 0.01,          # JPY pip size (different!)
-    "micro_pip_size": 0.001,        # JPY micro pip
-    "nbins": 9,                     # Fewer bins for JPY dynamics
-    "lookforward_input": 5000,      # 5000 ticks lookforward
-    "coverage_percentage": 0.6,     # Process 60% of data
-}
-```
-
-### GBPUSD Configuration
-```python
-{
-    "true_pip_size": 0.0001,        # Standard pip size
-    "nbins": 13,                    # 13-bin classification
-    "lookforward_input": 3000,      # Shorter window (more volatile)
-    "coverage_percentage": 0.7,     # Process 70% of data
-}
-```
-
-## Manual vs Currency Configuration
-
-### Manual Configuration
-```python
-# Manual configuration - you specify all parameters
-dataset = MarketDepthDataset(
-    data_source="data.dbn",
-    classification_config={
-        'true_pip_size': 0.0001,
-        'nbins': 13,
-        'lookforward_input': 5000
-    },
-    sampling_config={
-        'sampling_mode': 'consecutive',
-        'coverage_percentage': 1.0
-    },
-    features=['volume']
+# Market Depth Processor - for ML tensor processing
+processor_config = MarketDepthProcessorConfig(
+    features=['volume', 'variance'],
+    samples=50000,
+    ticks_per_bin=100
 )
 ```
 
-### Currency Configuration
+### Compatible Configuration Creation
+
 ```python
-# Currency configuration - optimized settings loaded automatically
-dataset = MarketDepthDataset(
-    data_source="data.dbn", 
-    currency='AUDUSD',  # Loads AUDUSD-optimized settings
-    features=['volume']
+from represent import create_compatible_configs
+
+# Create all three configs with consistent parameters
+dataset_cfg, threshold_cfg, processor_cfg = create_compatible_configs(
+    currency="AUDUSD",
+    features=['volume', 'variance'],
+    lookback_rows=5000,
+    lookforward_input=5000,
+    lookforward_offset=500,
+    nbins=13,
+    samples=50000
+)
+
+# All configs will have consistent currency and price movement parameters
+print(f"All currencies match: {dataset_cfg.currency == threshold_cfg.currency}")  # True
+print(f"Price params consistent: {dataset_cfg.lookback_rows == threshold_cfg.lookback_rows}")  # True
+```
+
+## Usage Examples
+
+### Dataset Building
+
+```python
+from represent import DatasetBuilder, DatasetBuildConfig
+
+# Use focused config for dataset building
+dataset_config = DatasetBuilderConfig(
+    currency="AUDUSD",
+    lookback_rows=5000,
+    lookforward_input=5000,
+    lookforward_offset=500
+)
+
+# Dataset build configuration (legacy)
+dataset_build_config = DatasetBuildConfig(
+    currency="AUDUSD",
+    force_uniform=True,
+    nbins=13
+)
+
+# Create builder with focused config
+builder = DatasetBuilder(
+    config=dataset_config,
+    dataset_config=dataset_build_config
 )
 ```
+
+### Global Threshold Calculation
+
+```python
+from represent import GlobalThresholdCalculator
+
+# Use focused config for threshold calculation
+threshold_config = GlobalThresholdConfig(
+    currency="AUDUSD",
+    nbins=13,
+    lookback_rows=5000,
+    lookforward_input=5000,
+    lookforward_offset=500,
+    sample_fraction=0.5
+)
+
+calculator = GlobalThresholdCalculator(config=threshold_config)
+thresholds = calculator.calculate_global_thresholds("/path/to/dbn/files/")
+```
+
+### Market Depth Processing
+
+```python
+from represent import MarketDepthProcessor
+
+# Use focused config for processing
+processor_config = MarketDepthProcessorConfig(
+    features=['volume', 'variance'],
+    samples=50000,
+    ticks_per_bin=100
+)
+
+processor = MarketDepthProcessor(config=processor_config)
+
+# Process market data
+import polars as pl
+df = pl.read_parquet("symbol_data.parquet")
+tensor = processor.process(df)
+print(f"Tensor shape: {tensor.shape}")  # (2, 402, 500) for 2 features
+```
+
+## Factory Functions
+
+### Individual Factory Functions
+
+```python
+from represent import (
+    create_dataset_builder_config,
+    create_threshold_config,
+    create_processor_config
+)
+
+# Create specific configs
+dataset_cfg = create_dataset_builder_config(currency="EURUSD", lookback_rows=3000)
+threshold_cfg = create_threshold_config(currency="EURUSD", nbins=9)
+processor_cfg = create_processor_config(features=['volume'], samples=25000)
+```
+
+### Currency-Specific Optimizations
+
+The package automatically applies optimizations based on currency:
+
+```python
+# GBPUSD gets shorter lookforward for volatility
+dataset_cfg, threshold_cfg, processor_cfg = create_compatible_configs(currency="GBPUSD")
+print(f"GBPUSD lookforward: {dataset_cfg.lookforward_input}")  # 3000 instead of 5000
+
+# JPY pairs get different pip sizes and fewer bins
+dataset_cfg, threshold_cfg, processor_cfg = create_compatible_configs(currency="USDJPY")
+print(f"USDJPY nbins: {threshold_cfg.nbins}")  # 9 instead of 13
+print(f"USDJPY micro_pip_size: {processor_cfg.micro_pip_size}")  # 0.001 instead of 0.00001
+```
+
+## Legacy Compatibility
+
+The package maintains backward compatibility through the legacy `create_represent_config` function:
+
+```python
+from represent import create_represent_config
+
+# Legacy function returns tuple of three configs
+configs = create_represent_config(
+    currency="AUDUSD",
+    features=['volume'],
+    lookback_rows=5000
+)
+
+dataset_cfg, threshold_cfg, processor_cfg = configs
+```
+
+## Migration Guide
+
+### From Old RepresentConfig
+
+**Old way:**
+```python
+from represent.config import RepresentConfig
+
+config = RepresentConfig(
+    currency="AUDUSD",
+    features=['volume'],
+    lookback_rows=5000,
+    nbins=13,
+    samples=50000
+)
+```
+
+**New way:**
+```python
+from represent import create_compatible_configs
+
+dataset_cfg, threshold_cfg, processor_cfg = create_compatible_configs(
+    currency="AUDUSD",
+    features=['volume'],
+    lookback_rows=5000,
+    nbins=13,
+    samples=50000
+)
+```
+
+### Module Usage Updates
+
+**DatasetBuilder:**
+```python
+# Old: builder = DatasetBuilder(config)
+# New: builder = DatasetBuilder(config=dataset_cfg)
+```
+
+**GlobalThresholdCalculator:**
+```python  
+# Old: calculator = GlobalThresholdCalculator(config)
+# New: calculator = GlobalThresholdCalculator(config=threshold_cfg)
+```
+
+**MarketDepthProcessor:**
+```python
+# Old: processor = MarketDepthProcessor(config)  
+# New: processor = MarketDepthProcessor(config=processor_cfg)
+```
+
+## Configuration Reference
+
+### DatasetBuilderConfig Fields
+- `currency`: Currency pair (e.g., "AUDUSD") 
+- `lookback_rows`: Historical data rows for price calculation
+- `lookforward_input`: Future data rows for price calculation
+- `lookforward_offset`: Offset before future window starts
+- `min_required_samples`: Auto-computed minimum samples needed
+
+### GlobalThresholdConfig Fields  
+- All DatasetBuilderConfig fields plus:
+- `nbins`: Number of classification bins
+- `max_samples_per_file`: Performance optimization limit
+- `sample_fraction`: Fraction of files to use for threshold calculation
+- `jump_size`: Sampling step size for performance
+
+### MarketDepthProcessorConfig Fields
+- `features`: List of features to extract (['volume', 'variance', 'trade_counts'])
+- `samples`: Number of samples to process 
+- `ticks_per_bin`: Ticks per time bin
+- `micro_pip_size`: Price precision
+- `time_bins`: Auto-computed time dimension
+- `output_shape`: Auto-computed tensor shape
+
+## Best Practices
+
+1. **Use Compatible Configs**: Always use `create_compatible_configs()` when you need configs for multiple modules
+2. **Validate Early**: Config validation happens at creation time - catch errors early  
+3. **Currency Optimization**: Let the package apply currency-specific optimizations automatically
+4. **Focused Usage**: Only create the configs you actually need for your specific modules
+5. **Type Safety**: Leverage Pydantic validation - the configs will tell you if parameters are invalid
 
 ## Advanced Usage
 
-### Custom Currency Configuration
+### Custom Validation
 
 ```python
-from represent.config import CurrencyConfig, ClassificationConfig, SamplingConfig
+from represent import DatasetBuilderConfig
 
-# Create custom configuration
-custom_config = CurrencyConfig(
-    currency_pair="CUSTOM",
-    classification=ClassificationConfig(
-        true_pip_size=0.0001,
-        nbins=9,
-        lookforward_input=3000,
-        ticks_per_bin=50
-    ),
-    sampling=SamplingConfig(
-        sampling_mode='random',
-        coverage_percentage=0.5,
-        seed=123
-    ),
-    description="Custom configuration for exotic pair"
-)
-
-# Save for reuse
-from represent.config import save_currency_config
-save_currency_config(custom_config, Path("./configs"))
-
-# Use with dataset
-dataset = MarketDepthDataset(
-    data_source="data.dbn",
-    currency="CUSTOM",  # Loads from saved config
-    features=['volume']
-)
-```
-
-### Override Currency Settings
-
-```python
-# Start with currency config but override specific settings
-dataset = MarketDepthDataset(
-    data_source="data.dbn",
-    currency='EURUSD'  # Base configuration
-)
-
-# Override specific settings
-dataset.classification_config.lookforward_input = 2000  # Shorter lookforward
-dataset.sampling_config.coverage_percentage = 0.5      # Process less data
-
-# Re-analyze with new settings
-dataset._analyze_and_select_end_ticks()
-```
-
-## Output Shapes by Feature Count
-
-The output tensor shape depends on the number of features selected:
-
-- **Single feature**: `(402, 500)` - 2D tensor
-- **Multiple features**: `(N, 402, 500)` - 3D tensor where N = number of features
-
-```python
-# Single feature
-dataset = MarketDepthDataset(currency='AUDUSD', features=['volume'])
-# Output shape: (402, 500)
-
-# Two features  
-dataset = MarketDepthDataset(currency='AUDUSD', features=['volume', 'variance'])
-# Output shape: (2, 402, 500)
-
-# Three features
-dataset = MarketDepthDataset(currency='AUDUSD', features=['volume', 'variance', 'trade_counts'])
-# Output shape: (3, 402, 500)
-```
-
-## Performance Considerations
-
-Currency configurations are optimized for performance:
-
-- **Random Sampling**: Reduces data processing by using coverage percentages
-- **Optimized Lookforward**: Balanced between accuracy and speed per currency
-- **Memory Efficiency**: Pre-allocated buffers scale with feature count
-- **Classification Bins**: Optimal bin counts for each currency's volatility
-
-### Performance Targets (maintained across all currencies)
-
-- **Single Record**: <1ms processing time
-- **Array Generation**: <10ms for complete feature arrays
-- **Batch Processing**: <50ms for 500-record batches
-- **Memory Usage**: Linear scaling with feature count
-
-## Complete Working Example
-
-```python
-#!/usr/bin/env python3
-"""Complete example using currency configuration with PyTorch DataLoader."""
-
-import torch
-from torch.utils.data import DataLoader
-from represent.dataloader import MarketDepthDataset
-
-def main():
-    # Load data with EURUSD optimizations
-    dataset = MarketDepthDataset(
-        data_source="eurusd_data.dbn",
-        currency="EURUSD",
-        features=['volume', 'variance']
+try:
+    config = DatasetBuilderConfig(
+        currency="INVALID",  # Will raise validation error
+        lookback_rows=-100   # Will raise validation error  
     )
-    
-    print(f"Dataset configured for EURUSD:")
-    print(f"- Classification bins: {dataset.classification_config.nbins}")
-    print(f"- Pip size: {dataset.classification_config.true_pip_size}")
-    print(f"- Features: {dataset.features}")
-    print(f"- Output shape: {dataset.output_shape}")
-    print(f"- Available batches: {len(dataset)}")
-    
-    # Create DataLoader
-    dataloader = DataLoader(
-        dataset, 
-        batch_size=16,
-        shuffle=True,
-        num_workers=4
-    )
-    
-    # Training loop
-    for epoch in range(10):
-        for batch_idx, (features, targets) in enumerate(dataloader):
-            # features: (16, 2, 402, 500) - batch of 16, 2 features, 402x500 market depth
-            # targets: (16, 1) - classification targets
-            
-            # Your model training here
-            print(f"Epoch {epoch}, Batch {batch_idx}: {features.shape} -> {targets.shape}")
-            
-            if batch_idx >= 2:  # Just show first few batches
-                break
-
-if __name__ == "__main__":
-    main()
+except ValueError as e:
+    print(f"Validation error: {e}")
 ```
 
-## Troubleshooting
-
-### Common Issues
-
-1. **Insufficient Data**: Ensure your data has enough rows for the lookforward window
-   ```
-   ⚠️  Insufficient data: need 55500 rows, got 51000
-   ```
-   Solution: Reduce `lookforward_input` or increase your dataset size
-
-2. **No Batches Available**: Check if your data meets minimum requirements
-   ```python
-   if len(dataset) == 0:
-       # Reduce requirements
-       dataset.classification_config.lookforward_input = 2000
-       dataset.sampling_config.coverage_percentage = 0.5
-       dataset._analyze_and_select_end_ticks()
-   ```
-
-3. **Currency Not Found**: Custom currencies need to be saved first
-   ```python
-   from represent.config import save_currency_config
-   save_currency_config(custom_config, config_dir)
-   ```
-
-### Debug Information
+### Computed Fields
 
 ```python
-# Check configuration details
-print(f"Currency: {dataset.currency}")
-print(f"Classification config: {dataset.classification_config}")
-print(f"Sampling config: {dataset.sampling_config}")
-print(f"Available end ticks: {len(dataset._end_tick_positions)}")
+config = DatasetBuilderConfig(
+    lookback_rows=5000,
+    lookforward_input=4000,
+    lookforward_offset=500
+)
+
+print(f"Min required samples: {config.min_required_samples}")  # 9500 (auto-computed)
 ```
-
-## Summary
-
-Currency configuration provides:
-
-✅ **Automatic Optimization**: Pre-tuned settings for major currency pairs  
-✅ **Correct Pip Handling**: Proper pip sizes for different currency types  
-✅ **PyTorch Integration**: Seamless DataLoader compatibility  
-✅ **Multi-Feature Support**: Works with all feature combinations  
-✅ **Performance**: Maintains <10ms latency targets  
-✅ **Flexibility**: Override settings as needed  
-
-This makes currency-specific market depth processing both easy and optimized for real-world trading applications.

@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 import polars as pl
 
-from represent.config import create_represent_config
+from represent.configs import MarketDepthProcessorConfig
 from represent.data_structures import OutputBuffer
 from represent.market_depth_processor import process_market_data
 
@@ -26,7 +26,12 @@ class TestSignedNormalization:
 
     def setup_method(self):
         """Setup config for each test."""
-        self.config = create_represent_config("AUDUSD")
+        self.config = MarketDepthProcessorConfig(
+            features=["volume"],
+            samples=50000,
+            ticks_per_bin=100,
+            micro_pip_size=0.00001
+        )
 
     def test_process_market_data_produces_signed_output(self):
         """

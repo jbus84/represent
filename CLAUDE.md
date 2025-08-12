@@ -41,7 +41,6 @@ from represent import DatasetBuilder, DatasetBuildConfig, build_datasets_from_db
 config = create_represent_config("AUDUSD", features=['volume', 'variance'])
 dataset_config = DatasetBuildConfig(
     currency="AUDUSD",
-    features=['volume', 'variance'],
     min_symbol_samples=60500,          # Must be >= samples + lookback + lookforward + offset (50K + 5K + 5K + 500)
     force_uniform=True,                # Ensure uniform class distribution
     keep_intermediate=False            # Clean up intermediate split files
@@ -227,12 +226,16 @@ def apply_symbol_classification(symbol_df, nbins=13, force_uniform=True):
 
 ### Currency-Specific Configuration
 
-Each currency uses RepresentConfig for standardized configuration:
+Each currency uses focused configuration models for each module:
 
 ```python
-from represent import create_represent_config
+from represent import (
+    DatasetBuilderConfig, GlobalThresholdConfig, MarketDepthProcessorConfig,
+    create_compatible_configs
+)
 
-config = create_represent_config(
+# Create compatible configs for all modules
+dataset_cfg, threshold_cfg, processor_cfg = create_compatible_configs(
     currency="AUDUSD",
     features=['volume', 'variance'],
     lookback_rows=5000,        # Historical data for price movement calculation
@@ -398,13 +401,16 @@ from represent import create_represent_config
 
 ### Dynamic Configuration Generation
 
-The represent package uses **RepresentConfig** for standardized configuration:
+The represent package uses **focused configuration models** for each module:
 
 ```python
-from represent import create_represent_config
+from represent import (
+    DatasetBuilderConfig, GlobalThresholdConfig, MarketDepthProcessorConfig,
+    create_compatible_configs
+)
 
-# Create standardized configuration
-config = create_represent_config(
+# Create focused configurations for each module
+dataset_cfg, threshold_cfg, processor_cfg = create_compatible_configs(
     currency="AUDUSD",
     features=['volume', 'variance'],
     lookback_rows=5000,
@@ -412,9 +418,9 @@ config = create_represent_config(
     lookforward_offset=500
 )
 
-print(f"Currency: {config.currency}")
-print(f"Features: {config.features}")
-print(f"Lookback rows: {config.lookback_rows}")
+print(f"Dataset config currency: {dataset_cfg.currency}")
+print(f"Processor config features: {processor_cfg.features}")
+print(f"Threshold config lookback rows: {threshold_cfg.lookback_rows}")
 ```
 
 ## Instructions for Claude
@@ -440,14 +446,14 @@ When working on this codebase:
 
 ✅ **PRIMARY COMPONENTS:**
 - `dataset_builder.py` - Symbol-split-merge dataset builder for comprehensive datasets
-- `config.py` - Standardized RepresentConfig for all processing
+- `configs.py` - Focused configuration models for each module
 - `api.py` - High-level convenience API updated for new architecture
 
 **WORKFLOW INTEGRATION:**
 - Use `build_datasets_from_dbn_files()` for comprehensive dataset creation
 - Use `batch_build_datasets_from_directory()` for directory processing  
 - Implement custom dataloader in your ML repository (see DATALOADER_MIGRATION_GUIDE.md)
-- Leverage RepresentConfig for standardized configurations
+- Leverage focused configuration models for each module
 - Pre-computed labels eliminate runtime classification overhead
 
 ## Example Workflows
@@ -470,7 +476,6 @@ config = create_represent_config(
 # Create dataset building configuration  
 dataset_config = DatasetBuildConfig(
     currency="AUDUSD",
-    features=['volume', 'variance'], 
     min_symbol_samples=60500,     # Auto-calculated: samples + lookback + lookforward + offset
     force_uniform=True,           # Guarantee uniform class distribution
     keep_intermediate=False       # Clean up intermediate split files

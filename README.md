@@ -36,10 +36,13 @@ uv sync --all-extras
 **Primary module for creating comprehensive symbol datasets from multiple DBN files**
 
 ```python
-from represent import build_datasets_from_dbn_files, DatasetBuildConfig, create_represent_config
+from represent import (
+    build_datasets_from_dbn_files, DatasetBuildConfig, 
+    DatasetBuilderConfig, create_compatible_configs
+)
 
-# Configure processing
-config = create_represent_config(
+# Configure processing with focused configs
+dataset_cfg, threshold_cfg, processor_cfg = create_compatible_configs(
     currency="AUDUSD",
     features=['volume', 'variance'],
     lookback_rows=5000,
@@ -49,13 +52,12 @@ config = create_represent_config(
 
 dataset_config = DatasetBuildConfig(
     currency="AUDUSD",
-    features=['volume', 'variance'],
     force_uniform=True  # Ensures balanced class distribution
 )
 
 # Build comprehensive symbol datasets from multiple DBN files
 results = build_datasets_from_dbn_files(
-    config=config,
+    config=dataset_cfg,
     dbn_files=[
         "data/AUDUSD-20240101.dbn.zst",
         "data/AUDUSD-20240102.dbn.zst", 
@@ -171,8 +173,7 @@ thresholds = calculate_global_thresholds(
 
 # Step 3: Build comprehensive symbol datasets
 dataset_config = DatasetBuildConfig(
-    currency="AUDUSD", 
-    features=['volume', 'variance'],
+    currency="AUDUSD",
     global_thresholds=thresholds,  # Use calculated thresholds
     force_uniform=True
 )
@@ -269,35 +270,48 @@ for features, labels in dataloader:
 
 ## ⚙️ Configuration System
 
-### **RepresentConfig**
-Central configuration object for all processing parameters:
+### **Focused Configuration Models**
+Separate configuration models for each module:
 
 ```python
-from represent import RepresentConfig, create_represent_config
-
-# Manual configuration
-config = RepresentConfig(
-    currency="AUDUSD",
-    features=['volume', 'variance'], 
-    samples=50000,
-    lookback_rows=5000,
-    lookforward_input=5000,
-    lookforward_offset=500,
-    nbins=13,
-    batch_size=1500
+from represent import (
+    DatasetBuilderConfig, GlobalThresholdConfig, MarketDepthProcessorConfig,
+    create_compatible_configs
 )
 
-# Convenience function with currency-specific optimizations
-config = create_represent_config(
-    currency="AUDUSD",  # Auto-configures pip size, time bins, etc.
+# Create focused configurations
+dataset_cfg = DatasetBuilderConfig(
+    currency="AUDUSD",
+    lookback_rows=5000,
+    lookforward_input=5000,
+    lookforward_offset=500
+)
+
+threshold_cfg = GlobalThresholdConfig(
+    currency="AUDUSD",
+    nbins=13,
+    lookback_rows=5000,
+    lookforward_input=5000,
+    lookforward_offset=500
+)
+
+processor_cfg = MarketDepthProcessorConfig(
+    features=['volume', 'variance'],
+    samples=50000
+)
+
+# Or use convenience function for compatible configs
+dataset_cfg, threshold_cfg, processor_cfg = create_compatible_configs(
+    currency="AUDUSD",  # Auto-configures optimizations
     features=['volume'],
     samples=25000
 )
 
 # Access configuration parameters
-print(f"Time bins: {config.time_bins}")           # Auto-calculated
-print(f"Min samples: {config.min_symbol_samples}") # Auto-calculated
-print(f"Pip size: {config.true_pip_size}")        # Currency-specific
+print(f"Dataset currency: {dataset_cfg.currency}")
+print(f"Min required samples: {dataset_cfg.min_required_samples}")  # Auto-calculated
+print(f"Processor time bins: {processor_cfg.time_bins}")           # Auto-calculated
+print(f"Threshold nbins: {threshold_cfg.nbins}")                   # Currency-specific
 ```
 
 ### **DatasetBuildConfig**
@@ -308,7 +322,6 @@ from represent import DatasetBuildConfig
 
 dataset_config = DatasetBuildConfig(
     currency="AUDUSD",
-    features=['volume', 'variance'],
     min_symbol_samples=10000,     # Minimum samples per symbol
     force_uniform=True,           # Ensure balanced class distribution
     nbins=13,                     # Number of classification bins

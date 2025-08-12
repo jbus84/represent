@@ -7,7 +7,7 @@ Optimized for <10ms array generation and zero-copy operations.
 import numpy as np
 import polars as pl
 
-from .config import RepresentConfig
+from .configs import MarketDepthProcessorConfig
 from .constants import (
     ASK_ANCHOR_COLUMN,
     ASK_COUNT_COLUMNS,
@@ -17,7 +17,6 @@ from .constants import (
     BID_COUNT_COLUMNS,
     BID_PRICE_COLUMNS,
     BID_VOL_COLUMNS,
-    DEFAULT_FEATURES,
     FEATURE_INDEX_MAP,
     FEATURE_TYPES,
     MAX_FEATURES,
@@ -38,25 +37,39 @@ class MarketDepthProcessor:
 
     def __init__(
         self,
-        config: RepresentConfig,
-        features: list[str] | list[FeatureType] | None = None
+        config: MarketDepthProcessorConfig | None = None,
+        features: list[str] | list[FeatureType] | None = None,
+        # Legacy support
+        legacy_config = None,
     ):
         """Initialize processor with pre-allocated structures.
 
         Args:
-            config: RepresentConfig with currency-specific configuration
-            features: List of features to extract. Can be strings or FeatureType enums.
-                     Options: 'volume', 'variance', 'trade_counts' or FeatureType enum values
-                     Defaults to ['volume'] for backward compatibility.
+            config: MarketDepthProcessorConfig with focused configuration (new preferred way)
+            features: List of features to extract (overrides config.features if provided)
+            legacy_config: Legacy RepresentConfig for backward compatibility
         """
-        # Use the provided RepresentConfig
+        # Handle legacy usage - legacy_config should now be a tuple from create_represent_config
+        if config is None and legacy_config is not None:
+            if isinstance(legacy_config, tuple) and len(legacy_config) == 3:
+                # New style: tuple of (DatasetBuilderConfig, GlobalThresholdConfig, MarketDepthProcessorConfig)
+                config = legacy_config[2]  # Use MarketDepthProcessorConfig
+            else:
+                # Very old style - create default config
+                config = MarketDepthProcessorConfig()
+
+        # Default config if none provided
+        if config is None:
+            config = MarketDepthProcessorConfig()
+
         self.config = config
 
         # Pre-compute values for performance
         self.micro_pip_multiplier = 1.0 / self.config.micro_pip_size
-        # Validate and set features
+        # Validate and set features (parameters override config)
         if features is None:
-            self.features: list[str] = DEFAULT_FEATURES.copy()
+            # Use features from config
+            self.features: list[str] = self.config.features.copy()
         else:
             # Convert FeatureType enums to strings if needed
             self.features = []
@@ -82,10 +95,10 @@ class MarketDepthProcessor:
 
         # Sort features by index for consistent ordering
         self.features = sorted(self.features, key=lambda f: FEATURE_INDEX_MAP[f])
-        self.output_shape = get_output_shape(self.features)
 
-        # Get computed value once to avoid type checker issues
-        time_bins = getattr(self.config, 'time_bins', self.config.samples // self.config.ticks_per_bin)
+        # Calculate time_bins from config
+        time_bins = self.config.samples // self.config.ticks_per_bin
+        self.output_shape = get_output_shape(self.features, time_bins=time_bins)
 
         # Pre-allocate all data structures to avoid runtime allocations
         # One grid per feature type
@@ -349,43 +362,54 @@ class MarketDepthProcessor:
             return stacked_result
 
 
-# Factory function for easy instantiation
+# Factory function for easy instantiation with backward compatibility
 def create_processor(
-    config: RepresentConfig,
-    features: list[str] | list[FeatureType] | None = None
+    config: MarketDepthProcessorConfig | None = None,
+    features: list[str] | list[FeatureType] | None = None,
+    # Legacy support
+    legacy_config = None,
 ) -> MarketDepthProcessor:
     """Create a new market depth processor instance.
 
     Args:
-        config: RepresentConfig with currency-specific configuration
-        features: List of features to extract. Can be strings or FeatureType enums.
-                 Options: 'volume', 'variance', 'trade_counts' or FeatureType enum values
-                 Defaults to ['volume'] for backward compatibility.
+        config: MarketDepthProcessorConfig with focused configuration (preferred)
+        features: List of features to extract (overrides config.features if provided)
+        legacy_config: Legacy RepresentConfig for backward compatibility
     """
-    return MarketDepthProcessor(config=config, features=features)
+    if config is None and legacy_config is not None:
+        # Legacy usage
+        return MarketDepthProcessor(legacy_config=legacy_config, features=features)
+    else:
+        # New focused config usage
+        return MarketDepthProcessor(config=config, features=features)
 
 
-# Main API function that uses RepresentConfig
+# Main API function with backward compatibility
 def process_market_data(
     df: pl.DataFrame,
-    config: RepresentConfig,
-    features: list[str] | list[FeatureType] | None = None
+    config: MarketDepthProcessorConfig | None = None,
+    features: list[str] | list[FeatureType] | None = None,
+    # Legacy support
+    legacy_config = None,
 ) -> np.ndarray:
     """
     Process market data and return normalized depth representation.
-    Now uses RepresentConfig to determine output shape and processing parameters.
 
     Args:
         df: Polars DataFrame with market data
-        config: RepresentConfig with currency-specific configuration and shape parameters
-        features: List of features to extract. Can be strings or FeatureType enums.
-                 Options: 'volume', 'variance', 'trade_counts' or FeatureType enum values
-                 Defaults to ['volume'] for backward compatibility.
+        config: MarketDepthProcessorConfig with focused configuration (preferred)
+        features: List of features to extract (overrides config.features if provided)
+        legacy_config: Legacy RepresentConfig for backward compatibility
 
     Returns:
         numpy array with normalized market depth:
-        - Single feature: shape (402, config.time_bins)
-        - Multiple features: shape (N, 402, config.time_bins) where N is number of features
+        - Single feature: shape (402, time_bins)
+        - Multiple features: shape (N, 402, time_bins) where N is number of features
     """
-    processor = create_processor(config=config, features=features)
+    if config is None and legacy_config is not None:
+        # Legacy usage
+        processor = create_processor(legacy_config=legacy_config, features=features)
+    else:
+        # New focused config usage
+        processor = create_processor(config=config, features=features)
     return processor.process(df)
