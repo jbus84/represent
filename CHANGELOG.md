@@ -2,6 +2,28 @@
 
 <!-- version list -->
 
+## v1.14.0 (2025-08-13)
+
+### Documentation
+
+- **examples**: Rerun
+  ([`3a70ef8`](https://github.com/jbus84/represent/commit/3a70ef8c36d6aabeaea1ea4b725c8611f37099e1))
+
+- **readme**: Update it
+  ([`007935d`](https://github.com/jbus84/represent/commit/007935d8736ccb53e6944faa07abd3b8a1ec0ac0))
+
+### Features
+
+- **files**: Add missing files
+  ([`c7e9526`](https://github.com/jbus84/represent/commit/c7e9526d6deec4956d6750461ba0184af486410b))
+
+- **fix-classificaiton**: All logic updated
+  ([`7ce8d4c`](https://github.com/jbus84/represent/commit/7ce8d4cbe0fae6786f0d85813e69b2b526a71834))
+
+- **pydantic**: Add pydantic configs
+  ([`d95ddb4`](https://github.com/jbus84/represent/commit/d95ddb4d3e555267663c3371dd614fd0733373e3))
+
+
 ## v1.13.0 (2025-08-11)
 
 ### Features
