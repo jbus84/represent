@@ -34,18 +34,41 @@
                 <li><strong>Dataset Builder</strong> - Create comprehensive symbol datasets</li>
                 <li><strong>Market Depth Processor</strong> - Generate and visualize market depth features</li>
             </ol>
-            <p><em>Generated: 2025-08-11 18:28:21</em></p>
+            <p><em>Generated: 2025-08-13 07:25:09</em></p>
         </div>
 
-        <h2>🎯 STEP 1: Global Threshold Calculation <span class="timestamp">18:28:05</span></h2>
+        <h2>🎯 STEP 1: Global Threshold Calculation <span class="timestamp">07:24:55</span></h2>
         <div class="section">
-            <pre>Calculating consistent classification thresholds from sample DBN data...</pre>
+            <pre>Demonstrating the new focused configuration architecture for threshold calculation...</pre>
         </div>
 
-        <h2>📊 Threshold Results <span class="timestamp">18:28:07</span></h2>
+        <h2>🔧 Configuration Architecture <span class="timestamp">07:24:55</span></h2>
         <div class="section">
             <pre>
-✅ Global thresholds calculated successfully!
+🆕 NEW FOCUSED CONFIGURATION APPROACH:
+
+📊 GlobalThresholdConfig - Only threshold-specific parameters:
+   • Currency: AUDUSD
+   • Number of bins: 13
+   • Lookback rows: 1000
+   • Lookforward input: 1000
+   • Lookforward offset: 100
+   • Max samples per file: 10000
+   • Sample fraction: 0.5
+   • Jump size: 100
+
+✅ Benefits of focused configuration:
+   • Only parameters relevant to threshold calculation
+   • Clear separation of concerns
+   • Better type safety and validation
+   • No confusion with unrelated parameters
+</pre>
+        </div>
+
+        <h2>📊 Threshold Results <span class="timestamp">07:24:57</span></h2>
+        <div class="section">
+            <pre>
+✅ Global thresholds calculated successfully using focused GlobalThresholdConfig!
 
 📊 Threshold Statistics:
    • Number of bins: 13
@@ -54,6 +77,7 @@
    • Currency: AUDUSD
    • Lookback rows: 1000
    • Lookforward input: 1000
+   • Sample fraction: 0.5
 
 📁 Source files analyzed: 2
       • glbx-mdp3-20240405.mbp-10.dbn.zst
@@ -67,15 +91,42 @@
    Bin  3: -0.000168
    Bin  4: -0.000106
       ... (showing first 5)
+
+🆕 Configuration approach: Using focused GlobalThresholdConfig with only relevant parameters
 </pre>
         </div>
 
-        <h2>🏗️ STEP 2: Dataset Building <span class="timestamp">18:28:08</span></h2>
+        <h2>🏗️ STEP 2: Dataset Building <span class="timestamp">07:24:58</span></h2>
         <div class="section">
-            <pre>Creating comprehensive symbol datasets using calculated thresholds...</pre>
+            <pre>Demonstrating the focused DatasetBuilderConfig for symbol dataset creation...</pre>
         </div>
 
-        <h2>🏗️ Dataset Results <span class="timestamp">18:28:17</span></h2>
+        <h2>🔧 Dataset Builder Configuration <span class="timestamp">07:24:58</span></h2>
+        <div class="section">
+            <pre>
+🆕 NEW FOCUSED DATASET BUILDER CONFIGURATION:
+
+🏗️ DatasetBuilderConfig - Only dataset building parameters:
+   • Currency: AUDUSD
+   • Lookback rows: 1000
+   • Lookforward input: 1000
+   • Lookforward offset: 100
+   • Min required samples: 2100
+
+✅ Benefits of focused DatasetBuilderConfig:
+   • Only parameters needed for dataset building
+   • Computed field for min_required_samples
+   • Clear separation from feature processing parameters
+   • Better validation and type safety
+
+🔄 DatasetBuildConfig for dataset management:
+   • Handles classification method (thresholds vs uniform)
+   • Manages intermediate file cleanup
+   • Controls output formatting
+</pre>
+        </div>
+
+        <h2>🏗️ Dataset Results <span class="timestamp">07:25:05</span></h2>
         <div class="section">
             <pre>
 ✅ Symbol datasets created successfully!
@@ -84,7 +135,7 @@
    • Datasets created: 2
    • Total samples: 621,462
    • Symbols processed: 2
-   • Features: ['volume', 'variance']
+   • Classification: 13 bins
    • Uniform distribution: True
 
 📁 Output datasets:
@@ -100,17 +151,42 @@
 </pre>
         </div>
 
-        <h2>⚡ STEP 3: Market Depth Processing & Visualization <span class="timestamp">18:28:18</span></h2>
+        <h2>⚡ STEP 3: Market Depth Processing & Visualization <span class="timestamp">07:25:06</span></h2>
         <div class="section">
-            <pre>Processing market data into normalized tensors and creating visualizations...</pre>
+            <pre>Demonstrating the focused MarketDepthProcessorConfig for tensor generation...</pre>
         </div>
 
-        <h2>🔄 Feature Processing <span class="timestamp">18:28:18</span></h2>
+        <h2>🔧 Market Depth Processor Configuration <span class="timestamp">07:25:06</span></h2>
+        <div class="section">
+            <pre>
+🆕 NEW FOCUSED MARKET DEPTH PROCESSOR CONFIGURATION:
+
+⚡ MarketDepthProcessorConfig - Only feature processing parameters:
+   • Features: ['volume', 'variance', 'trade_counts']
+   • Samples: 25,000
+   • Ticks per bin: 100
+   • Micro pip size: 1e-05
+   • Computed time bins: 250
+   • Computed output shape: (3, 402, 250)
+
+✅ Benefits of focused MarketDepthProcessorConfig:
+   • Only parameters needed for tensor generation
+   • Automatic time_bins calculation
+   • Computed output_shape field
+   • Clear separation from dataset building parameters
+   • Feature-specific validation
+
+🎯 Output tensor shape for 3 features:
+   • 3D tensor: (3, 402, 250)
+</pre>
+        </div>
+
+        <h2>🔄 Feature Processing <span class="timestamp">07:25:06</span></h2>
         <div class="section">
             <pre>Processing 5000 samples with features: ['volume', 'variance', 'trade_counts']</pre>
         </div>
 
-        <h2>⚡ Processing Results <span class="timestamp">18:28:18</span></h2>
+        <h2>⚡ Processing Results <span class="timestamp">07:25:06</span></h2>
         <div class="section">
             <pre>
 ✅ Market depth processing successful!
@@ -129,7 +205,47 @@
 </pre>
         </div>
 
-        <h2>📊 Generating Unified Report <span class="timestamp">18:28:21</span></h2>
+        <h2>🔗 BONUS: Compatible Configuration Creation <span class="timestamp">07:25:09</span></h2>
+        <div class="section">
+            <pre>Demonstrating create_compatible_configs() - one function for all three modules...</pre>
+        </div>
+
+        <h2>🔗 Compatible Configuration Results <span class="timestamp">07:25:09</span></h2>
+        <div class="section">
+            <pre>
+🔗 CREATE_COMPATIBLE_CONFIGS() - One Function, Three Configs:
+
+✨ Single function call creates all three focused configurations:
+   create_compatible_configs(currency="EURUSD", features=["volume", "variance"], ...)
+
+📊 DatasetBuilderConfig output:
+   • Currency: EURUSD
+   • Lookback rows: 2000
+   • Lookforward input: 1500
+   • Lookforward offset: 200
+
+🎯 GlobalThresholdConfig output:
+   • Currency: EURUSD
+   • Nbins: 9
+   • Sample fraction: 0.5
+   • Jump size: 50
+
+⚡ MarketDepthProcessorConfig output:
+   • Features: ['volume', 'variance']
+   • Samples: 30,000
+   • Micro pip size: 1e-05
+   • Time bins: 300
+
+✅ Compatibility guaranteed:
+   • Shared parameters (currency, lookback, etc.) are synchronized
+   • Currency-specific optimizations applied automatically
+   • All three configs work together seamlessly
+
+🚀 Perfect for complex workflows requiring all three modules!
+</pre>
+        </div>
+
+        <h2>📊 Generating Unified Report <span class="timestamp">07:25:09</span></h2>
         <div class="section">
             <pre>Creating comprehensive HTML report with all results...</pre>
         </div>
