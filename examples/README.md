@@ -45,24 +45,36 @@ python examples/complete_workflow_demo.py
 
 ## 🎯 Core Workflow Illustrated
 
-### Three-Module Architecture
+### Three-Module Architecture with Focused Configurations
 
-The example demonstrates the clean three-module architecture of represent:
+The example demonstrates the clean three-module architecture of represent with the new focused configuration system:
 
 1. **Global Threshold Calculator** (`global_threshold_calculator`)
+   - **Configuration**: `GlobalThresholdConfig` - only threshold calculation parameters
    - Analyzes sample data to determine optimal classification boundaries
    - Ensures consistent thresholds across multiple files
    - Provides quantile-based uniform distribution
 
 2. **Dataset Builder** (`dataset_builder`)
+   - **Configuration**: `DatasetBuilderConfig` - only dataset building parameters  
    - Uses calculated thresholds to create symbol datasets
    - Implements symbol-split-merge for comprehensive coverage
    - Generates ML-ready datasets with uniform class distribution
 
 3. **Market Depth Processor** (`market_depth_processor`)  
+   - **Configuration**: `MarketDepthProcessorConfig` - only feature processing parameters
    - Converts market data into normalized tensors
    - Supports multiple features simultaneously
    - Provides high-performance processing for ML training
+
+### 🆕 New Focused Configuration Architecture
+
+The demo showcases the new configuration approach:
+
+- **Separate Configs**: Each module has its own focused Pydantic configuration
+- **Clear Separation**: No confusion between unrelated parameters
+- **Better Validation**: Type safety and field validation for each module
+- **Compatibility Helper**: `create_compatible_configs()` for workflows using all modules
 
 ### Feature Generation Pipeline
 
@@ -110,13 +122,51 @@ All results are compiled into a unified HTML report containing:
    - Adjust feature configurations as needed
    - Update currency and processing parameters
 
+## 🔧 Configuration Examples
+
+The demo shows two different ways to create configurations:
+
+### Individual Focused Configs
+```python
+from represent.configs import GlobalThresholdConfig, DatasetBuilderConfig, MarketDepthProcessorConfig
+
+# Each module gets its own focused configuration
+threshold_config = GlobalThresholdConfig(
+    currency="AUDUSD", nbins=13, lookback_rows=1000
+)
+dataset_config = DatasetBuilderConfig(
+    currency="AUDUSD", lookback_rows=1000, lookforward_input=1000
+)
+processor_config = MarketDepthProcessorConfig(
+    features=["volume", "variance"], samples=25000
+)
+```
+
+### Compatible Configs (Recommended for Multi-Module Workflows)
+```python
+from represent.configs import create_compatible_configs
+
+# One function creates all three compatible configurations
+dataset_cfg, threshold_cfg, processor_cfg = create_compatible_configs(
+    currency="AUDUSD",
+    features=["volume", "variance"],
+    lookback_rows=1000,
+    nbins=13
+)
+```
+
+
 ## 💡 Key Benefits Demonstrated
 
-- **Clean Architecture**: Three focused modules with clear responsibilities
+- **🆕 Focused Configurations**: Each module has its own Pydantic config with only relevant parameters
+- **Clean Architecture**: Three focused modules with clear responsibilities  
 - **End-to-End Pipeline**: Complete workflow from raw data to ML-ready tensors
 - **Performance Optimized**: High-speed processing with memory efficiency
 - **Comprehensive Reporting**: Detailed analysis and visualization of results
 - **Flexible Configuration**: Easy customization for different currencies and features
+- **Type Safety**: Pydantic validation ensures correct parameter usage
+- **Better Separation**: No confusion between module-specific parameters
+- **Compatibility Helper**: `create_compatible_configs()` for complex workflows
 - **Production Ready**: Robust error handling and fallback mechanisms
 
-This example serves as both a demonstration and a template for implementing represent in your own ML projects.
+This example serves as both a demonstration and a template for implementing the new focused configuration architecture in your own ML projects.

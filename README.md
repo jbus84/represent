@@ -6,12 +6,15 @@
 
 High-performance Python package for creating normalized market depth representations from limit order book data using a **symbol-split-merge architecture**. Built for machine learning applications requiring comprehensive, uniform datasets from multiple DBN files.
 
+**🆕 v5.0.0+**: Now features **focused Pydantic configuration models** for each core module, replacing the monolithic configuration approach.
+
 ## 🚀 Key Features
 
 - **📊 Symbol-Split-Merge Architecture**: Process multiple DBN files into comprehensive symbol datasets
 - **⚡ High Performance**: 1500+ samples/second processing with memory-efficient streaming
 - **🎯 Uniform Distribution**: Guaranteed balanced class distributions for optimal ML training
-- **🔧 Three Core Modules**: Clean, focused architecture for dataset building, market processing, and thresholds
+- **🔧 Three Core Modules**: Clean, focused architecture with separate Pydantic configs for each module
+- **🆕 Focused Configuration**: Type-safe Pydantic models with auto-computed fields and validation
 - **📈 Multi-Feature Support**: Volume, variance, and trade count features
 - **🧠 Framework Agnostic**: Compatible with PyTorch, TensorFlow, or custom ML frameworks
 
@@ -36,10 +39,15 @@ uv sync --all-extras
 **Primary module for creating comprehensive symbol datasets from multiple DBN files**
 
 ```python
-from represent import build_datasets_from_dbn_files, DatasetBuildConfig, create_represent_config
+from represent import (
+    build_datasets_from_dbn_files, DatasetBuildConfig, 
+    DatasetBuilderConfig, create_compatible_configs
+)
 
-# Configure processing
-config = create_represent_config(
+# Configure processing with NEW focused configs approach
+from represent.configs import create_compatible_configs
+
+dataset_cfg, threshold_cfg, processor_cfg = create_compatible_configs(
     currency="AUDUSD",
     features=['volume', 'variance'],
     lookback_rows=5000,
@@ -49,13 +57,12 @@ config = create_represent_config(
 
 dataset_config = DatasetBuildConfig(
     currency="AUDUSD",
-    features=['volume', 'variance'],
     force_uniform=True  # Ensures balanced class distribution
 )
 
 # Build comprehensive symbol datasets from multiple DBN files
 results = build_datasets_from_dbn_files(
-    config=config,
+    config=dataset_cfg,
     dbn_files=[
         "data/AUDUSD-20240101.dbn.zst",
         "data/AUDUSD-20240102.dbn.zst", 
@@ -82,9 +89,15 @@ print(f"Total samples: {results['phase_2_stats']['total_samples']:,}")
 from represent import MarketDepthProcessor, create_processor, process_market_data
 import polars as pl
 
-# Create processor for specific features
-config = create_represent_config("AUDUSD", features=['volume', 'variance'])
-processor = MarketDepthProcessor(config=config, features=['volume', 'variance'])
+# Create processor with NEW focused config approach
+from represent.configs import MarketDepthProcessorConfig
+
+processor_config = MarketDepthProcessorConfig(
+    features=['volume', 'variance'],
+    samples=50000,
+    ticks_per_bin=100
+)
+processor = MarketDepthProcessor(config=processor_config)
 
 # Load market data
 market_data = pl.read_parquet("symbol_datasets/AUDUSD_M6AM4_dataset.parquet")
@@ -97,7 +110,7 @@ print(f"Tensor shape: {tensor_data.shape}")
 print(f"Data type: {tensor_data.dtype}")
 
 # Convenience function for single-use processing
-tensor_data = process_market_data(market_data, config=config, features=['volume'])
+tensor_data = process_market_data(market_data, config=processor_config)
 ```
 
 **Key Functions:**
@@ -111,12 +124,20 @@ tensor_data = process_market_data(market_data, config=config, features=['volume'
 ```python
 from represent import calculate_global_thresholds, GlobalThresholdCalculator
 
-# Calculate thresholds from sample of DBN files
-config = create_represent_config("AUDUSD")
+# Calculate thresholds from sample of DBN files with NEW focused config
+from represent.configs import GlobalThresholdConfig
+
+threshold_config = GlobalThresholdConfig(
+    currency="AUDUSD",
+    nbins=13,
+    lookback_rows=5000,
+    lookforward_input=5000,
+    lookforward_offset=500,
+    sample_fraction=0.5
+)
 thresholds = calculate_global_thresholds(
-    config=config,
+    config=threshold_config,
     data_directory="data/databento/AUDUSD/",
-    sample_fraction=0.5,  # Use 50% of files for threshold calculation
     verbose=True
 )
 
@@ -130,7 +151,7 @@ dataset_config = DatasetBuildConfig(
 )
 
 # Advanced usage with custom calculator
-calculator = GlobalThresholdCalculator(config=config)
+calculator = GlobalThresholdCalculator(config=threshold_config)
 thresholds = calculator.calculate_thresholds_from_directory(
     data_directory="data/databento/AUDUSD/",
     sample_fraction=0.3
@@ -146,15 +167,20 @@ thresholds = calculator.calculate_thresholds_from_directory(
 
 ```python
 from represent import (
-    create_represent_config, 
     DatasetBuildConfig,
     build_datasets_from_dbn_files,
     calculate_global_thresholds,
     MarketDepthProcessor
 )
+from represent.configs import (
+    create_compatible_configs,
+    GlobalThresholdConfig,
+    DatasetBuilderConfig,
+    MarketDepthProcessorConfig
+)
 
-# Step 1: Configure processing parameters
-config = create_represent_config(
+# Step 1: Configure processing with NEW focused configs
+dataset_cfg, threshold_cfg, processor_cfg = create_compatible_configs(
     currency="AUDUSD",
     features=['volume', 'variance'],
     lookback_rows=5000,
@@ -164,21 +190,20 @@ config = create_represent_config(
 
 # Step 2: Calculate global thresholds for consistent classification
 thresholds = calculate_global_thresholds(
-    config=config,
+    config=threshold_cfg,
     data_directory="data/databento/AUDUSD/",
     sample_fraction=0.5
 )
 
 # Step 3: Build comprehensive symbol datasets
 dataset_config = DatasetBuildConfig(
-    currency="AUDUSD", 
-    features=['volume', 'variance'],
+    currency="AUDUSD",
     global_thresholds=thresholds,  # Use calculated thresholds
     force_uniform=True
 )
 
 results = build_datasets_from_dbn_files(
-    config=config,
+    config=dataset_cfg,
     dbn_files=[
         "data/AUDUSD-20240101.dbn.zst",
         "data/AUDUSD-20240102.dbn.zst",
@@ -189,7 +214,7 @@ results = build_datasets_from_dbn_files(
 )
 
 # Step 4: Process datasets for ML training (in your ML repository)
-processor = MarketDepthProcessor(config=config, features=['volume', 'variance'])
+processor = MarketDepthProcessor(config=processor_cfg)
 
 # Load a comprehensive symbol dataset
 import polars as pl
@@ -215,15 +240,20 @@ print(f"✅ Ready for ML training with {tensor_data.shape} tensor shape")
 - **2+ features**: `(N, 402, 500)` - 3D tensor with feature dimension first
 
 ```python
-# Examples of different feature configurations
-config = create_represent_config("AUDUSD", features=['volume'])
-# Output: (402, 500)
+# Examples of different feature configurations with NEW focused configs
+from represent.configs import MarketDepthProcessorConfig
 
-config = create_represent_config("AUDUSD", features=['volume', 'variance']) 
-# Output: (2, 402, 500)
+# Single feature configuration
+processor_cfg = MarketDepthProcessorConfig(features=['volume'])
+print(f"Output shape: {processor_cfg.output_shape}")  # (402, 500)
 
-config = create_represent_config("AUDUSD", features=['volume', 'variance', 'trade_counts'])
-# Output: (3, 402, 500)
+# Multi-feature configuration
+processor_cfg = MarketDepthProcessorConfig(features=['volume', 'variance'])
+print(f"Output shape: {processor_cfg.output_shape}")  # (2, 402, 500)
+
+# Three features configuration
+processor_cfg = MarketDepthProcessorConfig(features=['volume', 'variance', 'trade_counts'])
+print(f"Output shape: {processor_cfg.output_shape}")  # (3, 402, 500)
 ```
 
 ## 🏗️ Symbol-Split-Merge Architecture
@@ -267,37 +297,98 @@ for features, labels in dataloader:
     # ... training logic
 ```
 
-## ⚙️ Configuration System
+## ⚙️ NEW Configuration System
 
-### **RepresentConfig**
-Central configuration object for all processing parameters:
+### **🆕 Focused Configuration Models (v5.0.0+)**
+Replace the old monolithic `RepresentConfig` with separate Pydantic models for each module:
 
 ```python
-from represent import RepresentConfig, create_represent_config
-
-# Manual configuration
-config = RepresentConfig(
-    currency="AUDUSD",
-    features=['volume', 'variance'], 
-    samples=50000,
-    lookback_rows=5000,
-    lookforward_input=5000,
-    lookforward_offset=500,
-    nbins=13,
-    batch_size=1500
+from represent.configs import (
+    DatasetBuilderConfig, GlobalThresholdConfig, MarketDepthProcessorConfig,
+    create_compatible_configs
 )
 
-# Convenience function with currency-specific optimizations
-config = create_represent_config(
-    currency="AUDUSD",  # Auto-configures pip size, time bins, etc.
-    features=['volume'],
+# Create focused configurations
+dataset_cfg = DatasetBuilderConfig(
+    currency="AUDUSD",
+    lookback_rows=5000,
+    lookforward_input=5000,
+    lookforward_offset=500
+)
+
+threshold_cfg = GlobalThresholdConfig(
+    currency="AUDUSD",
+    nbins=13,
+    lookback_rows=5000,
+    lookforward_input=5000,
+    lookforward_offset=500
+)
+
+processor_cfg = MarketDepthProcessorConfig(
+    features=['volume', 'variance'],
+    samples=50000
+)
+
+# Or use convenience function for compatible configs (RECOMMENDED)
+dataset_cfg, threshold_cfg, processor_cfg = create_compatible_configs(
+    currency="AUDUSD",    # Auto-configures currency-specific optimizations
+    features=['volume'],  # Shared across compatible configs
     samples=25000
 )
 
-# Access configuration parameters
-print(f"Time bins: {config.time_bins}")           # Auto-calculated
-print(f"Min samples: {config.min_symbol_samples}") # Auto-calculated
-print(f"Pip size: {config.true_pip_size}")        # Currency-specific
+# Access configuration parameters (with Pydantic validation)
+print(f"Dataset currency: {dataset_cfg.currency}")
+print(f"Min required samples: {dataset_cfg.min_required_samples}")  # Computed field
+print(f"Processor time bins: {processor_cfg.time_bins}")           # Computed field 
+print(f"Processor output shape: {processor_cfg.output_shape}")     # Computed field
+print(f"Threshold nbins: {threshold_cfg.nbins}")                   # Currency-specific
+```
+
+### **🆕 Key Benefits of New Configuration Architecture**
+
+- **✅ Focused Validation**: Each module validates only relevant parameters
+- **✅ Type Safety**: Full Pydantic validation with descriptive error messages
+- **✅ Auto-Computed Fields**: Properties like `min_required_samples`, `time_bins`, `output_shape`
+- **✅ Clear Separation**: No confusion between module-specific parameters
+- **✅ Better IDE Support**: Full autocomplete and type hints
+- **✅ Currency Optimizations**: Automatic adjustments for different currency pairs
+- **✅ Backwards Compatibility**: Legacy `create_represent_config()` still works
+
+### **📝 Migration Guide: Old → New Configuration**
+
+```python
+# ❌ OLD APPROACH (still works but deprecated)
+from represent import create_represent_config
+
+config = create_represent_config(
+    currency="AUDUSD",
+    features=['volume', 'variance'],
+    lookback_rows=5000,
+    nbins=13
+)
+# Returns tuple of three configs - confusing!
+
+# ✅ NEW APPROACH (recommended)
+from represent.configs import create_compatible_configs
+
+dataset_cfg, threshold_cfg, processor_cfg = create_compatible_configs(
+    currency="AUDUSD",
+    features=['volume', 'variance'],
+    lookback_rows=5000,
+    nbins=13
+)
+# Clear separation of concerns, focused validation!
+
+# ✅ OR individual focused configs for specific modules
+from represent.configs import MarketDepthProcessorConfig
+
+processor_cfg = MarketDepthProcessorConfig(
+    features=['volume', 'variance'],
+    samples=50000,
+    ticks_per_bin=100
+)
+print(f"Auto-computed time bins: {processor_cfg.time_bins}")        # 500
+print(f"Auto-computed output shape: {processor_cfg.output_shape}")  # (2, 402, 500)
 ```
 
 ### **DatasetBuildConfig**
@@ -308,7 +399,6 @@ from represent import DatasetBuildConfig
 
 dataset_config = DatasetBuildConfig(
     currency="AUDUSD",
-    features=['volume', 'variance'],
     min_symbol_samples=10000,     # Minimum samples per symbol
     force_uniform=True,           # Ensure balanced class distribution
     nbins=13,                     # Number of classification bins
@@ -383,10 +473,13 @@ python examples/demonstrate_feature_extraction.py
 - **Uniform Distribution**: Balanced class labels for optimal ML training  
 - **Production Ready**: Handle 10+ DBN files efficiently with automatic validation
 
-**Clean Three-Module Design:**
-- **dataset_builder**: High-level dataset creation from DBN files
-- **market_depth_processor**: Low-level market data tensor processing
-- **global_threshold_calculator**: Consistent classification across files
+**Clean Three-Module Design with Focused Configs (v5.0.0+):**
+- **dataset_builder**: High-level dataset creation (`DatasetBuilderConfig`)
+- **market_depth_processor**: Low-level tensor processing (`MarketDepthProcessorConfig`)
+- **global_threshold_calculator**: Consistent classification (`GlobalThresholdConfig`)
+- **🆕 Focused Architecture**: Each module has its own type-safe Pydantic configuration model
+- **🆕 Auto-Computed Fields**: Properties automatically calculated from base parameters
+- **🆕 Better Validation**: Module-specific validation with descriptive error messages
 
 ## 📄 License
 

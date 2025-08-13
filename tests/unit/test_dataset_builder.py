@@ -19,6 +19,10 @@ from represent import (
     DatasetBuilder,
     batch_build_datasets_from_directory,
     build_datasets_from_dbn_files,
+)
+from represent.configs import (
+    DatasetBuilderConfig,
+    create_dataset_builder_config,
     create_represent_config,
 )
 
@@ -31,7 +35,6 @@ class TestDatasetBuildConfig:
         config = DatasetBuildConfig()
 
         assert config.currency == "AUDUSD"
-        assert config.features == ["volume"]
         assert config.min_symbol_samples == 10500
         assert config.force_uniform is True
         assert config.nbins == 13
@@ -43,7 +46,6 @@ class TestDatasetBuildConfig:
         """Test custom DatasetBuildConfig creation."""
         config = DatasetBuildConfig(
             currency="EURUSD",
-            features=["volume", "variance"],
             min_symbol_samples=15000,
             force_uniform=True,
             nbins=10,
@@ -51,7 +53,6 @@ class TestDatasetBuildConfig:
         )
 
         assert config.currency == "EURUSD"
-        assert config.features == ["volume", "variance"]
         assert config.min_symbol_samples == 15000
         assert config.force_uniform is True
         assert config.nbins == 10
@@ -74,11 +75,9 @@ class TestDatasetBuilderInitialization:
 
     @pytest.fixture
     def base_config(self):
-        """Base RepresentConfig for testing."""
-        return create_represent_config(
+        """Base DatasetBuilderConfig for testing."""
+        return DatasetBuilderConfig(
             currency="AUDUSD",
-            features=["volume"],
-            samples=25000,
             lookback_rows=100,
             lookforward_input=100,
             lookforward_offset=20
@@ -87,7 +86,7 @@ class TestDatasetBuilderInitialization:
     def test_automatic_min_samples_calculation(self, base_config):
         """Test that DatasetBuilder automatically calculates minimum required samples."""
         dataset_config = DatasetBuildConfig(min_symbol_samples=50)  # Too low
-        builder = DatasetBuilder(base_config, dataset_config, verbose=False)
+        builder = DatasetBuilder(config=base_config, dataset_config=dataset_config, verbose=False)
 
         expected_min = 100 + 100 + 20  # lookback + lookforward + offset = 220
         assert builder.dataset_config.min_symbol_samples == expected_min
@@ -96,19 +95,18 @@ class TestDatasetBuilderInitialization:
         """Test that DatasetBuilder respects higher min_symbol_samples values."""
         high_min = 50000
         dataset_config = DatasetBuildConfig(min_symbol_samples=high_min)
-        builder = DatasetBuilder(base_config, dataset_config, verbose=False)
+        builder = DatasetBuilder(config=base_config, dataset_config=dataset_config, verbose=False)
 
         assert builder.dataset_config.min_symbol_samples == high_min
 
     def test_initialization_verbose_output(self, base_config, capsys):
         """Test verbose output during initialization."""
         dataset_config = DatasetBuildConfig(min_symbol_samples=100)
-        DatasetBuilder(base_config, dataset_config, verbose=True)
+        DatasetBuilder(config=base_config, dataset_config=dataset_config, verbose=True)
 
         captured = capsys.readouterr()
         assert "DatasetBuilder initialized" in captured.out
         assert "Currency: AUDUSD" in captured.out
-        assert "Features: ['volume']" in captured.out
 
 
 class TestSimplifiedPipeline:
@@ -117,9 +115,8 @@ class TestSimplifiedPipeline:
     @pytest.fixture
     def pipeline_config(self):
         """Config for pipeline testing."""
-        return create_represent_config(
+        return DatasetBuilderConfig(
             currency="AUDUSD",
-            features=["volume", "variance"],
             lookback_rows=50,
             lookforward_input=50,
             lookforward_offset=10
@@ -145,14 +142,14 @@ class TestSimplifiedPipeline:
 
     def test_no_feature_generation_method(self, pipeline_config):
         """Test that _generate_features method no longer exists."""
-        dataset_config = DatasetBuildConfig(features=["volume", "variance"])
+        dataset_config = DatasetBuildConfig()
         builder = DatasetBuilder(pipeline_config, dataset_config, verbose=False)
 
         assert not hasattr(builder, '_generate_features'), "_generate_features method should be removed"
 
     def test_simplified_pipeline_only_essential_processing(self, pipeline_config, test_data):
         """Test that pipeline only does essential processing (no feature storage)."""
-        dataset_config = DatasetBuildConfig(features=["volume", "variance"], min_symbol_samples=50)
+        dataset_config = DatasetBuildConfig(min_symbol_samples=50)
         builder = DatasetBuilder(pipeline_config, dataset_config, verbose=False)
 
         # Process through pipeline steps
@@ -172,13 +169,15 @@ class TestSimplifiedPipeline:
             assert len(feature_cols) == 0, f"Found feature columns that should not exist: {feature_cols}"
 
     def test_features_preserved_for_on_demand_generation(self, pipeline_config):
-        """Test that features config is preserved for on-demand generation."""
-        dataset_config = DatasetBuildConfig(features=["volume", "variance"])
+        """Test that DatasetBuilder has proper configuration without features (features moved to MarketDepthProcessor)."""
+        dataset_config = DatasetBuildConfig()
         builder = DatasetBuilder(pipeline_config, dataset_config, verbose=False)
 
-        # Features should still be configured (for on-demand generation)
-        assert builder.dataset_config.features == ["volume", "variance"]
-        assert builder.represent_config.features == ["volume", "variance"]
+        # DatasetBuilder should have config but features are now handled by MarketDepthProcessor
+        assert hasattr(builder, 'config')
+        assert builder.config.currency == "AUDUSD"
+        # Features are no longer part of DatasetBuilder - they're handled by MarketDepthProcessor
+        assert not hasattr(builder.config, 'features')
 
 
 class TestPriceMovementCalculation:
@@ -187,7 +186,7 @@ class TestPriceMovementCalculation:
     @pytest.fixture
     def calc_config(self):
         """Config for calculation testing."""
-        return create_represent_config(
+        return create_dataset_builder_config(
             currency="AUDUSD",
             lookback_rows=20,
             lookforward_input=15,
@@ -198,7 +197,7 @@ class TestPriceMovementCalculation:
     def builder(self, calc_config):
         """Builder for calculation tests."""
         dataset_config = DatasetBuildConfig(min_symbol_samples=100)
-        return DatasetBuilder(calc_config, dataset_config, verbose=False)
+        return DatasetBuilder(config=calc_config, dataset_config=dataset_config, verbose=False)
 
     @pytest.fixture
     def calc_test_data(self):
@@ -225,7 +224,7 @@ class TestPriceMovementCalculation:
 
         # Calculate expected valid range
         total_rows = len(calc_test_data)
-        config = builder.represent_config
+        config = builder.config  # Now uses DatasetBuilderConfig
         valid_start = config.lookback_rows
         valid_end = total_rows - (config.lookforward_input + config.lookforward_offset)
         expected_count = max(0, valid_end - valid_start)
@@ -264,9 +263,9 @@ class TestPriceMovementCalculation:
         price_movements = result_df['price_movement'].to_numpy()
 
         # For the calculation to work, we need sufficient data
-        if len(mid_prices) > builder.represent_config.lookback_rows + builder.represent_config.lookforward_input + builder.represent_config.lookforward_offset:
+        if len(mid_prices) > builder.config.lookback_rows + builder.config.lookforward_input + builder.config.lookforward_offset:
             # Test the first valid position where we can calculate
-            stop_row = builder.represent_config.lookback_rows
+            stop_row = builder.config.lookback_rows
             if stop_row < len(price_movements) and not np.isnan(price_movements[stop_row]):
                 # Manual calculation verification would go here
                 # This is a basic check that movements are calculated
@@ -321,7 +320,7 @@ class TestClassification:
     @pytest.fixture
     def class_config(self):
         """Config for classification testing."""
-        return create_represent_config(
+        return create_dataset_builder_config(
             currency="AUDUSD",
             lookback_rows=10,
             lookforward_input=10,
@@ -336,7 +335,7 @@ class TestClassification:
             force_uniform=True,
             nbins=5  # Smaller for easier testing
         )
-        return DatasetBuilder(class_config, dataset_config, verbose=False)
+        return DatasetBuilder(config=class_config, dataset_config=dataset_config, verbose=False)
 
     def test_classification_uniform_distribution(self, class_builder):
         """Test uniform classification distribution."""
@@ -430,7 +429,7 @@ class TestSymbolProcessing:
     def symbol_builder(self, symbol_config):
         """Builder for symbol tests."""
         dataset_config = DatasetBuildConfig(min_symbol_samples=100)
-        return DatasetBuilder(symbol_config, dataset_config, verbose=False)
+        return DatasetBuilder(legacy_config=symbol_config, dataset_config=dataset_config, verbose=False)
 
     @pytest.fixture
     def multi_symbol_data(self):
@@ -500,7 +499,7 @@ class TestSymbolProcessing:
     def test_merge_verbose_output(self, symbol_config, multi_symbol_data, capsys):
         """Test verbose output during symbol merging."""
         dataset_config = DatasetBuildConfig(min_symbol_samples=50)
-        builder = DatasetBuilder(symbol_config, dataset_config, verbose=True)
+        builder = DatasetBuilder(legacy_config=symbol_config, dataset_config=dataset_config, verbose=True)
 
         with tempfile.TemporaryDirectory() as temp_dir:
             intermediate_dir = Path(temp_dir) / "intermediate"
@@ -651,7 +650,7 @@ class TestErrorHandling:
         """Test handling of symbols with insufficient samples."""
         config = create_represent_config(currency="AUDUSD")
         dataset_config = DatasetBuildConfig(min_symbol_samples=10000)  # Very high
-        builder = DatasetBuilder(config, dataset_config, verbose=False)
+        builder = DatasetBuilder(legacy_config=config, dataset_config=dataset_config, verbose=False)
 
         small_data = pl.DataFrame({
             'ts_event': [1640995200000000000 + i * 1000000000 for i in range(100)],
@@ -706,7 +705,7 @@ class TestPerformanceRequirements:
 
         config = create_represent_config(currency="AUDUSD")
         dataset_config = DatasetBuildConfig(min_symbol_samples=200)
-        builder = DatasetBuilder(config, dataset_config, verbose=False)
+        builder = DatasetBuilder(legacy_config=config, dataset_config=dataset_config, verbose=False)
 
         with tempfile.TemporaryDirectory() as temp_dir:
             intermediate_dir = Path(temp_dir)
@@ -727,7 +726,7 @@ class TestPerformanceRequirements:
         config = create_represent_config(currency="AUDUSD")
         dataset_config = DatasetBuildConfig(min_symbol_samples=200)
 
-        builder = DatasetBuilder(config, dataset_config, verbose=False)
+        builder = DatasetBuilder(legacy_config=config, dataset_config=dataset_config, verbose=False)
 
         # Basic memory efficiency check
         assert len(builder.symbol_registry) == 0
@@ -750,7 +749,7 @@ class TestPerformanceRequirements:
         )
 
         dataset_config = DatasetBuildConfig(min_symbol_samples=1)  # Force auto-update
-        builder = DatasetBuilder(config, dataset_config, verbose=False)
+        builder = DatasetBuilder(legacy_config=config, dataset_config=dataset_config, verbose=False)
 
         # Should only consider lookback + lookforward + offset
         expected_min = 200 + 150 + 25  # 375
@@ -771,7 +770,7 @@ class TestPerformanceRequirements:
         )
 
         dataset_config = DatasetBuildConfig(min_symbol_samples=10, force_uniform=True)
-        builder = DatasetBuilder(config, dataset_config, verbose=False)
+        builder = DatasetBuilder(legacy_config=config, dataset_config=dataset_config, verbose=False)
 
         # Create data with known prices for manual verification
         test_data = []

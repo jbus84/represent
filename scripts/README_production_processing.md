@@ -42,8 +42,9 @@ config = create_represent_config(
 )
 
 dataset_config = DatasetBuildConfig(
+    currency="AUDUSD",                   # Currency for the datasets
     global_thresholds=thresholds,        # Use first-half calculated thresholds
-    force_uniform=True,                  # Enforce balanced distribution
+    force_uniform=False,                 # CRITICAL: False to use global_thresholds
     min_symbol_samples=50000,            # Minimum 50K samples per symbol dataset
     keep_intermediate=False              # Clean up intermediate files
 )

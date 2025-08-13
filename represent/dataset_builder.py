@@ -19,15 +19,14 @@ import databento as db
 import numpy as np
 import polars as pl
 
-from .config import RepresentConfig
+from .configs import DatasetBuilderConfig as BuilderConfig
 from .global_threshold_calculator import GlobalThresholds
 
 
 @dataclass
 class DatasetBuildConfig:
-    """Configuration for the symbol-split-merge dataset building process."""
+    """Legacy configuration for the symbol-split-merge dataset building process."""
     currency: str = "AUDUSD"
-    features: list[str] | None = None
     min_symbol_samples: int = 10500  # Must be >= lookback_rows + lookforward_input + lookforward_offset
     force_uniform: bool = True
     nbins: int = 13
@@ -36,9 +35,6 @@ class DatasetBuildConfig:
     keep_intermediate: bool = False  # Whether to keep intermediate split files
 
     def __post_init__(self):
-        if self.features is None:
-            self.features = ["volume"]
-
         # Validate that classification method is properly specified
         if not self.force_uniform and self.global_thresholds is None:
             raise ValueError(
@@ -62,32 +58,41 @@ class DatasetBuilder:
 
     def __init__(
         self,
-        config: RepresentConfig,
+        config: BuilderConfig | None = None,
         dataset_config: DatasetBuildConfig | None = None,
         verbose: bool = True,
+        # Legacy support
+        legacy_config: Any = None,
     ):
         """
         Initialize the dataset builder.
 
         Args:
-            config: RepresentConfig with currency-specific configuration
-            dataset_config: Configuration for dataset building process
+            config: DatasetBuilderConfig with focused configuration (new preferred way)
+            dataset_config: Legacy DatasetBuildConfig for backward compatibility
             verbose: Whether to print progress information
+            legacy_config: Legacy RepresentConfig for backward compatibility
         """
-        self.represent_config = config
-        self.dataset_config = dataset_config or DatasetBuildConfig(
-            currency=config.currency,
-            features=config.features
-        )
+        # Handle legacy usage - legacy_config should now be a tuple from create_represent_config
+        if config is None and legacy_config is not None:
+            if isinstance(legacy_config, tuple) and len(legacy_config) == 3:
+                # New style: tuple of (DatasetBuilderConfig, GlobalThresholdConfig, MarketDepthProcessorConfig)
+                config = legacy_config[0]  # Use DatasetBuilderConfig
+            else:
+                # Very old style - create default config
+                config = BuilderConfig()
 
-        # Calculate minimum required samples - only need lookback window size for processing
-        required_samples = (
-            config.lookback_rows +  # Historical data needed for lookback window
-            config.lookforward_input +  # Future data needed for lookforward window
-            config.lookforward_offset  # Offset before future window starts
+        # Default config if none provided
+        if config is None:
+            config = BuilderConfig()
+
+        self.config = config
+        self.dataset_config = dataset_config or DatasetBuildConfig(
+            currency=config.currency
         )
 
         # Update min_symbol_samples if it's too low
+        required_samples = config.lookback_rows + config.lookforward_input + config.lookforward_offset
         if self.dataset_config.min_symbol_samples < required_samples:
             if verbose:
                 print(f"⚠️  Updating min_symbol_samples from {self.dataset_config.min_symbol_samples:,} to {required_samples:,}")
@@ -101,7 +106,6 @@ class DatasetBuilder:
         if self.verbose:
             print("🏗️  DatasetBuilder initialized")
             print(f"   💱 Currency: {self.dataset_config.currency}")
-            print(f"   📊 Features: {self.dataset_config.features}")
             print(f"   🎯 Min samples per symbol: {self.dataset_config.min_symbol_samples}")
             print(f"   ⚖️  Force uniform: {self.dataset_config.force_uniform}")
 
@@ -279,9 +283,9 @@ class DatasetBuilder:
         """
         if self.verbose:
             print("   🧮 Calculating price movements using lookback/lookforward methodology")
-            print(f"      Lookback: {self.represent_config.lookback_rows} rows")
-            print(f"      Lookforward: {self.represent_config.lookforward_input} rows")
-            print(f"      Lookforward offset: {self.represent_config.lookforward_offset} rows")
+            print(f"      Lookback: {self.config.lookback_rows} rows")
+            print(f"      Lookforward: {self.config.lookforward_input} rows")
+            print(f"      Lookforward offset: {self.config.lookforward_offset} rows")
             print("      Processing: Every valid row (no jumping)")
 
         # Calculate mid prices using polars vectorized operations
@@ -298,9 +302,9 @@ class DatasetBuilder:
 
         # Calculate valid processing range
         min_required_rows = (
-            self.represent_config.lookback_rows +
-            self.represent_config.lookforward_input +
-            self.represent_config.lookforward_offset
+            self.config.lookback_rows +
+            self.config.lookforward_input +
+            self.config.lookforward_offset
         )
 
         if total_rows < min_required_rows:
@@ -315,15 +319,15 @@ class DatasetBuilder:
         movements_calculated = 0
 
         for stop_row in range(
-            self.represent_config.lookback_rows,
-            total_rows - (self.represent_config.lookforward_input + self.represent_config.lookforward_offset)
+            self.config.lookback_rows,
+            total_rows - (self.config.lookforward_input + self.config.lookforward_offset)
         ):
             # Define window boundaries
-            lookback_start = stop_row - self.represent_config.lookback_rows
+            lookback_start = stop_row - self.config.lookback_rows
             lookback_end = stop_row
 
-            target_start_row = stop_row + 1 + self.represent_config.lookforward_offset
-            target_stop_row = target_start_row + self.represent_config.lookforward_input
+            target_start_row = stop_row + 1 + self.config.lookforward_offset
+            target_stop_row = target_start_row + self.config.lookforward_input
 
             # Extract window data
             lookback_prices = mid_prices[lookback_start:lookback_end]
@@ -341,7 +345,7 @@ class DatasetBuilder:
 
         if self.verbose:
             print(f"   ✅ Calculated {movements_calculated:,} price movements")
-            print(f"      Valid range: rows {self.represent_config.lookback_rows} to {total_rows - (self.represent_config.lookforward_input + self.represent_config.lookforward_offset)}")
+            print(f"      Valid range: rows {self.config.lookback_rows} to {total_rows - (self.config.lookforward_input + self.config.lookforward_offset)}")
 
         # Add price movement column using polars
         return symbol_df.with_columns([
@@ -604,7 +608,6 @@ class DatasetBuilder:
             'dataset_files': dataset_files,
             'config': {
                 'currency': self.dataset_config.currency,
-                'features': self.dataset_config.features,
                 'min_symbol_samples': self.dataset_config.min_symbol_samples,
                 'force_uniform': self.dataset_config.force_uniform,
                 'nbins': self.dataset_config.nbins,
@@ -624,34 +627,52 @@ class DatasetBuilder:
         return results
 
 
-# Convenience function
+# Convenience functions with backward compatibility
 def build_datasets_from_dbn_files(
-    config: RepresentConfig,
-    dbn_files: Sequence[str | Path],
-    output_dir: str | Path,
+    config: BuilderConfig | Any = None,
+    dbn_files: Sequence[str | Path] | None = None,
+    output_dir: str | Path | None = None,
     dataset_config: DatasetBuildConfig | None = None,
     intermediate_dir: str | Path | None = None,
     verbose: bool = True,
+    # Legacy support
+    **kwargs,
 ) -> dict[str, Any]:
     """
     Convenience function to build comprehensive symbol datasets from multiple DBN files.
 
     Args:
-        config: RepresentConfig with currency-specific configuration
+        config: DatasetBuilderConfig with focused configuration (preferred)
+               or legacy RepresentConfig for backward compatibility
         dbn_files: List of DBN files to process
         output_dir: Directory for final dataset files
-        dataset_config: Configuration for dataset building process
+        dataset_config: Legacy DatasetBuildConfig for dataset building process
         intermediate_dir: Directory for intermediate files (temp if None)
         verbose: Whether to print progress information
 
     Returns:
         Processing statistics and results
     """
-    builder = DatasetBuilder(
-        config=config,
-        dataset_config=dataset_config,
-        verbose=verbose
-    )
+    # Handle legacy usage patterns
+    if config is None or not isinstance(config, BuilderConfig):
+        # Support legacy RepresentConfig
+        builder = DatasetBuilder(
+            config=None if isinstance(config, BuilderConfig) else None,
+            dataset_config=dataset_config,
+            verbose=verbose,
+            legacy_config=config  # Pass legacy config
+        )
+    else:
+        builder = DatasetBuilder(
+            config=config,
+            dataset_config=dataset_config,
+            verbose=verbose
+        )
+
+    if dbn_files is None:
+        raise ValueError("dbn_files parameter is required")
+    if output_dir is None:
+        raise ValueError("output_dir parameter is required")
 
     return builder.build_datasets_from_dbn_files(
         dbn_files=dbn_files,
@@ -661,13 +682,15 @@ def build_datasets_from_dbn_files(
 
 
 def batch_build_datasets_from_directory(
-    config: RepresentConfig,
-    input_directory: str | Path,
-    output_dir: str | Path,
+    config: BuilderConfig | Any = None,
+    input_directory: str | Path | None = None,
+    output_dir: str | Path | None = None,
     file_pattern: str = "*.dbn*",
     dataset_config: DatasetBuildConfig | None = None,
     intermediate_dir: str | Path | None = None,
     verbose: bool = True,
+    # Legacy support
+    **kwargs,
 ) -> dict[str, Any]:
     """
     Build datasets from all DBN files in a directory.
@@ -684,6 +707,9 @@ def batch_build_datasets_from_directory(
     Returns:
         Processing statistics and results
     """
+    if input_directory is None:
+        raise ValueError("input_directory parameter is required")
+
     input_path = Path(input_directory)
 
     if not input_path.exists():

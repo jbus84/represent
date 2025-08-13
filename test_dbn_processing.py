@@ -5,7 +5,8 @@ Test script to process real DBN files using the symbol-split-merge architecture.
 
 from pathlib import Path
 
-from represent import DatasetBuildConfig, build_datasets_from_dbn_files, create_represent_config
+from represent import DatasetBuildConfig, build_datasets_from_dbn_files
+from represent.configs import create_represent_config
 
 
 def main():
@@ -30,7 +31,7 @@ def main():
         print(f"   📄 {file.name} ({file_size_mb:.1f} MB)")
 
     # Create configuration - use smaller parameters for testing
-    config = create_represent_config(
+    configs = create_represent_config(
         currency="AUDUSD",  # Assuming these are AUDUSD files
         features=["volume"],
         samples=25000,      # Minimum allowed
@@ -39,24 +40,24 @@ def main():
         lookforward_offset=100,
         jump_size=50       # Smaller jump for more data points
     )
+    dataset_cfg, threshold_cfg, processor_cfg = configs
 
     # Create dataset configuration
     dataset_config = DatasetBuildConfig(
         currency="AUDUSD",
-        features=["volume"],
         min_symbol_samples=5000,  # Lower threshold for testing
         force_uniform=True,
         keep_intermediate=True    # Keep intermediate files for inspection
     )
 
     print("\n⚙️  Configuration:")
-    print(f"   💱 Currency: {config.currency}")
-    print(f"   📊 Features: {config.features}")
-    print(f"   📏 Samples: {config.samples:,}")
-    print(f"   📈 Lookback rows: {config.lookback_rows:,}")
-    print(f"   📉 Lookforward input: {config.lookforward_input:,}")
-    print(f"   ⏭️  Lookforward offset: {config.lookforward_offset:,}")
-    print(f"   🦘 Jump size: {config.jump_size}")
+    print(f"   💱 Currency: {dataset_cfg.currency}")
+    print(f"   📊 Features: {processor_cfg.features}")
+    print(f"   📏 Samples: {processor_cfg.samples:,}")
+    print(f"   📈 Lookback rows: {dataset_cfg.lookback_rows:,}")
+    print(f"   📉 Lookforward input: {dataset_cfg.lookforward_input:,}")
+    print(f"   ⏭️  Lookforward offset: {dataset_cfg.lookforward_offset:,}")
+    print(f"   🦘 Jump size: {threshold_cfg.jump_size}")
     print(f"   🎯 Min samples per symbol: {dataset_config.min_symbol_samples:,}")
 
     try:
@@ -64,7 +65,7 @@ def main():
         print("\n🚀 Starting DBN Processing...")
 
         results = build_datasets_from_dbn_files(
-            config=config,
+            config=dataset_cfg,
             dbn_files=dbn_files,
             output_dir=output_dir,
             dataset_config=dataset_config,

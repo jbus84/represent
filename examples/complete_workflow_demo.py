@@ -25,8 +25,13 @@ from represent import (
     DatasetBuildConfig,
     build_datasets_from_dbn_files,
     calculate_global_thresholds,
-    create_represent_config,
     process_market_data,
+)
+from represent.configs import (
+    DatasetBuilderConfig,
+    GlobalThresholdConfig,
+    MarketDepthProcessorConfig,
+    create_compatible_configs,
 )
 
 
@@ -51,21 +56,46 @@ class WorkflowDemo:
         })
 
     def step1_global_thresholds(self):
-        """Step 1: Demonstrate Global Threshold Calculator."""
+        """Step 1: Demonstrate Global Threshold Calculator with focused configuration."""
         self.log_section(
             "🎯 STEP 1: Global Threshold Calculation",
-            "Calculating consistent classification thresholds from sample DBN data..."
+            "Demonstrating the new focused configuration architecture for threshold calculation..."
         )
 
-        # Create config for threshold calculation
-        config = create_represent_config(
+        # NEW APPROACH: Use focused GlobalThresholdConfig
+        threshold_config = GlobalThresholdConfig(
             currency="AUDUSD",
-            features=['volume'],
+            nbins=13,
             lookback_rows=1000,
             lookforward_input=1000,
             lookforward_offset=100,
-            samples=25000  # Minimum required by validation
+            max_samples_per_file=10000,
+            sample_fraction=0.5,
+            jump_size=100
         )
+
+        # Show configuration details
+        config_info = f"""
+🆕 NEW FOCUSED CONFIGURATION APPROACH:
+
+📊 GlobalThresholdConfig - Only threshold-specific parameters:
+   • Currency: {threshold_config.currency}
+   • Number of bins: {threshold_config.nbins}
+   • Lookback rows: {threshold_config.lookback_rows}
+   • Lookforward input: {threshold_config.lookforward_input}
+   • Lookforward offset: {threshold_config.lookforward_offset}
+   • Max samples per file: {threshold_config.max_samples_per_file}
+   • Sample fraction: {threshold_config.sample_fraction}
+   • Jump size: {threshold_config.jump_size}
+
+✅ Benefits of focused configuration:
+   • Only parameters relevant to threshold calculation
+   • Clear separation of concerns
+   • Better type safety and validation
+   • No confusion with unrelated parameters
+"""
+
+        self.log_section("🔧 Configuration Architecture", config_info)
 
         # Look for DBN files in the data directory
         data_paths = [
@@ -95,13 +125,13 @@ class WorkflowDemo:
             np.random.seed(42)
             mock_movements = np.random.normal(0, 0.001, 50000)  # 0.1% std movement
 
-            # Calculate quantile boundaries
-            quantiles = np.linspace(0, 1, config.nbins + 1)
+            # Calculate quantile boundaries using the focused config
+            quantiles = np.linspace(0, 1, threshold_config.nbins + 1)
             boundaries = np.quantile(mock_movements, quantiles)
 
             thresholds = GlobalThresholds(
                 quantile_boundaries=boundaries,
-                nbins=config.nbins,
+                nbins=threshold_config.nbins,
                 sample_size=50000,
                 files_analyzed=1,
                 price_movement_stats={
@@ -115,23 +145,25 @@ class WorkflowDemo:
             results = {
                 'thresholds': thresholds,
                 'sample_files': ['mock_data_generation'],
-                'total_movements': 50000
+                'total_movements': 50000,
+                'config': threshold_config
             }
 
         else:
             try:
-                # Calculate real thresholds from available data
+                # Calculate real thresholds using the focused configuration
                 thresholds = calculate_global_thresholds(
-                    config=config,
+                    config=threshold_config,
                     data_directory=dbn_files[0].parent,
-                    sample_fraction=0.5,
+                    sample_fraction=threshold_config.sample_fraction,
                     verbose=True
                 )
 
                 results = {
                     'thresholds': thresholds,
                     'sample_files': [f.name for f in dbn_files[:3]],  # Show first 3
-                    'total_movements': thresholds.sample_size
+                    'total_movements': thresholds.sample_size,
+                    'config': threshold_config
                 }
 
             except Exception as e:
@@ -140,15 +172,16 @@ class WorkflowDemo:
 
         # Log threshold results
         threshold_info = f"""
-✅ Global thresholds calculated successfully!
+✅ Global thresholds calculated successfully using focused GlobalThresholdConfig!
 
 📊 Threshold Statistics:
    • Number of bins: {results['thresholds'].nbins}
    • Sample size: {results['total_movements']:,} price movements
    • Files analyzed: {results['thresholds'].files_analyzed}
-   • Currency: {config.currency}
-   • Lookback rows: {config.lookback_rows}
-   • Lookforward input: {config.lookforward_input}
+   • Currency: {threshold_config.currency}
+   • Lookback rows: {threshold_config.lookback_rows}
+   • Lookforward input: {threshold_config.lookforward_input}
+   • Sample fraction: {threshold_config.sample_fraction}
 
 📁 Source files analyzed: {len(results['sample_files'])}
    {chr(10).join(f'   • {f}' for f in results['sample_files'][:5])}
@@ -157,6 +190,8 @@ class WorkflowDemo:
 🎯 Classification boundaries:
    {chr(10).join(f'   Bin {i:2d}: {boundary:+.6f}' for i, boundary in enumerate(results['thresholds'].quantile_boundaries[:5]))}
    {'   ... (showing first 5)' if len(results['thresholds'].quantile_boundaries) > 5 else ''}
+
+🆕 Configuration approach: Using focused GlobalThresholdConfig with only relevant parameters
 """
 
         self.log_section("📊 Threshold Results", threshold_info)
@@ -201,32 +236,56 @@ class WorkflowDemo:
         return threshold_path
 
     def step2_dataset_building(self, threshold_results):
-        """Step 2: Demonstrate Dataset Builder with calculated thresholds."""
+        """Step 2: Demonstrate Dataset Builder with focused configuration."""
         if not threshold_results:
             self.log_section("❌ Step 2 Skipped", "Cannot proceed without thresholds from Step 1")
             return None
 
         self.log_section(
             "🏗️ STEP 2: Dataset Building",
-            "Creating comprehensive symbol datasets using calculated thresholds..."
+            "Demonstrating the focused DatasetBuilderConfig for symbol dataset creation..."
         )
 
-        # Create dataset config using the calculated thresholds
-        config = create_represent_config(
+        # NEW APPROACH: Use focused DatasetBuilderConfig
+        dataset_builder_config = DatasetBuilderConfig(
             currency="AUDUSD",
-            features=['volume', 'variance'],
             lookback_rows=1000,
             lookforward_input=1000,
-            lookforward_offset=100,
-            samples=25000  # Minimum required by validation
+            lookforward_offset=100
         )
 
+        # Show the configuration benefits
+        builder_config_info = f"""
+🆕 NEW FOCUSED DATASET BUILDER CONFIGURATION:
+
+🏗️ DatasetBuilderConfig - Only dataset building parameters:
+   • Currency: {dataset_builder_config.currency}
+   • Lookback rows: {dataset_builder_config.lookback_rows}
+   • Lookforward input: {dataset_builder_config.lookforward_input}
+   • Lookforward offset: {dataset_builder_config.lookforward_offset}
+   • Min required samples: {dataset_builder_config.lookback_rows + dataset_builder_config.lookforward_input + dataset_builder_config.lookforward_offset}
+
+✅ Benefits of focused DatasetBuilderConfig:
+   • Only parameters needed for dataset building
+   • Computed field for min_required_samples
+   • Clear separation from feature processing parameters
+   • Better validation and type safety
+
+🔄 DatasetBuildConfig for dataset management:
+   • Handles classification method (thresholds vs uniform)
+   • Manages intermediate file cleanup
+   • Controls output formatting
+"""
+
+        self.log_section("🔧 Dataset Builder Configuration", builder_config_info)
+
+        # Create dataset build configuration using calculated thresholds
         dataset_config = DatasetBuildConfig(
             currency="AUDUSD",
-            features=['volume', 'variance'],
             global_thresholds=threshold_results['thresholds'],
             force_uniform=True,
-            keep_intermediate=False
+            keep_intermediate=False,
+            nbins=threshold_results['thresholds'].nbins
         )
 
         # Look for DBN files
@@ -250,8 +309,8 @@ class WorkflowDemo:
                 "No DBN files found, generating mock symbol dataset for demonstration..."
             )
 
-            # Generate realistic mock market data
-            mock_dataset = self._generate_mock_dataset(config, threshold_results['thresholds'])
+            # Generate realistic mock market data using focused config
+            mock_dataset = self._generate_mock_dataset(dataset_builder_config, threshold_results['thresholds'])
 
             # Save mock dataset
             dataset_path = self.output_dir / "AUDUSD_M6AM4_dataset.parquet"
@@ -266,9 +325,9 @@ class WorkflowDemo:
 
         else:
             try:
-                # Build real datasets from DBN files
+                # Build real datasets using focused DatasetBuilderConfig
                 build_results = build_datasets_from_dbn_files(
-                    config=config,
+                    config=dataset_builder_config,
                     dbn_files=dbn_files,
                     output_dir=str(self.output_dir),
                     dataset_config=dataset_config,
@@ -301,7 +360,7 @@ class WorkflowDemo:
    • Datasets created: {len(results['datasets_created'])}
    • Total samples: {results['total_samples']:,}
    • Symbols processed: {len(results['symbols'])}
-   • Features: {dataset_config.features}
+   • Classification: {dataset_config.nbins} bins
    • Uniform distribution: {dataset_config.force_uniform}
 
 📁 Output datasets:
@@ -413,26 +472,52 @@ class WorkflowDemo:
         return analysis_path
 
     def step3_market_depth_visualization(self, dataset_results):
-        """Step 3: Demonstrate Market Depth Processor with feature visualization."""
+        """Step 3: Demonstrate Market Depth Processor with focused configuration."""
         if not dataset_results or not dataset_results['datasets_created']:
             self.log_section("❌ Step 3 Skipped", "Cannot proceed without datasets from Step 2")
             return None
 
         self.log_section(
             "⚡ STEP 3: Market Depth Processing & Visualization",
-            "Processing market data into normalized tensors and creating visualizations..."
+            "Demonstrating the focused MarketDepthProcessorConfig for tensor generation..."
         )
 
         # Get the first available dataset
         first_dataset_path = list(dataset_results['datasets_created'].values())[0]
         df = pl.read_parquet(first_dataset_path)
 
-        # Create config for feature processing
-        config = create_represent_config(
-            currency="AUDUSD",
+        # NEW APPROACH: Use focused MarketDepthProcessorConfig
+        processor_config = MarketDepthProcessorConfig(
             features=['volume', 'variance', 'trade_counts'],
-            samples=min(25000, len(df))  # Use available samples or default
+            samples=min(25000, len(df)),  # Use available samples or default
+            ticks_per_bin=100,
+            micro_pip_size=0.00001
         )
+
+        # Show configuration details
+        processor_config_info = f"""
+🆕 NEW FOCUSED MARKET DEPTH PROCESSOR CONFIGURATION:
+
+⚡ MarketDepthProcessorConfig - Only feature processing parameters:
+   • Features: {processor_config.features}
+   • Samples: {processor_config.samples:,}
+   • Ticks per bin: {processor_config.ticks_per_bin}
+   • Micro pip size: {processor_config.micro_pip_size}
+   • Computed time bins: {processor_config.samples // processor_config.ticks_per_bin}
+   • Computed output shape: {processor_config.output_shape if hasattr(processor_config, 'output_shape') else 'Computed at runtime'}
+
+✅ Benefits of focused MarketDepthProcessorConfig:
+   • Only parameters needed for tensor generation
+   • Automatic time_bins calculation
+   • Computed output_shape field
+   • Clear separation from dataset building parameters
+   • Feature-specific validation
+
+🎯 Output tensor shape for {len(processor_config.features)} features:
+   • {'2D tensor' if len(processor_config.features) == 1 else '3D tensor'}: {processor_config.output_shape if hasattr(processor_config, 'output_shape') else 'Shape computed at runtime'}
+"""
+
+        self.log_section("🔧 Market Depth Processor Configuration", processor_config_info)
 
         # Take sufficient samples for processing
         sample_size = min(5000, len(df))
@@ -440,13 +525,15 @@ class WorkflowDemo:
 
         self.log_section(
             "🔄 Feature Processing",
-            f"Processing {sample_size} samples with features: {config.features}"
+            f"Processing {sample_size} samples with features: {processor_config.features}"
         )
 
         try:
-            # Generate multi-feature tensor
+            # Generate multi-feature tensor using focused configuration
             multi_feature_tensor = process_market_data(
-                sample_data, config=config, features=['volume', 'variance', 'trade_counts']
+                sample_data,
+                config=processor_config,
+                features=processor_config.features
             )
 
             if multi_feature_tensor is not None and multi_feature_tensor.size > 0:
@@ -469,13 +556,14 @@ class WorkflowDemo:
                 self.log_section("⚡ Processing Results", feature_info)
 
                 # Create comprehensive visualizations
-                self._create_market_depth_visualizations(multi_feature_tensor, config.features)
+                self._create_market_depth_visualizations(multi_feature_tensor, processor_config.features)
 
                 results = {
                     'tensor_shape': multi_feature_tensor.shape,
-                    'features': config.features,
+                    'features': processor_config.features,
                     'samples_processed': sample_size,
                     'memory_usage_kb': multi_feature_tensor.nbytes / 1024,
+                    'config': processor_config,
                     'success': True
                 }
 
@@ -805,6 +893,60 @@ class WorkflowDemo:
         self.log_section("🎉 WORKFLOW COMPLETE", final_info)
         return report_path
 
+    def demonstrate_compatible_configs(self):
+        """Demonstrate the create_compatible_configs convenience function."""
+        self.log_section(
+            "🔗 BONUS: Compatible Configuration Creation",
+            "Demonstrating create_compatible_configs() - one function for all three modules..."
+        )
+
+        # Show the convenience function for creating compatible configs
+        dataset_cfg, threshold_cfg, processor_cfg = create_compatible_configs(
+            currency="EURUSD",
+            features=["volume", "variance"],
+            lookback_rows=2000,
+            lookforward_input=1500,
+            lookforward_offset=200,
+            nbins=9,
+            samples=30000,
+            micro_pip_size=0.00001,
+            jump_size=50
+        )
+
+        compatible_info = f"""
+🔗 CREATE_COMPATIBLE_CONFIGS() - One Function, Three Configs:
+
+✨ Single function call creates all three focused configurations:
+   create_compatible_configs(currency="EURUSD", features=["volume", "variance"], ...)
+
+📊 DatasetBuilderConfig output:
+   • Currency: {dataset_cfg.currency}
+   • Lookback rows: {dataset_cfg.lookback_rows}
+   • Lookforward input: {dataset_cfg.lookforward_input}
+   • Lookforward offset: {dataset_cfg.lookforward_offset}
+
+🎯 GlobalThresholdConfig output:
+   • Currency: {threshold_cfg.currency}
+   • Nbins: {threshold_cfg.nbins}
+   • Sample fraction: {threshold_cfg.sample_fraction}
+   • Jump size: {threshold_cfg.jump_size}
+
+⚡ MarketDepthProcessorConfig output:
+   • Features: {processor_cfg.features}
+   • Samples: {processor_cfg.samples:,}
+   • Micro pip size: {processor_cfg.micro_pip_size}
+   • Time bins: {processor_cfg.samples // processor_cfg.ticks_per_bin}
+
+✅ Compatibility guaranteed:
+   • Shared parameters (currency, lookback, etc.) are synchronized
+   • Currency-specific optimizations applied automatically
+   • All three configs work together seamlessly
+
+🚀 Perfect for complex workflows requiring all three modules!
+"""
+
+        self.log_section("🔗 Compatible Configuration Results", compatible_info)
+
 
 def main():
     """Run the complete workflow demo."""
@@ -822,6 +964,9 @@ def main():
 
         # Step 3: Market depth visualization
         demo.step3_market_depth_visualization(dataset_results)
+
+        # Bonus: Demonstrate compatible configs
+        demo.demonstrate_compatible_configs()
 
         # Generate final report
         report_path = demo.generate_report()
