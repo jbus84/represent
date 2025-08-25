@@ -26,8 +26,11 @@ from .global_threshold_calculator import GlobalThresholds
 @dataclass
 class DatasetBuildConfig:
     """Legacy configuration for the symbol-split-merge dataset building process."""
+
     currency: str = "AUDUSD"
-    min_symbol_samples: int = 10500  # Must be >= lookback_rows + lookforward_input + lookforward_offset
+    min_symbol_samples: int = (
+        10500  # Must be >= lookback_rows + lookforward_input + lookforward_offset
+    )
     force_uniform: bool = True
     nbins: int = 13
     global_thresholds: GlobalThresholds | None = None
@@ -87,16 +90,20 @@ class DatasetBuilder:
             config = BuilderConfig()
 
         self.config = config
-        self.dataset_config = dataset_config or DatasetBuildConfig(
-            currency=config.currency
-        )
+        self.dataset_config = dataset_config or DatasetBuildConfig(currency=config.currency)
 
         # Update min_symbol_samples if it's too low
-        required_samples = config.lookback_rows + config.lookforward_input + config.lookforward_offset
+        required_samples = (
+            config.lookback_rows + config.lookforward_input + config.lookforward_offset
+        )
         if self.dataset_config.min_symbol_samples < required_samples:
             if verbose:
-                print(f"⚠️  Updating min_symbol_samples from {self.dataset_config.min_symbol_samples:,} to {required_samples:,}")
-                print(f"    Required: {config.lookback_rows:,} lookback + {config.lookforward_input:,} lookforward + {config.lookforward_offset:,} offset")
+                print(
+                    f"⚠️  Updating min_symbol_samples from {self.dataset_config.min_symbol_samples:,} to {required_samples:,}"
+                )
+                print(
+                    f"    Required: {config.lookback_rows:,} lookback + {config.lookforward_input:,} lookforward + {config.lookforward_offset:,} offset"
+                )
             self.dataset_config.min_symbol_samples = required_samples
         self.verbose = verbose
 
@@ -109,11 +116,7 @@ class DatasetBuilder:
             print(f"   🎯 Min samples per symbol: {self.dataset_config.min_symbol_samples}")
             print(f"   ⚖️  Force uniform: {self.dataset_config.force_uniform}")
 
-    def split_dbn_by_symbol(
-        self,
-        dbn_path: str | Path,
-        intermediate_dir: Path
-    ) -> dict[str, Path]:
+    def split_dbn_by_symbol(self, dbn_path: str | Path, intermediate_dir: Path) -> dict[str, Path]:
         """
         Split a single DBN file by symbol into intermediate parquet files.
 
@@ -134,7 +137,7 @@ class DatasetBuilder:
         df = pl.from_pandas(data.to_df())
 
         # Get unique symbols
-        symbols = df['symbol'].unique().to_list()
+        symbols = df["symbol"].unique().to_list()
 
         if self.verbose:
             print(f"   📊 Found {len(df):,} rows across {len(symbols)} symbols")
@@ -144,7 +147,7 @@ class DatasetBuilder:
         dbn_name = Path(dbn_path).stem
 
         for symbol in symbols:
-            symbol_df = df.filter(pl.col('symbol') == symbol)
+            symbol_df = df.filter(pl.col("symbol") == symbol)
 
             if len(symbol_df) == 0:
                 continue
@@ -154,10 +157,7 @@ class DatasetBuilder:
 
             # Save symbol data
             symbol_df.write_parquet(
-                str(intermediate_file),
-                compression="snappy",
-                statistics=True,
-                row_group_size=50000
+                str(intermediate_file), compression="snappy", statistics=True, row_group_size=50000
             )
 
             symbol_files[symbol] = intermediate_file
@@ -176,10 +176,7 @@ class DatasetBuilder:
         return symbol_files
 
     def merge_symbol_data(
-        self,
-        symbol: str,
-        symbol_files: list[Path],
-        output_dir: Path
+        self, symbol: str, symbol_files: list[Path], output_dir: Path
     ) -> Path | None:
         """
         Merge all instances of a symbol across files into a single large parquet dataset.
@@ -223,14 +220,16 @@ class DatasetBuilder:
         # Check if total samples meet minimum threshold
         if total_rows < self.dataset_config.min_symbol_samples:
             if self.verbose:
-                print(f"   ❌ Insufficient total samples: {total_rows:,} < {self.dataset_config.min_symbol_samples:,}")
+                print(
+                    f"   ❌ Insufficient total samples: {total_rows:,} < {self.dataset_config.min_symbol_samples:,}"
+                )
             return None
 
         # Concatenate all DataFrames
         merged_df = pl.concat(all_dfs, how="vertical")
 
         # Sort by timestamp to ensure proper order
-        merged_df = merged_df.sort('ts_event')
+        merged_df = merged_df.sort("ts_event")
 
         # Calculate price movements using lookback vs lookforward methodology
         merged_df = self._calculate_price_movements(merged_df)
@@ -254,12 +253,14 @@ class DatasetBuilder:
             str(output_file),
             compression="snappy",
             statistics=True,
-            row_group_size=100000  # Larger row groups for big datasets
+            row_group_size=100000,  # Larger row groups for big datasets
         )
 
         if self.verbose:
             # Show classification distribution
-            class_dist = final_df['classification_label'].value_counts().sort('classification_label')
+            class_dist = (
+                final_df["classification_label"].value_counts().sort("classification_label")
+            )
             file_size_mb = output_file.stat().st_size / 1024 / 1024
             print(f"   ✅ Merged {symbol}: {len(final_df):,} samples")
             print(f"      📊 Classes: {class_dist['classification_label'].to_list()}")
@@ -289,12 +290,12 @@ class DatasetBuilder:
             print("      Processing: Every valid row (no jumping)")
 
         # Calculate mid prices using polars vectorized operations
-        symbol_df = symbol_df.with_columns([
-            ((pl.col('ask_px_00') + pl.col('bid_px_00')) / 2).alias('mid_price')
-        ])
+        symbol_df = symbol_df.with_columns(
+            [((pl.col("ask_px_00") + pl.col("bid_px_00")) / 2).alias("mid_price")]
+        )
 
         # Extract mid prices as numpy array for complex window operations
-        mid_prices = symbol_df['mid_price'].to_numpy()
+        mid_prices = symbol_df["mid_price"].to_numpy()
         total_rows = len(mid_prices)
 
         # Pre-allocate price movements array
@@ -302,17 +303,17 @@ class DatasetBuilder:
 
         # Calculate valid processing range
         min_required_rows = (
-            self.config.lookback_rows +
-            self.config.lookforward_input +
-            self.config.lookforward_offset
+            self.config.lookback_rows
+            + self.config.lookforward_input
+            + self.config.lookforward_offset
         )
 
         if total_rows < min_required_rows:
             if self.verbose:
                 print(f"   ⚠️  Insufficient data: {total_rows} < {min_required_rows} required")
-            return symbol_df.with_columns([
-                pl.Series('price_movement', price_movements).cast(pl.Float64)
-            ])
+            return symbol_df.with_columns(
+                [pl.Series("price_movement", price_movements).cast(pl.Float64)]
+            )
 
         # Calculate price movements using optimized window operations
         valid_indices = []
@@ -320,7 +321,7 @@ class DatasetBuilder:
 
         for stop_row in range(
             self.config.lookback_rows,
-            total_rows - (self.config.lookforward_input + self.config.lookforward_offset)
+            total_rows - (self.config.lookforward_input + self.config.lookforward_offset),
         ):
             # Define window boundaries
             lookback_start = stop_row - self.config.lookback_rows
@@ -345,12 +346,14 @@ class DatasetBuilder:
 
         if self.verbose:
             print(f"   ✅ Calculated {movements_calculated:,} price movements")
-            print(f"      Valid range: rows {self.config.lookback_rows} to {total_rows - (self.config.lookforward_input + self.config.lookforward_offset)}")
+            print(
+                f"      Valid range: rows {self.config.lookback_rows} to {total_rows - (self.config.lookforward_input + self.config.lookforward_offset)}"
+            )
 
         # Add price movement column using polars
-        return symbol_df.with_columns([
-            pl.Series('price_movement', price_movements).cast(pl.Float64)
-        ])
+        return symbol_df.with_columns(
+            [pl.Series("price_movement", price_movements).cast(pl.Float64)]
+        )
 
     # Feature generation removed - features should be generated on-demand during ML training
     # This eliminates storage overhead and allows flexible feature combinations
@@ -371,15 +374,14 @@ class DatasetBuilder:
         """
         # Filter valid price movements
         valid_df = symbol_df.filter(
-            pl.col('price_movement').is_not_null() &
-            pl.col('price_movement').is_finite()
+            pl.col("price_movement").is_not_null() & pl.col("price_movement").is_finite()
         )
 
         if len(valid_df) == 0:
             if self.verbose:
                 print("   ⚠️  No valid price movements for classification")
             return symbol_df.with_columns(
-                pl.lit(None, dtype=pl.Int32).alias('classification_label')
+                pl.lit(None, dtype=pl.Int32).alias("classification_label")
             )
 
         # Use first half of data to define classification bins
@@ -387,17 +389,21 @@ class DatasetBuilder:
 
         if first_half_size < self.dataset_config.nbins * 10:  # Minimum samples per bin
             if self.verbose:
-                print(f"   ⚠️  Insufficient data for reliable bin calculation: {first_half_size} samples")
+                print(
+                    f"   ⚠️  Insufficient data for reliable bin calculation: {first_half_size} samples"
+                )
             # Fallback to using all data if first half is too small
             training_df = valid_df
         else:
             training_df = valid_df.head(first_half_size)
 
-        training_movements = training_df['price_movement'].to_numpy()
-        all_movements = valid_df['price_movement'].to_numpy()
+        training_movements = training_df["price_movement"].to_numpy()
+        all_movements = valid_df["price_movement"].to_numpy()
 
         if self.verbose:
-            print(f"   📊 Using {len(training_movements):,} samples to define {self.dataset_config.nbins} bins")
+            print(
+                f"   📊 Using {len(training_movements):,} samples to define {self.dataset_config.nbins} bins"
+            )
             print(f"   📊 Applying classification to {len(all_movements):,} total samples")
 
         if self.dataset_config.force_uniform:
@@ -420,7 +426,7 @@ class DatasetBuilder:
             if self.verbose:
                 print(f"   🎯 Quantile boundaries: {[f'{b:.6f}' for b in quantile_boundaries[:5]]}")
                 if len(quantile_boundaries) > 5:
-                    print(f"      ... {len(quantile_boundaries)-5} more boundaries")
+                    print(f"      ... {len(quantile_boundaries) - 5} more boundaries")
 
         elif self.dataset_config.global_thresholds is not None:
             # Global threshold-based classification
@@ -429,7 +435,7 @@ class DatasetBuilder:
             classification_labels = np.clip(classification_labels, 0, self.dataset_config.nbins - 1)
 
             if self.verbose:
-                print(f"   🌍 Using global thresholds with {len(quantile_boundaries)-1} bins")
+                print(f"   🌍 Using global thresholds with {len(quantile_boundaries) - 1} bins")
 
         else:
             # No fallback allowed - GlobalThresholds are required
@@ -441,14 +447,18 @@ class DatasetBuilder:
             )
 
         # Create classification series and add to dataframe
-        classification_series = pl.Series('classification_label', classification_labels, dtype=pl.Int32)
+        classification_series = pl.Series(
+            "classification_label", classification_labels, dtype=pl.Int32
+        )
 
         # Add classification labels to the valid dataframe
         classified_df = valid_df.with_columns(classification_series)
 
         if self.verbose:
             # Show classification distribution
-            class_dist = classified_df['classification_label'].value_counts().sort('classification_label')
+            class_dist = (
+                classified_df["classification_label"].value_counts().sort("classification_label")
+            )
             total_classified = len(classified_df)
             print(f"   📊 Classification distribution ({total_classified:,} samples):")
             for row in class_dist.iter_rows():
@@ -469,8 +479,7 @@ class DatasetBuilder:
             Filtered DataFrame with only processable rows
         """
         return symbol_df.filter(
-            pl.col('price_movement').is_not_null() &
-            pl.col('classification_label').is_not_null()
+            pl.col("price_movement").is_not_null() & pl.col("classification_label").is_not_null()
         )
 
     def build_datasets_from_dbn_files(
@@ -555,14 +564,14 @@ class DatasetBuilder:
                 dataset_file = self.merge_symbol_data(symbol, symbol_file_list, output_path)
                 if dataset_file:
                     # Get sample count from the file
-                    sample_df = pl.read_parquet(dataset_file, columns=['classification_label'])
+                    sample_df = pl.read_parquet(dataset_file, columns=["classification_label"])
                     sample_count = len(sample_df)
 
                     dataset_files[symbol] = {
-                        'file_path': str(dataset_file),
-                        'samples': sample_count,
-                        'file_size_mb': dataset_file.stat().st_size / 1024 / 1024,
-                        'source_files': len(symbol_file_list)
+                        "file_path": str(dataset_file),
+                        "samples": sample_count,
+                        "file_size_mb": dataset_file.stat().st_size / 1024 / 1024,
+                        "source_files": len(symbol_file_list),
                     }
                     total_samples += sample_count
             except Exception as e:
@@ -590,29 +599,29 @@ class DatasetBuilder:
 
         # Compile results
         results = {
-            'input_files': [str(f) for f in dbn_files],
-            'output_directory': str(output_path),
-            'intermediate_directory': str(intermediate_path),
-            'phase_1_stats': {
-                'split_time_seconds': split_time,
-                'intermediate_files_created': total_split_files,
-                'symbols_discovered': len(self.symbol_registry),
+            "input_files": [str(f) for f in dbn_files],
+            "output_directory": str(output_path),
+            "intermediate_directory": str(intermediate_path),
+            "phase_1_stats": {
+                "split_time_seconds": split_time,
+                "intermediate_files_created": total_split_files,
+                "symbols_discovered": len(self.symbol_registry),
             },
-            'phase_2_stats': {
-                'merge_time_seconds': merge_time,
-                'datasets_created': len(dataset_files),
-                'total_samples': total_samples,
+            "phase_2_stats": {
+                "merge_time_seconds": merge_time,
+                "datasets_created": len(dataset_files),
+                "total_samples": total_samples,
             },
-            'total_processing_time_seconds': total_time,
-            'samples_per_second': total_samples / total_time if total_time > 0 else 0,
-            'dataset_files': dataset_files,
-            'config': {
-                'currency': self.dataset_config.currency,
-                'min_symbol_samples': self.dataset_config.min_symbol_samples,
-                'force_uniform': self.dataset_config.force_uniform,
-                'nbins': self.dataset_config.nbins,
-                'keep_intermediate': self.dataset_config.keep_intermediate,
-            }
+            "total_processing_time_seconds": total_time,
+            "samples_per_second": total_samples / total_time if total_time > 0 else 0,
+            "dataset_files": dataset_files,
+            "config": {
+                "currency": self.dataset_config.currency,
+                "min_symbol_samples": self.dataset_config.min_symbol_samples,
+                "force_uniform": self.dataset_config.force_uniform,
+                "nbins": self.dataset_config.nbins,
+                "keep_intermediate": self.dataset_config.keep_intermediate,
+            },
         }
 
         if self.verbose:
@@ -660,14 +669,10 @@ def build_datasets_from_dbn_files(
             config=None if isinstance(config, BuilderConfig) else None,
             dataset_config=dataset_config,
             verbose=verbose,
-            legacy_config=config  # Pass legacy config
+            legacy_config=config,  # Pass legacy config
         )
     else:
-        builder = DatasetBuilder(
-            config=config,
-            dataset_config=dataset_config,
-            verbose=verbose
-        )
+        builder = DatasetBuilder(config=config, dataset_config=dataset_config, verbose=verbose)
 
     if dbn_files is None:
         raise ValueError("dbn_files parameter is required")
@@ -675,9 +680,7 @@ def build_datasets_from_dbn_files(
         raise ValueError("output_dir parameter is required")
 
     return builder.build_datasets_from_dbn_files(
-        dbn_files=dbn_files,
-        output_dir=output_dir,
-        intermediate_dir=intermediate_dir
+        dbn_files=dbn_files, output_dir=output_dir, intermediate_dir=intermediate_dir
     )
 
 
@@ -732,5 +735,5 @@ def batch_build_datasets_from_directory(
         output_dir=output_dir,
         dataset_config=dataset_config,
         intermediate_dir=intermediate_dir,
-        verbose=verbose
+        verbose=verbose,
     )

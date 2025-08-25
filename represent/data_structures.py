@@ -98,7 +98,10 @@ class VolumeGrid:
         """Set volumes at multiple grid positions."""
         # Filter valid coordinates
         valid_mask = (
-            (y_coords >= 0) & (y_coords < PRICE_LEVELS) & (x_coords >= 0) & (x_coords < self.time_bins)
+            (y_coords >= 0)
+            & (y_coords < PRICE_LEVELS)
+            & (x_coords >= 0)
+            & (x_coords < self.time_bins)
         )
 
         valid_y = y_coords[valid_mask]

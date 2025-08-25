@@ -33,10 +33,7 @@ class TestDatasetBuilderConfig:
     def test_custom_dataset_builder_config(self):
         """Test creating DatasetBuilderConfig with custom values."""
         config = DatasetBuilderConfig(
-            currency="EURUSD",
-            lookback_rows=3000,
-            lookforward_input=4000,
-            lookforward_offset=600
+            currency="EURUSD", lookback_rows=3000, lookforward_input=4000, lookforward_offset=600
         )
 
         assert config.currency == "EURUSD"
@@ -78,10 +75,7 @@ class TestGlobalThresholdConfig:
     def test_custom_threshold_config(self):
         """Test creating GlobalThresholdConfig with custom values."""
         config = GlobalThresholdConfig(
-            currency="EURUSD",
-            nbins=9,
-            sample_fraction=0.3,
-            jump_size=50
+            currency="EURUSD", nbins=9, sample_fraction=0.3, jump_size=50
         )
 
         assert config.currency == "EURUSD"
@@ -118,9 +112,7 @@ class TestMarketDepthProcessorConfig:
     def test_custom_processor_config(self):
         """Test creating MarketDepthProcessorConfig with custom values."""
         config = MarketDepthProcessorConfig(
-            features=["volume", "variance"],
-            samples=25000,
-            ticks_per_bin=50
+            features=["volume", "variance"], samples=25000, ticks_per_bin=50
         )
 
         assert config.features == ["volume", "variance"]
@@ -145,10 +137,7 @@ class TestFactoryFunctions:
 
     def test_create_dataset_builder_config(self):
         """Test dataset builder config factory."""
-        config = create_dataset_builder_config(
-            currency="GBPUSD",
-            lookback_rows=3000
-        )
+        config = create_dataset_builder_config(currency="GBPUSD", lookback_rows=3000)
 
         assert isinstance(config, DatasetBuilderConfig)
         assert config.currency == "GBPUSD"
@@ -156,11 +145,7 @@ class TestFactoryFunctions:
 
     def test_create_threshold_config(self):
         """Test threshold config factory."""
-        config = create_threshold_config(
-            currency="EURUSD",
-            nbins=9,
-            jump_size=50
-        )
+        config = create_threshold_config(currency="EURUSD", nbins=9, jump_size=50)
 
         assert isinstance(config, GlobalThresholdConfig)
         assert config.currency == "EURUSD"
@@ -169,10 +154,7 @@ class TestFactoryFunctions:
 
     def test_create_processor_config(self):
         """Test processor config factory."""
-        config = create_processor_config(
-            features=["volume", "variance"],
-            samples=30000
-        )
+        config = create_processor_config(features=["volume", "variance"], samples=30000)
 
         assert isinstance(config, MarketDepthProcessorConfig)
         assert config.features == ["volume", "variance"]
@@ -181,10 +163,7 @@ class TestFactoryFunctions:
     def test_create_compatible_configs(self):
         """Test creating compatible configs for all modules."""
         dataset_cfg, threshold_cfg, processor_cfg = create_compatible_configs(
-            currency="GBPUSD",
-            features=["volume", "variance"],
-            nbins=9,
-            samples=25000
+            currency="GBPUSD", features=["volume", "variance"], nbins=9, samples=25000
         )
 
         # Check types
@@ -235,7 +214,7 @@ class TestLegacyCompatibility:
         dataset_cfg, threshold_cfg, processor_cfg = create_represent_config(
             currency="GBPUSD",
             lookforward_input=5000,  # Override the GBPUSD default of 3000
-            nbins=13
+            nbins=13,
         )
 
         assert dataset_cfg.lookforward_input == 5000  # Should use explicit value
@@ -288,9 +267,7 @@ class TestConfigIntegration:
     def test_compatible_price_movement_params(self):
         """Test that dataset and threshold configs have compatible price movement params."""
         dataset_cfg, threshold_cfg, processor_cfg = create_compatible_configs(
-            lookback_rows=3000,
-            lookforward_input=4000,
-            lookforward_offset=600
+            lookback_rows=3000, lookforward_input=4000, lookforward_offset=600
         )
 
         # Price movement parameters should match

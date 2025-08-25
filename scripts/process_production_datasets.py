@@ -48,7 +48,9 @@ def main():
         return 1
 
     print(f"📁 Found {len(dbn_files)} DBN files")
-    print(f"📅 Date range: {dbn_files[0].stem.split('-')[-1]} to {dbn_files[-1].stem.split('-')[-1]}")
+    print(
+        f"📅 Date range: {dbn_files[0].stem.split('-')[-1]} to {dbn_files[-1].stem.split('-')[-1]}"
+    )
 
     # Create output directory
     output_dir.mkdir(exist_ok=True, parents=True)
@@ -57,12 +59,12 @@ def main():
     # Create production configuration
     configs = create_represent_config(
         currency="AUDUSD",
-        features=['volume', 'variance'],
-        lookback_rows=5000,          # Production lookback
-        lookforward_input=5000,      # Production lookforward
-        lookforward_offset=500,      # Production offset
-        samples=50000,               # Production sample size
-        nbins=13                     # Standard 13 bins (0-12)
+        features=["volume", "variance"],
+        lookback_rows=5000,  # Production lookback
+        lookforward_input=5000,  # Production lookforward
+        lookforward_offset=500,  # Production offset
+        samples=50000,  # Production sample size
+        nbins=13,  # Standard 13 bins (0-12)
     )
     dataset_cfg, threshold_cfg, processor_cfg = configs
 
@@ -86,8 +88,12 @@ def main():
         first_half_size = len(dbn_files) // 2
         threshold_files = dbn_files[:first_half_size]
 
-        print(f"📊 Using first {first_half_size} files ({len(threshold_files)}) for threshold calculation")
-        print(f"📅 Threshold data range: {threshold_files[0].stem.split('-')[-1]} to {threshold_files[-1].stem.split('-')[-1]}")
+        print(
+            f"📊 Using first {first_half_size} files ({len(threshold_files)}) for threshold calculation"
+        )
+        print(
+            f"📅 Threshold data range: {threshold_files[0].stem.split('-')[-1]} to {threshold_files[-1].stem.split('-')[-1]}"
+        )
         print(f"📁 Sample files: {threshold_files[0].name} ... {threshold_files[-1].name}")
 
         # Calculate thresholds from first half
@@ -96,7 +102,7 @@ def main():
             config=threshold_cfg,
             data_directory=str(input_dir),
             sample_fraction=0.3,  # Use 30% of first half files for speed
-            verbose=True
+            verbose=True,
         )
         phase1_time = time.time() - phase1_start
 
@@ -106,7 +112,9 @@ def main():
         print("📈 Price movement stats:")
         print(f"   Mean: {thresholds.price_movement_stats['mean']:+.6f}")
         print(f"   Std:  {thresholds.price_movement_stats['std']:.6f}")
-        print(f"   Range: [{thresholds.price_movement_stats['min']:+.6f}, {thresholds.price_movement_stats['max']:+.6f}]")
+        print(
+            f"   Range: [{thresholds.price_movement_stats['min']:+.6f}, {thresholds.price_movement_stats['max']:+.6f}]"
+        )
 
         # PHASE 2: Process All Files with Calculated Thresholds
         print("\n🏗️ PHASE 2: Dataset Building with Global Thresholds")
@@ -115,10 +123,10 @@ def main():
         # Create dataset configuration with calculated thresholds
         dataset_config = DatasetBuildConfig(
             currency="AUDUSD",
-            global_thresholds=thresholds,     # Use calculated thresholds
-            force_uniform=False,              # CRITICAL: Set to False to use global_thresholds
-            min_symbol_samples=50000,         # Higher threshold for production
-            keep_intermediate=False           # Clean up intermediate files
+            global_thresholds=thresholds,  # Use calculated thresholds
+            force_uniform=False,  # CRITICAL: Set to False to use global_thresholds
+            min_symbol_samples=50000,  # Higher threshold for production
+            keep_intermediate=False,  # Clean up intermediate files
         )
 
         print("🔧 Dataset Configuration:")
@@ -129,7 +137,9 @@ def main():
 
         # Process ALL files (both halves) with the calculated thresholds
         print(f"\n📁 Processing ALL {len(dbn_files)} files with global thresholds")
-        print(f"📅 Full data range: {dbn_files[0].stem.split('-')[-1]} to {dbn_files[-1].stem.split('-')[-1]}")
+        print(
+            f"📅 Full data range: {dbn_files[0].stem.split('-')[-1]} to {dbn_files[-1].stem.split('-')[-1]}"
+        )
 
         phase2_start = time.time()
         results = build_datasets_from_dbn_files(
@@ -137,7 +147,7 @@ def main():
             dbn_files=dbn_files,  # Process ALL files
             output_dir=str(output_dir),
             dataset_config=dataset_config,
-            verbose=True
+            verbose=True,
         )
         phase2_time = time.time() - phase2_start
 
@@ -152,14 +162,16 @@ def main():
         # Get created datasets
         dataset_files = list(output_dir.glob("*_dataset.parquet"))
 
-        print(f"⏱️  Total processing time: {total_time:.1f}s ({total_time/60:.1f} minutes)")
+        print(f"⏱️  Total processing time: {total_time:.1f}s ({total_time / 60:.1f} minutes)")
         print(f"🎯 Phase 1 (Thresholds): {phase1_time:.1f}s")
         print(f"🏗️ Phase 2 (Datasets): {phase2_time:.1f}s")
         print("")
         print("📊 Dataset Creation Results:")
         print(f"   📁 Datasets created: {len(dataset_files)}")
         print(f"   📊 Total samples: {results.get('phase_2_stats', {}).get('total_samples', 0):,}")
-        print(f"   📈 Processing rate: {results.get('phase_2_stats', {}).get('total_samples', 0) / total_time:.0f} samples/sec")
+        print(
+            f"   📈 Processing rate: {results.get('phase_2_stats', {}).get('total_samples', 0) / total_time:.0f} samples/sec"
+        )
         print("   🎯 Classification method: First-half training with global thresholds")
 
         print("\n📁 Created Symbol Datasets:")
@@ -167,12 +179,12 @@ def main():
         for dataset_file in sorted(dataset_files):
             size_mb = dataset_file.stat().st_size / (1024 * 1024)
             total_size_mb += size_mb
-            symbol = dataset_file.stem.split('_')[1] if '_' in dataset_file.stem else 'unknown'
+            symbol = dataset_file.stem.split("_")[1] if "_" in dataset_file.stem else "unknown"
             print(f"   📊 {dataset_file.name}")
             print(f"      Symbol: {symbol}")
             print(f"      Size: {size_mb:.1f} MB")
 
-        print(f"\n💾 Total dataset size: {total_size_mb:.1f} MB ({total_size_mb/1024:.1f} GB)")
+        print(f"\n💾 Total dataset size: {total_size_mb:.1f} MB ({total_size_mb / 1024:.1f} GB)")
         print(f"📁 Output location: {output_dir}")
 
         # Validation

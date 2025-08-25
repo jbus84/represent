@@ -26,11 +26,11 @@ def quick_check_dataset(dataset_path):
     print(f"📅 Columns: {len(df.columns)}")
 
     # Check classification column
-    if 'classification_label' not in df.columns:
+    if "classification_label" not in df.columns:
         print("❌ No classification_label column!")
         return
 
-    labels = df['classification_label'].to_numpy()
+    labels = df["classification_label"].to_numpy()
 
     print("\n🎯 CLASSIFICATION DISTRIBUTION:")
     unique_labels, counts = np.unique(labels, return_counts=True)
@@ -64,7 +64,9 @@ def quick_check_dataset(dataset_path):
     if len(counts) > 1:
         min_count, max_count = min(counts), max(counts)
         imbalance_ratio = max_count / min_count
-        print(f"   Class imbalance ratio: {imbalance_ratio:.2f} (min={min_count:,}, max={max_count:,})")
+        print(
+            f"   Class imbalance ratio: {imbalance_ratio:.2f} (min={min_count:,}, max={max_count:,})"
+        )
 
         if imbalance_ratio > 5.0:
             print("   ❌ Severe class imbalance (ratio > 5.0)")
@@ -75,12 +77,12 @@ def quick_check_dataset(dataset_path):
 
     # Issue 3: Sample mid prices
     print("\n📈 SAMPLE PRICE DATA:")
-    if 'bid_px_00' in df.columns and 'ask_px_00' in df.columns:
+    if "bid_px_00" in df.columns and "ask_px_00" in df.columns:
         sample_size = min(1000, len(df))
         sample_df = df.head(sample_size)
 
-        bid_prices = sample_df['bid_px_00'].to_numpy()
-        ask_prices = sample_df['ask_px_00'].to_numpy()
+        bid_prices = sample_df["bid_px_00"].to_numpy()
+        ask_prices = sample_df["ask_px_00"].to_numpy()
         mid_prices = (bid_prices + ask_prices) / 2.0
 
         print(f"   Sample size: {sample_size:,}")
@@ -91,19 +93,25 @@ def quick_check_dataset(dataset_path):
         # Calculate simple price movements (adjacent rows)
         if len(mid_prices) > 1:
             simple_movements = np.diff(mid_prices) / mid_prices[:-1]
-            print(f"   Adjacent movements mean: {np.mean(simple_movements):+.6f} ({np.mean(simple_movements)*100:+.4f}%)")
-            print(f"   Adjacent movements std: {np.std(simple_movements):.6f} ({np.std(simple_movements)*100:.4f}%)")
+            print(
+                f"   Adjacent movements mean: {np.mean(simple_movements):+.6f} ({np.mean(simple_movements) * 100:+.4f}%)"
+            )
+            print(
+                f"   Adjacent movements std: {np.std(simple_movements):.6f} ({np.std(simple_movements) * 100:.4f}%)"
+            )
 
             large_moves = np.abs(simple_movements) > 0.001  # 0.1%
             if np.any(large_moves):
-                print(f"   ⚠️  Large movements (>0.1%): {np.sum(large_moves)} out of {len(simple_movements)}")
+                print(
+                    f"   ⚠️  Large movements (>0.1%): {np.sum(large_moves)} out of {len(simple_movements)}"
+                )
 
     return {
-        'name': dataset_path.name,
-        'samples': len(labels),
-        'unique_classes': len(unique_labels),
-        'classes': unique_labels.tolist(),
-        'imbalance_ratio': max(counts) / min(counts) if len(counts) > 1 else 1.0
+        "name": dataset_path.name,
+        "samples": len(labels),
+        "unique_classes": len(unique_labels),
+        "classes": unique_labels.tolist(),
+        "imbalance_ratio": max(counts) / min(counts) if len(counts) > 1 else 1.0,
     }
 
 
@@ -129,23 +137,25 @@ def main():
     print("\n📋 SUMMARY")
     print("=" * 50)
 
-    total_samples = sum(r['samples'] for r in results)
+    total_samples = sum(r["samples"] for r in results)
     print(f"📊 Total samples across all datasets: {total_samples:,}")
 
     # Check class consistency
     all_classes = set()
     for result in results:
-        all_classes.update(result['classes'])
+        all_classes.update(result["classes"])
 
     print(f"🎯 All classes found across datasets: {sorted(all_classes)}")
 
     # Check for problematic datasets
     problems = []
     for result in results:
-        if result['unique_classes'] != 13:
+        if result["unique_classes"] != 13:
             problems.append(f"{result['name']}: {result['unique_classes']} classes (expected 13)")
-        if result['imbalance_ratio'] > 3.0:
-            problems.append(f"{result['name']}: high imbalance ratio {result['imbalance_ratio']:.1f}")
+        if result["imbalance_ratio"] > 3.0:
+            problems.append(
+                f"{result['name']}: high imbalance ratio {result['imbalance_ratio']:.1f}"
+            )
 
     if problems:
         print("\n⚠️  ISSUES DETECTED:")
@@ -157,4 +167,3 @@ def main():
 
 if __name__ == "__main__":
     exit(main())
-

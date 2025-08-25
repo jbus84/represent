@@ -1,4 +1,4 @@
-.PHONY: install test lint typecheck format build clean help test-performance test-fast test-unit test-e2e demo examples process-production check-commit coverage-report coverage-html
+.PHONY: install test lint typecheck format build clean help test-performance test-fast test-unit test-e2e demo examples process-production check-commit coverage-report coverage-html distribution-analysis
 
 # Default target
 help:
@@ -25,6 +25,9 @@ help:
 	@echo "🚀 EXAMPLES & DEMOS:"
 	@echo "  demo                   - Run complete workflow demo (three core modules)"
 	@echo "  examples               - Alias for demo"
+	@echo ""
+	@echo "📊 RESEARCH & ANALYSIS:"
+	@echo "  distribution-analysis  - Run comprehensive distribution analysis (research only)"
 	@echo ""
 	@echo "🏭 PRODUCTION:"
 	@echo "  process-production     - Process AUDUSD-micro data for production ML training"
@@ -93,6 +96,19 @@ demo:
 	python examples/complete_workflow_demo.py
 
 examples: demo
+
+# Research & Analysis
+distribution-analysis:
+	@echo "📊 Running Comprehensive Distribution Analysis"
+	@echo "=============================================="
+	@echo "⚠️  Research only - Not part of main represent package"
+	@echo "🎯 Focus: Tail prediction for financial returns classification"
+	cd distributions && python enhanced_distribution_analyzer.py
+	@echo "📁 Reports generated:"
+	@echo "   • distributions/final_comprehensive_report_2024.html"
+	@echo "   • distributions/distribution_comparison_report_enhanced.html"
+	@echo "   • distributions/metrics_explanation_detailed.html"
+	@echo "🌟 Recommended approach: Merton Jump Diffusion"
 
 # Production
 process-production:

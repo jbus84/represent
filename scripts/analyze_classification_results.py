@@ -20,7 +20,9 @@ import polars as pl
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
-def calculate_mid_price_movements(df, lookback_rows=5000, lookforward_input=5000, lookforward_offset=500):
+def calculate_mid_price_movements(
+    df, lookback_rows=5000, lookforward_input=5000, lookforward_offset=500
+):
     """Calculate mid price movements using the same methodology as classification."""
     print("🔍 Calculating price movements:")
     print(f"   Lookback rows: {lookback_rows}")
@@ -31,8 +33,8 @@ def calculate_mid_price_movements(df, lookback_rows=5000, lookforward_input=5000
     mid_prices = []
     for i in range(len(df)):
         row = df.row(i)
-        bid_00 = row[df.columns.index('bid_px_00')]
-        ask_00 = row[df.columns.index('ask_px_00')]
+        bid_00 = row[df.columns.index("bid_px_00")]
+        ask_00 = row[df.columns.index("ask_px_00")]
         mid_price = (bid_00 + ask_00) / 2.0
         mid_prices.append(mid_price)
 
@@ -80,12 +82,12 @@ def analyze_dataset(dataset_path):
     print(f"📁 Dataset shape: {df.shape}")
 
     # Check for classification_label column
-    if 'classification_label' not in df.columns:
+    if "classification_label" not in df.columns:
         print("❌ No classification_label column found!")
         return
 
     # Get classification labels
-    labels = df['classification_label'].to_numpy()
+    labels = df["classification_label"].to_numpy()
 
     # Calculate price movements
     try:
@@ -107,10 +109,10 @@ def analyze_dataset(dataset_path):
     # Analysis 1: Price Movement Distribution
     print("\n📈 PRICE MOVEMENT ANALYSIS:")
     print(f"   Count: {len(price_movements):,}")
-    print(f"   Mean: {np.mean(price_movements):+.6f} ({np.mean(price_movements)*100:+.4f}%)")
-    print(f"   Std:  {np.std(price_movements):.6f} ({np.std(price_movements)*100:.4f}%)")
-    print(f"   Min:  {np.min(price_movements):+.6f} ({np.min(price_movements)*100:+.4f}%)")
-    print(f"   Max:  {np.max(price_movements):+.6f} ({np.max(price_movements)*100:+.4f}%)")
+    print(f"   Mean: {np.mean(price_movements):+.6f} ({np.mean(price_movements) * 100:+.4f}%)")
+    print(f"   Std:  {np.std(price_movements):.6f} ({np.std(price_movements) * 100:.4f}%)")
+    print(f"   Min:  {np.min(price_movements):+.6f} ({np.min(price_movements) * 100:+.4f}%)")
+    print(f"   Max:  {np.max(price_movements):+.6f} ({np.max(price_movements) * 100:+.4f}%)")
     print(f"   25%:  {np.percentile(price_movements, 25):+.6f}")
     print(f"   50%:  {np.percentile(price_movements, 50):+.6f}")
     print(f"   75%:  {np.percentile(price_movements, 75):+.6f}")
@@ -141,7 +143,9 @@ def analyze_dataset(dataset_path):
         mask = aligned_labels == label
         class_movements = price_movements[mask]
         if len(class_movements) > 0:
-            print(f"   Class {label:2d}: movements [{np.min(class_movements):+.6f}, {np.max(class_movements):+.6f}], mean={np.mean(class_movements):+.6f}")
+            print(
+                f"   Class {label:2d}: movements [{np.min(class_movements):+.6f}, {np.max(class_movements):+.6f}], mean={np.mean(class_movements):+.6f}"
+            )
 
     if len(unique_labels) > 5:
         print(f"   ... (showing first 5 of {len(unique_labels)} classes)")
@@ -182,18 +186,18 @@ def analyze_dataset(dataset_path):
         print("   ✅ No obvious issues detected")
 
     return {
-        'dataset_name': dataset_path.name,
-        'total_samples': len(df),
-        'valid_movements': len(price_movements),
-        'price_movement_stats': {
-            'mean': float(np.mean(price_movements)),
-            'std': float(np.std(price_movements)),
-            'min': float(np.min(price_movements)),
-            'max': float(np.max(price_movements))
+        "dataset_name": dataset_path.name,
+        "total_samples": len(df),
+        "valid_movements": len(price_movements),
+        "price_movement_stats": {
+            "mean": float(np.mean(price_movements)),
+            "std": float(np.std(price_movements)),
+            "min": float(np.min(price_movements)),
+            "max": float(np.max(price_movements)),
         },
-        'class_distribution': class_counts,
-        'unique_classes': len(unique_labels),
-        'issues': issues
+        "class_distribution": class_counts,
+        "unique_classes": len(unique_labels),
+        "issues": issues,
     }
 
 
@@ -205,24 +209,33 @@ def create_analysis_plots(results, output_dir):
     print(f"\n📊 Creating analysis plots in {output_dir}")
 
     # Plot 1: Dataset sizes
-    dataset_names = [r['dataset_name'] for r in results]
-    sample_counts = [r['total_samples'] for r in results]
+    dataset_names = [r["dataset_name"] for r in results]
+    sample_counts = [r["total_samples"] for r in results]
 
     plt.figure(figsize=(12, 6))
-    bars = plt.bar(range(len(dataset_names)), sample_counts, color='steelblue', alpha=0.7)
-    plt.title('Dataset Sizes by Symbol', fontsize=14, fontweight='bold')
-    plt.xlabel('Symbol Dataset')
-    plt.ylabel('Total Samples')
-    plt.xticks(range(len(dataset_names)), [name.replace('AUDUSD_', '').replace('_dataset.parquet', '') for name in dataset_names], rotation=45)
+    bars = plt.bar(range(len(dataset_names)), sample_counts, color="steelblue", alpha=0.7)
+    plt.title("Dataset Sizes by Symbol", fontsize=14, fontweight="bold")
+    plt.xlabel("Symbol Dataset")
+    plt.ylabel("Total Samples")
+    plt.xticks(
+        range(len(dataset_names)),
+        [name.replace("AUDUSD_", "").replace("_dataset.parquet", "") for name in dataset_names],
+        rotation=45,
+    )
 
     # Add value labels on bars
     for bar, count in zip(bars, sample_counts, strict=False):
-        plt.text(bar.get_x() + bar.get_width()/2, bar.get_height() + max(sample_counts)*0.01,
-                f'{count:,}', ha='center', fontsize=9)
+        plt.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + max(sample_counts) * 0.01,
+            f"{count:,}",
+            ha="center",
+            fontsize=9,
+        )
 
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(output_dir / 'dataset_sizes.png', dpi=300, bbox_inches='tight')
+    plt.savefig(output_dir / "dataset_sizes.png", dpi=300, bbox_inches="tight")
     plt.close()
 
     # Plot 2: Price movement distributions
@@ -233,26 +246,33 @@ def create_analysis_plots(results, output_dir):
         if i >= len(axes):
             break
 
-        stats = result['price_movement_stats']
-        symbol = result['dataset_name'].replace('AUDUSD_', '').replace('_dataset.parquet', '')
+        stats = result["price_movement_stats"]
+        symbol = result["dataset_name"].replace("AUDUSD_", "").replace("_dataset.parquet", "")
 
         # Create mock distribution for visualization (in real analysis, we'd load the actual movements)
-        movements = np.random.normal(stats['mean'], stats['std'], 10000)
-        movements = np.clip(movements, stats['min'], stats['max'])
+        movements = np.random.normal(stats["mean"], stats["std"], 10000)
+        movements = np.clip(movements, stats["min"], stats["max"])
 
-        axes[i].hist(movements, bins=50, alpha=0.7, color='darkgreen', edgecolor='black')
-        axes[i].set_title(f'{symbol} Price Movements', fontweight='bold')
-        axes[i].set_xlabel('Price Movement')
-        axes[i].set_ylabel('Frequency')
+        axes[i].hist(movements, bins=50, alpha=0.7, color="darkgreen", edgecolor="black")
+        axes[i].set_title(f"{symbol} Price Movements", fontweight="bold")
+        axes[i].set_xlabel("Price Movement")
+        axes[i].set_ylabel("Frequency")
         axes[i].grid(True, alpha=0.3)
 
         # Add stats text
-        stats_text = f'Mean: {stats["mean"]:+.5f}\nStd: {stats["std"]:.5f}'
-        axes[i].text(0.02, 0.98, stats_text, transform=axes[i].transAxes,
-                    verticalalignment='top', fontsize=9, bbox={'boxstyle': 'round', 'facecolor': 'white', 'alpha': 0.8})
+        stats_text = f"Mean: {stats['mean']:+.5f}\nStd: {stats['std']:.5f}"
+        axes[i].text(
+            0.02,
+            0.98,
+            stats_text,
+            transform=axes[i].transAxes,
+            verticalalignment="top",
+            fontsize=9,
+            bbox={"boxstyle": "round", "facecolor": "white", "alpha": 0.8},
+        )
 
     plt.tight_layout()
-    plt.savefig(output_dir / 'price_movement_distributions.png', dpi=300, bbox_inches='tight')
+    plt.savefig(output_dir / "price_movement_distributions.png", dpi=300, bbox_inches="tight")
     plt.close()
 
     print(f"✅ Plots saved to {output_dir}")
@@ -292,8 +312,8 @@ def main():
     print("\n📋 OVERALL SUMMARY")
     print("=" * 50)
 
-    total_samples = sum(r['total_samples'] for r in results)
-    total_movements = sum(r['valid_movements'] for r in results)
+    total_samples = sum(r["total_samples"] for r in results)
+    total_movements = sum(r["valid_movements"] for r in results)
 
     print(f"📊 Datasets analyzed: {len(results)}")
     print(f"📊 Total samples: {total_samples:,}")
@@ -303,7 +323,7 @@ def main():
     # Check for common issues
     common_issues = {}
     for result in results:
-        for issue in result['issues']:
+        for issue in result["issues"]:
             if issue not in common_issues:
                 common_issues[issue] = 0
             common_issues[issue] += 1
@@ -327,4 +347,3 @@ def main():
 
 if __name__ == "__main__":
     exit(main())
-

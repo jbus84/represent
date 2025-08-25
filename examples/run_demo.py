@@ -19,12 +19,13 @@ def main():
 
     try:
         # Run the demo
-        result = subprocess.run([sys.executable, str(script_path)],
-                              capture_output=False, text=True)
+        result = subprocess.run([sys.executable, str(script_path)], capture_output=False, text=True)
 
         if result.returncode == 0:
             # Try to open the HTML report
-            report_path = Path(__file__).parent / "complete_workflow_output" / "complete_workflow_report.html"
+            report_path = (
+                Path(__file__).parent / "complete_workflow_output" / "complete_workflow_report.html"
+            )
 
             if report_path.exists():
                 print("\n✅ Demo completed successfully!")
@@ -34,6 +35,7 @@ def main():
                 # Try to open in browser (optional)
                 try:
                     import webbrowser
+
                     webbrowser.open(f"file://{report_path.absolute()}")
                     print("🌐 Report opened in browser")
                 except Exception:
@@ -49,6 +51,7 @@ def main():
         return 1
 
     return 0
+
 
 if __name__ == "__main__":
     exit(main())

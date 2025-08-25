@@ -504,7 +504,9 @@ def create_mosiac_dataset(files_to_process):
     compression = None
 
     # Save the samples as shards using MDSWriter
-    for target, files in zip(["train", "val", "test"], [train_files, val_files, test_files], strict=False):
+    for target, files in zip(
+        ["train", "val", "test"], [train_files, val_files, test_files], strict=False
+    ):
         mean_list = []
         sample_list = []
         point_list = []

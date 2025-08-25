@@ -19,9 +19,11 @@ from pathlib import Path
 # Add represent package to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+
 @dataclass
 class ExampleResult:
     """Result of running an example."""
+
     name: str
     path: str
     success: bool
@@ -29,6 +31,7 @@ class ExampleResult:
     output: str
     error: str | None = None
     generated_files: list[str] | None = None
+
 
 class ExampleRunner:
     """Runs all examples and generates HTML report."""
@@ -67,7 +70,7 @@ class ExampleRunner:
                 [sys.executable, example_file.name],
                 capture_output=True,
                 text=True,
-                timeout=300  # 5 minute timeout
+                timeout=300,  # 5 minute timeout
             )
 
             os.chdir(original_cwd)
@@ -84,7 +87,7 @@ class ExampleRunner:
                 duration=duration,
                 output=result.stdout,
                 error=result.stderr if result.returncode != 0 else None,
-                generated_files=generated_files
+                generated_files=generated_files,
             )
 
         except subprocess.TimeoutExpired:
@@ -95,7 +98,7 @@ class ExampleRunner:
                 success=False,
                 duration=duration,
                 output="",
-                error="Timeout: Example took longer than 5 minutes to complete"
+                error="Timeout: Example took longer than 5 minutes to complete",
             )
 
         except Exception as e:
@@ -106,7 +109,7 @@ class ExampleRunner:
                 success=False,
                 duration=duration,
                 output="",
-                error=f"Exception: {str(e)}\n{traceback.format_exc()}"
+                error=f"Exception: {str(e)}\n{traceback.format_exc()}",
             )
 
     def find_generated_files(self, example_dir: Path) -> list[str]:
@@ -115,10 +118,18 @@ class ExampleRunner:
 
         # Common output patterns
         patterns = [
-            "*.png", "*.jpg", "*.jpeg", "*.svg",  # Images
-            "*.parquet", "*.csv", "*.json",       # Data files
-            "*.html", "*.txt", "*.log",           # Reports
-            "outputs/**/*", "classified/**/*"     # Output directories
+            "*.png",
+            "*.jpg",
+            "*.jpeg",
+            "*.svg",  # Images
+            "*.parquet",
+            "*.csv",
+            "*.json",  # Data files
+            "*.html",
+            "*.txt",
+            "*.log",  # Reports
+            "outputs/**/*",
+            "classified/**/*",  # Output directories
         ]
 
         for pattern in patterns:
@@ -352,7 +363,7 @@ class ExampleRunner:
     <div class="container">
         <div class="header">
             <h1>🚀 Represent Package - All Examples Report</h1>
-            <div class="timestamp">Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</div>
+            <div class="timestamp">Generated on {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</div>
         </div>
 
         <div class="summary">
@@ -382,7 +393,7 @@ class ExampleRunner:
             html += f"""
         <div class="directory-section">
             <h2 class="directory-title">
-                📂 {dir_name.replace('_', ' ').title()}
+                📂 {dir_name.replace("_", " ").title()}
                 ({dir_successful}/{len(dir_results)} successful)
             </h2>
 """
@@ -393,15 +404,15 @@ class ExampleRunner:
 
                 html += f"""
             <div class="example-card">
-                <div class="example-header collapsible" onclick="toggleContent('{result.name.replace('.', '_')}')">
+                <div class="example-header collapsible" onclick="toggleContent('{result.name.replace(".", "_")}')">
                     <div class="example-title">{result.name}</div>
                     <div class="example-status">
                         <span class="duration">{result.duration:.1f}s</span>
                         <span class="status-badge {status_class}">{status_text}</span>
-                        <span class="toggle-icon" id="icon_{result.name.replace('.', '_')}">▶</span>
+                        <span class="toggle-icon" id="icon_{result.name.replace(".", "_")}">▶</span>
                     </div>
                 </div>
-                <div class="example-content content" id="content_{result.name.replace('.', '_')}">
+                <div class="example-content content" id="content_{result.name.replace(".", "_")}">
 """
 
                 # Add output section
@@ -494,37 +505,38 @@ class ExampleRunner:
         html_report = self.generate_html_report()
         html_path = self.output_dir / "examples_report.html"
 
-        with open(html_path, 'w', encoding='utf-8') as f:
+        with open(html_path, "w", encoding="utf-8") as f:
             f.write(html_report)
 
         # Save JSON results for programmatic access
         json_data = {
-            'timestamp': datetime.now().isoformat(),
-            'summary': {
-                'total_examples': len(self.results),
-                'successful': sum(1 for r in self.results if r.success),
-                'failed': sum(1 for r in self.results if not r.success),
-                'total_duration': sum(r.duration for r in self.results)
+            "timestamp": datetime.now().isoformat(),
+            "summary": {
+                "total_examples": len(self.results),
+                "successful": sum(1 for r in self.results if r.success),
+                "failed": sum(1 for r in self.results if not r.success),
+                "total_duration": sum(r.duration for r in self.results),
             },
-            'results': [
+            "results": [
                 {
-                    'name': r.name,
-                    'path': r.path,
-                    'success': r.success,
-                    'duration': r.duration,
-                    'output_length': len(r.output) if r.output else 0,
-                    'error': r.error,
-                    'generated_files_count': len(r.generated_files) if r.generated_files else 0
+                    "name": r.name,
+                    "path": r.path,
+                    "success": r.success,
+                    "duration": r.duration,
+                    "output_length": len(r.output) if r.output else 0,
+                    "error": r.error,
+                    "generated_files_count": len(r.generated_files) if r.generated_files else 0,
                 }
                 for r in self.results
-            ]
+            ],
         }
 
         json_path = self.output_dir / "examples_results.json"
-        with open(json_path, 'w', encoding='utf-8') as f:
+        with open(json_path, "w", encoding="utf-8") as f:
             json.dump(json_data, f, indent=2)
 
         return html_path, json_path
+
 
 def main():
     """Main entry point."""
@@ -566,6 +578,7 @@ def main():
     # Open report in browser (optional)
     if successful > 0:
         print(f"\n🌐 Open in browser: file://{html_path.absolute()}")
+
 
 if __name__ == "__main__":
     main()

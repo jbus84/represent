@@ -19,6 +19,7 @@ from .configs import GlobalThresholdConfig
 @dataclass
 class GlobalThresholds:
     """Container for global classification thresholds."""
+
     quantile_boundaries: np.ndarray
     nbins: int
     sample_size: int
@@ -40,7 +41,7 @@ class GlobalThresholdCalculator:
         sample_fraction: float = 0.5,
         verbose: bool = True,
         # Legacy support
-        legacy_config = None,
+        legacy_config=None,
     ):
         """
         Initialize global threshold calculator using GlobalThresholdConfig.
@@ -99,7 +100,7 @@ class GlobalThresholdCalculator:
         self.nbins = config.nbins
 
         # Access jump_size from config if available, otherwise use default
-        self.jump_size = getattr(config, 'jump_size', 100)
+        self.jump_size = getattr(config, "jump_size", 100)
 
         if self.verbose:
             print("🌐 GlobalThresholdCalculator initialized")
@@ -107,7 +108,9 @@ class GlobalThresholdCalculator:
             print(f"   📊 Bins: {self.nbins}")
             print(f"   📈 Lookforward offset: {self.config.lookforward_offset}")
             print(f"   📉 Lookforward window: {self.config.lookforward_input}")
-            print(f"   📏 Total lookforward rows: {self.config.lookforward_input + self.config.lookforward_offset}")
+            print(
+                f"   📏 Total lookforward rows: {self.config.lookforward_input + self.config.lookforward_offset}"
+            )
             print(f"   📊 Lookback rows: {self.config.lookback_rows}")
             print(f"   🔢 Sample fraction: {self.sample_fraction}")
             print(f"   📏 Max samples per file: {self.max_samples_per_file}")
@@ -131,7 +134,11 @@ class GlobalThresholdCalculator:
             df = pl.from_pandas(data.to_df())
 
             # Check if we have sufficient data for the methodology
-            min_required_rows = self.config.lookback_rows + self.config.lookforward_input + self.config.lookforward_offset
+            min_required_rows = (
+                self.config.lookback_rows
+                + self.config.lookforward_input
+                + self.config.lookforward_offset
+            )
             if len(df) < min_required_rows:
                 if self.verbose:
                     print(f"      ⚠️  Insufficient data: {len(df)} < {min_required_rows} rows")
@@ -141,9 +148,12 @@ class GlobalThresholdCalculator:
             # For AUDUSD, valid prices should be roughly 0.50 to 0.80
             # Anything outside this range is likely corrupted data
             price_filter = (
-                (pl.col('bid_px_00') > 0.50) & (pl.col('bid_px_00') < 0.80) &
-                (pl.col('ask_px_00') > 0.50) & (pl.col('ask_px_00') < 0.80) &
-                (pl.col('bid_px_00') > 0) & (pl.col('ask_px_00') > 0)  # Exclude zeros
+                (pl.col("bid_px_00") > 0.50)
+                & (pl.col("bid_px_00") < 0.80)
+                & (pl.col("ask_px_00") > 0.50)
+                & (pl.col("ask_px_00") < 0.80)
+                & (pl.col("bid_px_00") > 0)
+                & (pl.col("ask_px_00") > 0)  # Exclude zeros
             )
 
             df = df.filter(price_filter)
@@ -155,18 +165,20 @@ class GlobalThresholdCalculator:
 
             # Calculate mid prices from bid/ask
             df = df.with_columns(
-                ((pl.col('ask_px_00') + pl.col('bid_px_00')) / 2).alias('mid_price')
+                ((pl.col("ask_px_00") + pl.col("bid_px_00")) / 2).alias("mid_price")
             )
 
             # Extract mid prices as numpy array for efficient processing
-            mid_prices = df['mid_price'].to_numpy()
+            mid_prices = df["mid_price"].to_numpy()
 
             # Calculate price movements using correct lookback vs lookforward methodology
             price_movements = []
 
             # Iterate through valid sample positions using jump_size steps
             total_lookforward = self.config.lookforward_input + self.config.lookforward_offset
-            for stop_row in range(self.config.lookback_rows, len(mid_prices) - total_lookforward, self.jump_size):
+            for stop_row in range(
+                self.config.lookback_rows, len(mid_prices) - total_lookforward, self.jump_size
+            ):
                 # Define time windows according to the correct methodology
                 lookback_start = stop_row - self.config.lookback_rows
                 lookback_end = stop_row
@@ -205,9 +217,7 @@ class GlobalThresholdCalculator:
             if len(price_movements) > self.max_samples_per_file:
                 # Use random sampling to get representative sample
                 indices = np.random.choice(
-                    len(price_movements),
-                    size=self.max_samples_per_file,
-                    replace=False
+                    len(price_movements), size=self.max_samples_per_file, replace=False
                 )
                 price_movements = price_movements[indices]
 
@@ -222,9 +232,7 @@ class GlobalThresholdCalculator:
             return None
 
     def calculate_global_thresholds(
-        self,
-        data_directory: str | Path,
-        file_pattern: str = "*.dbn*"
+        self, data_directory: str | Path, file_pattern: str = "*.dbn*"
     ) -> GlobalThresholds:
         """
         Calculate global classification thresholds from a sample of DBN files.
@@ -267,7 +275,7 @@ class GlobalThresholdCalculator:
 
         for i, dbn_file in enumerate(sample_files):
             if self.verbose:
-                print(f"\n🔄 Processing {i+1}/{len(sample_files)}: {dbn_file.name}")
+                print(f"\n🔄 Processing {i + 1}/{len(sample_files)}: {dbn_file.name}")
 
             price_movements = self.load_dbn_file_sample(dbn_file)
 
@@ -291,8 +299,14 @@ class GlobalThresholdCalculator:
             print(f"⏱️  Processing time: {processing_time:.1f}s")
 
         # Calculate global quantile boundaries
-        quantiles = np.linspace(0, 1, self.nbins + 1)
-        quantile_boundaries = np.quantile(combined_movements, quantiles)
+        if self.config.use_heavy_tailed:
+            # Use heavy-tailed distribution approach for better class balance
+            # This addresses the extreme class concentration problem
+            quantile_boundaries = self._calculate_heavy_tailed_boundaries(combined_movements)
+        else:
+            # Use traditional quantile approach
+            quantiles = np.linspace(0, 1, self.nbins + 1)
+            quantile_boundaries = np.quantile(combined_movements, quantiles)
 
         # Ensure unique boundaries (handle edge cases)
         quantile_boundaries = np.unique(quantile_boundaries)
@@ -304,31 +318,31 @@ class GlobalThresholdCalculator:
 
         # Calculate price movement statistics
         price_stats = {
-            'mean': float(np.mean(combined_movements)),
-            'std': float(np.std(combined_movements)),
-            'min': float(np.min(combined_movements)),
-            'max': float(np.max(combined_movements)),
-            'median': float(np.median(combined_movements)),
+            "mean": float(np.mean(combined_movements)),
+            "std": float(np.std(combined_movements)),
+            "min": float(np.min(combined_movements)),
+            "max": float(np.max(combined_movements)),
+            "median": float(np.median(combined_movements)),
         }
 
         if self.verbose:
             print("\n📈 PRICE MOVEMENT STATISTICS")
             print("=" * 30)
-            print(f"Mean: {price_stats['mean']:.6f} ({price_stats['mean']*100:.4f}%)")
-            print(f"Std:  {price_stats['std']:.6f} ({price_stats['std']*100:.4f}%)")
-            print(f"Min:  {price_stats['min']:.6f} ({price_stats['min']*100:.4f}%)")
-            print(f"Max:  {price_stats['max']:.6f} ({price_stats['max']*100:.4f}%)")
-            print(f"Median: {price_stats['median']:.6f} ({price_stats['median']*100:.4f}%)")
+            print(f"Mean: {price_stats['mean']:.6f} ({price_stats['mean'] * 100:.4f}%)")
+            print(f"Std:  {price_stats['std']:.6f} ({price_stats['std'] * 100:.4f}%)")
+            print(f"Min:  {price_stats['min']:.6f} ({price_stats['min'] * 100:.4f}%)")
+            print(f"Max:  {price_stats['max']:.6f} ({price_stats['max'] * 100:.4f}%)")
+            print(f"Median: {price_stats['median']:.6f} ({price_stats['median'] * 100:.4f}%)")
 
             print("\n🎯 GLOBAL QUANTILE BOUNDARIES")
             print("=" * 30)
             for i, boundary in enumerate(quantile_boundaries):
                 if i == 0:
-                    print(f"Bin {i:2d}: <= {boundary:8.6f} ({boundary*100:+7.4f}%)")
+                    print(f"Bin {i:2d}: <= {boundary:8.6f} ({boundary * 100:+7.4f}%)")
                 elif i == len(quantile_boundaries) - 1:
                     continue  # Skip the last boundary as it's just the max
                 else:
-                    print(f"Bin {i:2d}: <= {boundary:8.6f} ({boundary*100:+7.4f}%)")
+                    print(f"Bin {i:2d}: <= {boundary:8.6f} ({boundary * 100:+7.4f}%)")
 
         global_thresholds = GlobalThresholds(
             quantile_boundaries=quantile_boundaries,
@@ -343,6 +357,178 @@ class GlobalThresholdCalculator:
             print("🎯 Ready for consistent classification across all files")
 
         return global_thresholds
+
+    def _calculate_heavy_tailed_boundaries(self, price_movements: np.ndarray) -> np.ndarray:
+        """
+        Calculate boundaries using EVT-inspired approach.
+
+        This combines:
+        1. Student's t-distribution for overall heavy-tailed modeling
+        2. Power-law tail compression to reduce extreme class concentration
+
+        This approach provides the benefits of EVT theory while maintaining stability
+        and predictable results for financial returns classification.
+
+        Args:
+            price_movements: Array of price movements
+
+        Returns:
+            Array of boundary values
+        """
+        try:
+            from scipy import stats
+
+            if self.verbose:
+                print("\n📊 EVT-INSPIRED DISTRIBUTION APPROACH:")
+
+            # Step 1: Fit Student's t-distribution
+            try:
+                df, loc, scale = stats.t.fit(price_movements)
+                df = max(2.1, min(30, df))  # Constrain to reasonable range
+
+                if self.verbose:
+                    print(f"   Student's t fit: df={df:.2f}, loc={loc:.6f}, scale={scale:.6f}")
+
+                # Use t-distribution if meaningful heavy tails, else normal
+                use_t_dist = df < 10
+
+            except Exception:
+                # Fallback to normal
+                loc = np.mean(price_movements)
+                scale = np.std(price_movements)
+                use_t_dist = False
+
+                if self.verbose:
+                    print(f"   Normal fallback: loc={loc:.6f}, scale={scale:.6f}")
+
+            # Step 2: Generate quantiles with EVT-inspired tail compression
+            quantiles = np.linspace(0, 1, self.nbins + 1)
+            boundaries = []
+
+            # Tail compression parameters based on EVT theory
+            # Financial returns typically show power-law behavior in tails
+            tail_compression = 0.75  # Compress tail quantiles by this factor
+            center_preservation = 0.4  # Preserve center quantiles (±40% around median)
+
+            if self.verbose:
+                print(f"   Tail compression factor: {tail_compression:.2f}")
+                print(f"   Center preservation: ±{center_preservation * 100:.0f}% around median")
+
+            for i, q in enumerate(quantiles):
+                if i == 0:
+                    # Minimum boundary - extend for coverage
+                    if use_t_dist:
+                        boundary = stats.t.ppf(0.001, df, loc=loc, scale=scale)
+                    else:
+                        boundary = stats.norm.ppf(0.001, loc=loc, scale=scale)
+
+                    if not np.isfinite(boundary):
+                        boundary = price_movements.min() - abs(price_movements.min()) * 0.2
+
+                elif i == len(quantiles) - 1:
+                    # Maximum boundary - extend for coverage
+                    if use_t_dist:
+                        boundary = stats.t.ppf(0.999, df, loc=loc, scale=scale)
+                    else:
+                        boundary = stats.norm.ppf(0.999, loc=loc, scale=scale)
+
+                    if not np.isfinite(boundary):
+                        boundary = price_movements.max() + abs(price_movements.max()) * 0.2
+
+                else:
+                    # Internal boundaries with tail compression
+
+                    # Determine if this quantile is in the tails or center
+                    distance_from_median = abs(q - 0.5)
+
+                    if distance_from_median > center_preservation:
+                        # This is in the tail - apply compression
+
+                        # Calculate compression factor (stronger for more extreme quantiles)
+                        tail_strength = (distance_from_median - center_preservation) / (
+                            0.5 - center_preservation
+                        )
+                        compression_factor = 1.0 - (1.0 - tail_compression) * tail_strength
+
+                        # Apply compression by moving quantile toward center
+                        if q < 0.5:
+                            # Lower tail
+                            compressed_q = 0.5 - (0.5 - q) * compression_factor
+                        else:
+                            # Upper tail
+                            compressed_q = 0.5 + (q - 0.5) * compression_factor
+
+                        # Use compressed quantile for boundary
+                        if use_t_dist:
+                            boundary = stats.t.ppf(compressed_q, df, loc=loc, scale=scale)
+                        else:
+                            boundary = stats.norm.ppf(compressed_q, loc=loc, scale=scale)
+
+                    else:
+                        # This is in the center - use normal quantile
+                        if use_t_dist:
+                            boundary = stats.t.ppf(q, df, loc=loc, scale=scale)
+                        else:
+                            boundary = stats.norm.ppf(q, loc=loc, scale=scale)
+
+                    # Fallback for any numerical issues
+                    if not np.isfinite(boundary):
+                        boundary = np.quantile(price_movements, q)
+
+                boundaries.append(boundary)
+
+            # Step 3: Ensure monotonicity and proper spacing
+            boundaries = np.array(sorted(boundaries))
+
+            # Ensure minimum spacing
+            min_spacing = (boundaries[-1] - boundaries[0]) / (len(boundaries) * 1000)
+            for i in range(1, len(boundaries)):
+                if boundaries[i] - boundaries[i - 1] < min_spacing:
+                    boundaries[i] = boundaries[i - 1] + min_spacing
+
+            if self.verbose:
+                print("\n🎯 EVT-INSPIRED BOUNDARIES vs QUANTILE BOUNDARIES:")
+                quantile_boundaries = np.quantile(price_movements, quantiles)
+                for i in range(1, len(boundaries) - 1):
+                    evt_val = boundaries[i]
+                    q_val = quantile_boundaries[i]
+                    diff = (evt_val - q_val) / abs(q_val) * 100 if q_val != 0 else 0
+                    print(f"   Boundary {i:2d}: EVT={evt_val:8.6f} Q={q_val:8.6f} ({diff:+5.1f}%)")
+
+            return boundaries
+
+        except Exception as e:
+            if self.verbose:
+                print(f"   ⚠️  EVT-inspired fitting failed: {e}")
+                print("   📊 Falling back to Student's t approach")
+
+            # Fallback to simpler Student's t approach
+            return self._calculate_simple_t_boundaries(price_movements)
+
+    def _calculate_simple_t_boundaries(self, price_movements: np.ndarray) -> np.ndarray:
+        """Fallback to simple Student's t distribution (original approach)."""
+        try:
+            from scipy import stats
+
+            df, loc, scale = stats.t.fit(price_movements)
+            df = max(2.1, min(30, df))
+
+            quantiles = np.linspace(0, 1, self.nbins + 1)
+            boundaries = stats.t.ppf(quantiles, df, loc=loc, scale=scale)
+
+            # Handle infinities
+            if np.any(np.isinf(boundaries)):
+                data_range = price_movements.max() - price_movements.min()
+                extension = data_range * 0.5
+                boundaries[0] = price_movements.min() - extension
+                boundaries[-1] = price_movements.max() + extension
+
+            return boundaries
+
+        except Exception:
+            # Final fallback to quantiles
+            quantiles = np.linspace(0, 1, self.nbins + 1)
+            return np.quantile(price_movements, quantiles)
 
 
 def calculate_global_thresholds(
@@ -387,30 +573,22 @@ def calculate_global_thresholds(
     if config is None:
         # Use default config
         calculator = GlobalThresholdCalculator(
-            config=None,
-            sample_fraction=sample_fraction,
-            verbose=verbose
+            config=None, sample_fraction=sample_fraction, verbose=verbose
         )
     elif isinstance(config, GlobalThresholdConfig):
         # New focused config
         calculator = GlobalThresholdCalculator(
-            config=config,
-            sample_fraction=sample_fraction,
-            verbose=verbose
+            config=config, sample_fraction=sample_fraction, verbose=verbose
         )
     else:
         # Legacy RepresentConfig
         calculator = GlobalThresholdCalculator(
-            config=None,
-            sample_fraction=sample_fraction,
-            verbose=verbose,
-            legacy_config=config
+            config=None, sample_fraction=sample_fraction, verbose=verbose, legacy_config=config
         )
 
     if data_directory is None:
         raise ValueError("data_directory parameter is required")
 
     return calculator.calculate_global_thresholds(
-        data_directory=data_directory,
-        file_pattern=file_pattern
+        data_directory=data_directory, file_pattern=file_pattern
     )

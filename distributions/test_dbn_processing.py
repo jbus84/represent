@@ -34,11 +34,11 @@ def main():
     configs = create_represent_config(
         currency="AUDUSD",  # Assuming these are AUDUSD files
         features=["volume"],
-        samples=25000,      # Minimum allowed
-        lookback_rows=1000, # Smaller for testing
+        samples=25000,  # Minimum allowed
+        lookback_rows=1000,  # Smaller for testing
         lookforward_input=1000,
         lookforward_offset=100,
-        jump_size=50       # Smaller jump for more data points
+        jump_size=50,  # Smaller jump for more data points
     )
     dataset_cfg, threshold_cfg, processor_cfg = configs
 
@@ -47,7 +47,7 @@ def main():
         currency="AUDUSD",
         min_symbol_samples=5000,  # Lower threshold for testing
         force_uniform=True,
-        keep_intermediate=True    # Keep intermediate files for inspection
+        keep_intermediate=True,  # Keep intermediate files for inspection
     )
 
     print("\n⚙️  Configuration:")
@@ -69,24 +69,32 @@ def main():
             dbn_files=dbn_files,
             output_dir=output_dir,
             dataset_config=dataset_config,
-            verbose=True
+            verbose=True,
         )
 
         print("\n✅ Processing Complete!")
         print("📊 Results Summary:")
         print(f"   📁 Input files: {len(results['input_files'])}")
-        print(f"   📊 Phase 1 - Symbols discovered: {results['phase_1_stats']['symbols_discovered']}")
-        print(f"   📊 Phase 1 - Intermediate files: {results['phase_1_stats']['intermediate_files_created']}")
-        print(f"   📊 Phase 1 - Processing time: {results['phase_1_stats']['split_time_seconds']:.1f}s")
+        print(
+            f"   📊 Phase 1 - Symbols discovered: {results['phase_1_stats']['symbols_discovered']}"
+        )
+        print(
+            f"   📊 Phase 1 - Intermediate files: {results['phase_1_stats']['intermediate_files_created']}"
+        )
+        print(
+            f"   📊 Phase 1 - Processing time: {results['phase_1_stats']['split_time_seconds']:.1f}s"
+        )
         print(f"   📊 Phase 2 - Datasets created: {results['phase_2_stats']['datasets_created']}")
         print(f"   📊 Phase 2 - Total samples: {results['phase_2_stats']['total_samples']:,}")
-        print(f"   📊 Phase 2 - Processing time: {results['phase_2_stats']['merge_time_seconds']:.1f}s")
+        print(
+            f"   📊 Phase 2 - Processing time: {results['phase_2_stats']['merge_time_seconds']:.1f}s"
+        )
         print(f"   ⏱️  Total processing time: {results['total_processing_time_seconds']:.1f}s")
         print(f"   📈 Processing rate: {results['samples_per_second']:.0f} samples/sec")
 
-        if results['dataset_files']:
+        if results["dataset_files"]:
             print("\n📁 Dataset Files Created:")
-            for _symbol, info in results['dataset_files'].items():
+            for _symbol, info in results["dataset_files"].items():
                 print(f"   📄 {Path(info['file_path']).name}")
                 print(f"      🔢 Samples: {info['samples']:,}")
                 print(f"      📦 Size: {info['file_size_mb']:.1f} MB")
@@ -99,6 +107,7 @@ def main():
     except Exception as e:
         print(f"\n❌ Error during processing: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 

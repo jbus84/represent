@@ -49,7 +49,7 @@ class TestDatasetBuildConfig:
             min_symbol_samples=15000,
             force_uniform=True,
             nbins=10,
-            keep_intermediate=True
+            keep_intermediate=True,
         )
 
         assert config.currency == "EURUSD"
@@ -61,11 +61,7 @@ class TestDatasetBuildConfig:
     def test_config_validation_error(self):
         """Test that DatasetBuildConfig raises error when neither force_uniform nor global_thresholds provided."""
         with pytest.raises(ValueError) as exc_info:
-            DatasetBuildConfig(
-                currency="EURUSD",
-                force_uniform=False,
-                global_thresholds=None
-            )
+            DatasetBuildConfig(currency="EURUSD", force_uniform=False, global_thresholds=None)
 
         assert "requires either force_uniform=True or global_thresholds" in str(exc_info.value)
 
@@ -77,10 +73,7 @@ class TestDatasetBuilderInitialization:
     def base_config(self):
         """Base DatasetBuilderConfig for testing."""
         return DatasetBuilderConfig(
-            currency="AUDUSD",
-            lookback_rows=100,
-            lookforward_input=100,
-            lookforward_offset=20
+            currency="AUDUSD", lookback_rows=100, lookforward_input=100, lookforward_offset=20
         )
 
     def test_automatic_min_samples_calculation(self, base_config):
@@ -116,10 +109,7 @@ class TestSimplifiedPipeline:
     def pipeline_config(self):
         """Config for pipeline testing."""
         return DatasetBuilderConfig(
-            currency="AUDUSD",
-            lookback_rows=50,
-            lookforward_input=50,
-            lookforward_offset=10
+            currency="AUDUSD", lookback_rows=50, lookforward_input=50, lookforward_offset=10
         )
 
     @pytest.fixture
@@ -130,12 +120,12 @@ class TestSimplifiedPipeline:
         for i in range(n_rows):
             price = 0.67000 + np.sin(i / 20.0) * 0.0001
             row = {
-                'ts_event': 1640995200000000000 + i * 1000000000,
-                'symbol': 'M6AM4',
-                'ask_px_00': price + 0.00005,
-                'bid_px_00': price - 0.00005,
-                'ask_sz_00': 100000,
-                'bid_sz_00': 100000,
+                "ts_event": 1640995200000000000 + i * 1000000000,
+                "symbol": "M6AM4",
+                "ask_px_00": price + 0.00005,
+                "bid_px_00": price - 0.00005,
+                "ask_sz_00": 100000,
+                "bid_sz_00": 100000,
             }
             data.append(row)
         return pl.DataFrame(data)
@@ -145,7 +135,9 @@ class TestSimplifiedPipeline:
         dataset_config = DatasetBuildConfig()
         builder = DatasetBuilder(pipeline_config, dataset_config, verbose=False)
 
-        assert not hasattr(builder, '_generate_features'), "_generate_features method should be removed"
+        assert not hasattr(builder, "_generate_features"), (
+            "_generate_features method should be removed"
+        )
 
     def test_simplified_pipeline_only_essential_processing(self, pipeline_config, test_data):
         """Test that pipeline only does essential processing (no feature storage)."""
@@ -161,12 +153,14 @@ class TestSimplifiedPipeline:
             columns = set(df_final.columns)
 
             # Required columns
-            required = {'ts_event', 'symbol', 'price_movement', 'classification_label'}
+            required = {"ts_event", "symbol", "price_movement", "classification_label"}
             assert required.issubset(columns)
 
             # Should NOT have feature representation columns
-            feature_cols = {col for col in columns if col.endswith('_representation')}
-            assert len(feature_cols) == 0, f"Found feature columns that should not exist: {feature_cols}"
+            feature_cols = {col for col in columns if col.endswith("_representation")}
+            assert len(feature_cols) == 0, (
+                f"Found feature columns that should not exist: {feature_cols}"
+            )
 
     def test_features_preserved_for_on_demand_generation(self, pipeline_config):
         """Test that DatasetBuilder has proper configuration without features (features moved to MarketDepthProcessor)."""
@@ -174,10 +168,10 @@ class TestSimplifiedPipeline:
         builder = DatasetBuilder(pipeline_config, dataset_config, verbose=False)
 
         # DatasetBuilder should have config but features are now handled by MarketDepthProcessor
-        assert hasattr(builder, 'config')
+        assert hasattr(builder, "config")
         assert builder.config.currency == "AUDUSD"
         # Features are no longer part of DatasetBuilder - they're handled by MarketDepthProcessor
-        assert not hasattr(builder.config, 'features')
+        assert not hasattr(builder.config, "features")
 
 
 class TestPriceMovementCalculation:
@@ -187,10 +181,7 @@ class TestPriceMovementCalculation:
     def calc_config(self):
         """Config for calculation testing."""
         return create_dataset_builder_config(
-            currency="AUDUSD",
-            lookback_rows=20,
-            lookforward_input=15,
-            lookforward_offset=5
+            currency="AUDUSD", lookback_rows=20, lookforward_input=15, lookforward_offset=5
         )
 
     @pytest.fixture
@@ -208,12 +199,12 @@ class TestPriceMovementCalculation:
             # Linear price increase for predictable testing
             price = 1.0 + i * 0.001
             row = {
-                'ts_event': 1640995200000000000 + i * 1000000000,
-                'symbol': 'TEST',
-                'ask_px_00': price + 0.0001,
-                'bid_px_00': price - 0.0001,
-                'ask_sz_00': 100000,
-                'bid_sz_00': 100000,
+                "ts_event": 1640995200000000000 + i * 1000000000,
+                "symbol": "TEST",
+                "ask_px_00": price + 0.0001,
+                "bid_px_00": price - 0.0001,
+                "ask_sz_00": 100000,
+                "bid_sz_00": 100000,
             }
             data.append(row)
         return pl.DataFrame(data)
@@ -230,13 +221,15 @@ class TestPriceMovementCalculation:
         expected_count = max(0, valid_end - valid_start)
 
         # Count actual valid movements
-        price_movements = result_df['price_movement'].to_numpy()
+        price_movements = result_df["price_movement"].to_numpy()
         actual_count = 0
         for i in range(valid_start, min(valid_end, len(price_movements))):
             if not np.isnan(price_movements[i]):
                 actual_count += 1
 
-        assert actual_count == expected_count, f"Expected {expected_count} valid movements, got {actual_count}"
+        assert actual_count == expected_count, (
+            f"Expected {expected_count} valid movements, got {actual_count}"
+        )
 
     def test_price_movement_calculation_precision(self, builder):
         """Test precision of lookback/lookforward percentage calculations."""
@@ -246,12 +239,12 @@ class TestPriceMovementCalculation:
 
         for i, price in enumerate(prices):
             row = {
-                'ts_event': 1640995200000000000 + i * 1000000000,
-                'symbol': 'TEST',
-                'ask_px_00': price + 0.0001,
-                'bid_px_00': price - 0.0001,
-                'ask_sz_00': 100000,
-                'bid_sz_00': 100000,
+                "ts_event": 1640995200000000000 + i * 1000000000,
+                "symbol": "TEST",
+                "ask_px_00": price + 0.0001,
+                "bid_px_00": price - 0.0001,
+                "ask_sz_00": 100000,
+                "bid_sz_00": 100000,
             }
             test_data.append(row)
 
@@ -259,11 +252,16 @@ class TestPriceMovementCalculation:
         result_df = builder._calculate_price_movements(df)
 
         # Manually verify calculation for a specific position
-        mid_prices = ((df['ask_px_00'] + df['bid_px_00']) / 2).to_numpy()
-        price_movements = result_df['price_movement'].to_numpy()
+        mid_prices = ((df["ask_px_00"] + df["bid_px_00"]) / 2).to_numpy()
+        price_movements = result_df["price_movement"].to_numpy()
 
         # For the calculation to work, we need sufficient data
-        if len(mid_prices) > builder.config.lookback_rows + builder.config.lookforward_input + builder.config.lookforward_offset:
+        if (
+            len(mid_prices)
+            > builder.config.lookback_rows
+            + builder.config.lookforward_input
+            + builder.config.lookforward_offset
+        ):
             # Test the first valid position where we can calculate
             stop_row = builder.config.lookback_rows
             if stop_row < len(price_movements) and not np.isnan(price_movements[stop_row]):
@@ -273,20 +271,22 @@ class TestPriceMovementCalculation:
 
     def test_insufficient_data_handling(self, builder):
         """Test handling of insufficient data."""
-        small_data = pl.DataFrame({
-            'ts_event': [1640995200000000000 + i * 1000000000 for i in range(10)],
-            'symbol': ['TEST'] * 10,
-            'ask_px_00': [1.0] * 10,
-            'bid_px_00': [0.999] * 10,
-            'ask_sz_00': [100000] * 10,
-            'bid_sz_00': [100000] * 10,
-        })
+        small_data = pl.DataFrame(
+            {
+                "ts_event": [1640995200000000000 + i * 1000000000 for i in range(10)],
+                "symbol": ["TEST"] * 10,
+                "ask_px_00": [1.0] * 10,
+                "bid_px_00": [0.999] * 10,
+                "ask_sz_00": [100000] * 10,
+                "bid_sz_00": [100000] * 10,
+            }
+        )
 
         result_df = builder._calculate_price_movements(small_data)
 
         # Should have price_movement column but mostly NaN due to insufficient data
-        assert 'price_movement' in result_df.columns
-        movements = result_df['price_movement']
+        assert "price_movement" in result_df.columns
+        movements = result_df["price_movement"]
         finite_movements = [x for x in movements.to_list() if x is not None and not np.isnan(x)]
         # With only 10 rows and requirements of 20+15+5=40 minimum, should have no valid movements
         assert len(finite_movements) == 0
@@ -296,14 +296,16 @@ class TestPriceMovementCalculation:
         dataset_config = DatasetBuildConfig(min_symbol_samples=100)
         builder = DatasetBuilder(calc_config, dataset_config, verbose=True)
 
-        test_data = pl.DataFrame({
-            'ts_event': [1640995200000000000 + i * 1000000000 for i in range(100)],
-            'symbol': ['TEST'] * 100,
-            'ask_px_00': [1.0 + i * 0.001 for i in range(100)],
-            'bid_px_00': [0.999 + i * 0.001 for i in range(100)],
-            'ask_sz_00': [100000] * 100,
-            'bid_sz_00': [100000] * 100,
-        })
+        test_data = pl.DataFrame(
+            {
+                "ts_event": [1640995200000000000 + i * 1000000000 for i in range(100)],
+                "symbol": ["TEST"] * 100,
+                "ask_px_00": [1.0 + i * 0.001 for i in range(100)],
+                "bid_px_00": [0.999 + i * 0.001 for i in range(100)],
+                "ask_sz_00": [100000] * 100,
+                "bid_sz_00": [100000] * 100,
+            }
+        )
 
         builder._calculate_price_movements(test_data)
 
@@ -321,10 +323,7 @@ class TestClassification:
     def class_config(self):
         """Config for classification testing."""
         return create_dataset_builder_config(
-            currency="AUDUSD",
-            lookback_rows=10,
-            lookforward_input=10,
-            lookforward_offset=2
+            currency="AUDUSD", lookback_rows=10, lookforward_input=10, lookforward_offset=2
         )
 
     @pytest.fixture
@@ -333,7 +332,7 @@ class TestClassification:
         dataset_config = DatasetBuildConfig(
             min_symbol_samples=50,
             force_uniform=True,
-            nbins=5  # Smaller for easier testing
+            nbins=5,  # Smaller for easier testing
         )
         return DatasetBuilder(config=class_config, dataset_config=dataset_config, verbose=False)
 
@@ -352,12 +351,12 @@ class TestClassification:
             price = 1.0 + price_change * (i / 10.0)
 
             row = {
-                'ts_event': 1640995200000000000 + i * 1000000000,
-                'symbol': 'TEST',
-                'ask_px_00': price + 0.0001,
-                'bid_px_00': price - 0.0001,
-                'ask_sz_00': 100000,
-                'bid_sz_00': 100000,
+                "ts_event": 1640995200000000000 + i * 1000000000,
+                "symbol": "TEST",
+                "ask_px_00": price + 0.0001,
+                "bid_px_00": price - 0.0001,
+                "ask_sz_00": 100000,
+                "bid_sz_00": 100000,
             }
             test_data.append(row)
 
@@ -366,7 +365,7 @@ class TestClassification:
         classified_df = class_builder._apply_classification(df_movements)
 
         if len(classified_df) > 0:
-            classifications = classified_df['classification_label'].drop_nulls()
+            classifications = classified_df["classification_label"].drop_nulls()
             if len(classifications) > 0:
                 class_values = classifications.to_numpy()
 
@@ -377,16 +376,18 @@ class TestClassification:
     def test_classification_no_valid_movements(self, class_builder):
         """Test classification when no valid movements exist."""
         # Data with all NaN movements
-        df = pl.DataFrame({
-            'ts_event': [1640995200000000000],
-            'symbol': ['TEST'],
-            'price_movement': [None],
-        })
+        df = pl.DataFrame(
+            {
+                "ts_event": [1640995200000000000],
+                "symbol": ["TEST"],
+                "price_movement": [None],
+            }
+        )
 
         result_df = class_builder._apply_classification(df)
 
-        assert 'classification_label' in result_df.columns
-        labels = result_df['classification_label'].drop_nulls()
+        assert "classification_label" in result_df.columns
+        labels = result_df["classification_label"].drop_nulls()
         assert len(labels) == 0
 
     def test_classification_verbose_output(self, class_config, capsys):
@@ -399,12 +400,12 @@ class TestClassification:
         for i in range(50):
             price = 1.0 + i * 0.0001
             row = {
-                'ts_event': 1640995200000000000 + i * 1000000000,
-                'symbol': 'TEST',
-                'ask_px_00': price + 0.0001,
-                'bid_px_00': price - 0.0001,
-                'ask_sz_00': 100000,
-                'bid_sz_00': 100000,
+                "ts_event": 1640995200000000000 + i * 1000000000,
+                "symbol": "TEST",
+                "ask_px_00": price + 0.0001,
+                "bid_px_00": price - 0.0001,
+                "ask_sz_00": 100000,
+                "bid_sz_00": 100000,
             }
             test_data.append(row)
 
@@ -423,18 +424,22 @@ class TestSymbolProcessing:
     @pytest.fixture
     def symbol_config(self):
         """Config for symbol processing."""
-        return create_represent_config(currency="AUDUSD", lookback_rows=25, lookforward_input=25, lookforward_offset=5)
+        return create_represent_config(
+            currency="AUDUSD", lookback_rows=25, lookforward_input=25, lookforward_offset=5
+        )
 
     @pytest.fixture
     def symbol_builder(self, symbol_config):
         """Builder for symbol tests."""
         dataset_config = DatasetBuildConfig(min_symbol_samples=100)
-        return DatasetBuilder(legacy_config=symbol_config, dataset_config=dataset_config, verbose=False)
+        return DatasetBuilder(
+            legacy_config=symbol_config, dataset_config=dataset_config, verbose=False
+        )
 
     @pytest.fixture
     def multi_symbol_data(self):
         """Multi-symbol test data."""
-        symbols = ['M6AM4', 'M6AM5', 'M6AN4']
+        symbols = ["M6AM4", "M6AM5", "M6AN4"]
         data = []
 
         for i in range(300):
@@ -442,18 +447,18 @@ class TestSymbolProcessing:
             price = 0.67000 + np.sin(i / 50.0) * 0.0001
 
             row = {
-                'ts_event': 1640995200000000000 + i * 1000000000,
-                'symbol': symbol,
-                'ask_px_00': price + 0.00005,
-                'bid_px_00': price - 0.00005,
-                'ask_sz_00': np.random.randint(100000, 1000000),
-                'bid_sz_00': np.random.randint(100000, 1000000),
+                "ts_event": 1640995200000000000 + i * 1000000000,
+                "symbol": symbol,
+                "ask_px_00": price + 0.00005,
+                "bid_px_00": price - 0.00005,
+                "ask_sz_00": np.random.randint(100000, 1000000),
+                "bid_sz_00": np.random.randint(100000, 1000000),
             }
             data.append(row)
 
         return pl.DataFrame(data)
 
-    @patch('databento.read_dbn')
+    @patch("databento.read_dbn")
     def test_split_dbn_by_symbol(self, mock_read_dbn, symbol_builder, multi_symbol_data):
         """Test DBN file splitting by symbol."""
         mock_data = Mock()
@@ -464,7 +469,7 @@ class TestSymbolProcessing:
             intermediate_dir = Path(temp_dir)
             symbol_files = symbol_builder.split_dbn_by_symbol("test.dbn", intermediate_dir)
 
-            symbols = multi_symbol_data['symbol'].unique().to_list()
+            symbols = multi_symbol_data["symbol"].unique().to_list()
             assert len(symbol_files) == len(symbols)
 
             for symbol in symbols:
@@ -480,7 +485,7 @@ class TestSymbolProcessing:
             output_dir.mkdir()
 
             # Create intermediate files for single symbol
-            symbol_data = multi_symbol_data.filter(pl.col('symbol') == 'M6AM4')
+            symbol_data = multi_symbol_data.filter(pl.col("symbol") == "M6AM4")
             symbol_files = []
 
             for i in range(3):
@@ -494,12 +499,14 @@ class TestSymbolProcessing:
                 assert result_file.exists()
                 merged_df = pl.read_parquet(result_file)
                 assert len(merged_df) > 0
-                assert 'classification_label' in merged_df.columns
+                assert "classification_label" in merged_df.columns
 
     def test_merge_verbose_output(self, symbol_config, multi_symbol_data, capsys):
         """Test verbose output during symbol merging."""
         dataset_config = DatasetBuildConfig(min_symbol_samples=50)
-        builder = DatasetBuilder(legacy_config=symbol_config, dataset_config=dataset_config, verbose=True)
+        builder = DatasetBuilder(
+            legacy_config=symbol_config, dataset_config=dataset_config, verbose=True
+        )
 
         with tempfile.TemporaryDirectory() as temp_dir:
             intermediate_dir = Path(temp_dir) / "intermediate"
@@ -508,7 +515,7 @@ class TestSymbolProcessing:
             output_dir.mkdir()
 
             # Create test files
-            symbol_data = multi_symbol_data.filter(pl.col('symbol') == 'M6AM4')
+            symbol_data = multi_symbol_data.filter(pl.col("symbol") == "M6AM4")
             symbol_files = []
             for i in range(2):
                 file_path = intermediate_dir / f"file{i}_M6AM4.parquet"
@@ -520,7 +527,10 @@ class TestSymbolProcessing:
             captured = capsys.readouterr()
             assert "Merging symbol: M6AM4" in captured.out
             assert "Files: 2" in captured.out
-            assert "Processing: Lookback → Lookforward → Percentage Change → Classification" in captured.out
+            assert (
+                "Processing: Lookback → Lookforward → Percentage Change → Classification"
+                in captured.out
+            )
 
 
 class TestEndToEndWorkflows:
@@ -534,13 +544,13 @@ class TestEndToEndWorkflows:
             features=["volume"],
             lookback_rows=30,
             lookforward_input=20,
-            lookforward_offset=5
+            lookforward_offset=5,
         )
 
     @pytest.fixture
     def workflow_data(self):
         """Data for workflow testing."""
-        symbols = ['M6AM4', 'M6AM5']
+        symbols = ["M6AM4", "M6AM5"]
         data = []
 
         for i in range(400):
@@ -548,18 +558,18 @@ class TestEndToEndWorkflows:
             price = 0.67000 + np.sin(i / 30.0) * 0.0002
 
             row = {
-                'ts_event': 1640995200000000000 + i * 1000000000,
-                'symbol': symbol,
-                'ask_px_00': price + 0.00005,
-                'bid_px_00': price - 0.00005,
-                'ask_sz_00': np.random.randint(100000, 1000000),
-                'bid_sz_00': np.random.randint(100000, 1000000),
+                "ts_event": 1640995200000000000 + i * 1000000000,
+                "symbol": symbol,
+                "ask_px_00": price + 0.00005,
+                "bid_px_00": price - 0.00005,
+                "ask_sz_00": np.random.randint(100000, 1000000),
+                "bid_sz_00": np.random.randint(100000, 1000000),
             }
             data.append(row)
 
         return pl.DataFrame(data)
 
-    @patch('databento.read_dbn')
+    @patch("databento.read_dbn")
     def test_complete_dataset_building(self, mock_read_dbn, workflow_config, workflow_data):
         """Test complete dataset building process."""
         mock_data = Mock()
@@ -575,12 +585,12 @@ class TestEndToEndWorkflows:
                 dbn_files=["test.dbn"],
                 output_dir=output_dir,
                 dataset_config=dataset_config,
-                verbose=False
+                verbose=False,
             )
 
             assert isinstance(results, dict)
-            assert 'phase_1_stats' in results
-            assert 'phase_2_stats' in results
+            assert "phase_1_stats" in results
+            assert "phase_2_stats" in results
 
     def test_batch_build_from_directory(self, workflow_config):
         """Test batch building from directory."""
@@ -594,7 +604,7 @@ class TestEndToEndWorkflows:
             (input_dir / "test2.dbn.zst").write_text("mock")
             (input_dir / "other.txt").write_text("ignore")
 
-            with patch('represent.dataset_builder.build_datasets_from_dbn_files') as mock_build:
+            with patch("represent.dataset_builder.build_datasets_from_dbn_files") as mock_build:
                 mock_build.return_value = {"datasets_created": 2}
 
                 batch_build_datasets_from_directory(
@@ -602,12 +612,12 @@ class TestEndToEndWorkflows:
                     input_directory=input_dir,
                     output_dir=output_dir,
                     file_pattern="*.dbn*",
-                    verbose=False
+                    verbose=False,
                 )
 
                 mock_build.assert_called_once()
                 args, kwargs = mock_build.call_args
-                dbn_files = kwargs['dbn_files']
+                dbn_files = kwargs["dbn_files"]
 
                 assert len(dbn_files) == 2
                 assert any("test1.dbn" in str(f) for f in dbn_files)
@@ -626,7 +636,7 @@ class TestErrorHandling:
                 config=config,
                 input_directory="nonexistent_directory",
                 output_dir="/tmp/output",
-                verbose=False
+                verbose=False,
             )
 
     def test_no_matching_files(self):
@@ -643,7 +653,7 @@ class TestErrorHandling:
                     input_directory=input_dir,
                     output_dir="/tmp/output",
                     file_pattern="*.dbn*",
-                    verbose=False
+                    verbose=False,
                 )
 
     def test_insufficient_symbol_samples(self):
@@ -652,14 +662,16 @@ class TestErrorHandling:
         dataset_config = DatasetBuildConfig(min_symbol_samples=10000)  # Very high
         builder = DatasetBuilder(legacy_config=config, dataset_config=dataset_config, verbose=False)
 
-        small_data = pl.DataFrame({
-            'ts_event': [1640995200000000000 + i * 1000000000 for i in range(100)],
-            'symbol': ['M6AM4'] * 100,
-            'ask_px_00': [0.67000] * 100,
-            'bid_px_00': [0.66995] * 100,
-            'ask_sz_00': [100000] * 100,
-            'bid_sz_00': [100000] * 100
-        })
+        small_data = pl.DataFrame(
+            {
+                "ts_event": [1640995200000000000 + i * 1000000000 for i in range(100)],
+                "symbol": ["M6AM4"] * 100,
+                "ask_px_00": [0.67000] * 100,
+                "bid_px_00": [0.66995] * 100,
+                "ask_sz_00": [100000] * 100,
+                "bid_sz_00": [100000] * 100,
+            }
+        )
 
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = Path(temp_dir)
@@ -683,17 +695,17 @@ class TestPerformanceRequirements:
         data = []
         for i in range(n_rows):
             row = {
-                'ts_event': 1640995200000000000 + i * 1000000000,
-                'symbol': 'PERF_TEST',
-                'ask_px_00': 0.67000 + np.random.normal(0, 0.0001),
-                'bid_px_00': 0.66995 + np.random.normal(0, 0.0001),
-                'ask_sz_00': np.random.randint(100000, 1000000),
-                'bid_sz_00': np.random.randint(100000, 1000000),
+                "ts_event": 1640995200000000000 + i * 1000000000,
+                "symbol": "PERF_TEST",
+                "ask_px_00": 0.67000 + np.random.normal(0, 0.0001),
+                "bid_px_00": 0.66995 + np.random.normal(0, 0.0001),
+                "ask_sz_00": np.random.randint(100000, 1000000),
+                "bid_sz_00": np.random.randint(100000, 1000000),
             }
             data.append(row)
         return pl.DataFrame(data)
 
-    @patch('databento.read_dbn')
+    @patch("databento.read_dbn")
     @pytest.mark.performance
     def test_processing_performance(self, mock_read_dbn, large_test_data):
         """Test that processing meets performance requirements."""
@@ -716,7 +728,7 @@ class TestPerformanceRequirements:
 
             # Should process data efficiently
             total_rows = len(large_test_data)
-            rows_per_second = total_rows / processing_time if processing_time > 0 else float('inf')
+            rows_per_second = total_rows / processing_time if processing_time > 0 else float("inf")
 
             assert rows_per_second > 100, f"Performance too slow: {rows_per_second:.0f} rows/sec"
             assert len(symbol_files) > 0
@@ -745,7 +757,7 @@ class TestPerformanceRequirements:
             samples=100000,  # Large value that should be ignored
             lookback_rows=200,
             lookforward_input=150,
-            lookforward_offset=25
+            lookforward_offset=25,
         )
 
         dataset_config = DatasetBuildConfig(min_symbol_samples=1)  # Force auto-update
@@ -763,10 +775,7 @@ class TestPerformanceRequirements:
     def test_price_movement_calculation_precision(self):
         """Test precision of lookback/lookforward percentage calculations."""
         config = create_represent_config(
-            currency="AUDUSD",
-            lookback_rows=3,
-            lookforward_input=2,
-            lookforward_offset=1
+            currency="AUDUSD", lookback_rows=3, lookforward_input=2, lookforward_offset=1
         )
 
         dataset_config = DatasetBuildConfig(min_symbol_samples=10, force_uniform=True)
@@ -778,12 +787,12 @@ class TestPerformanceRequirements:
 
         for i, price in enumerate(prices):
             row = {
-                'ts_event': 1640995200000000000 + i * 1000000000,
-                'symbol': 'TEST_SYMBOL',
-                'ask_px_00': price + 0.0001,
-                'bid_px_00': price - 0.0001,
-                'ask_sz_00': 100000,
-                'bid_sz_00': 100000,
+                "ts_event": 1640995200000000000 + i * 1000000000,
+                "symbol": "TEST_SYMBOL",
+                "ask_px_00": price + 0.0001,
+                "bid_px_00": price - 0.0001,
+                "ask_sz_00": 100000,
+                "bid_sz_00": 100000,
             }
             test_data.append(row)
 
@@ -795,13 +804,13 @@ class TestPerformanceRequirements:
         # Lookforward: rows 5,6 (prices 1.005, 1.006) - offset of 1 from row 4
         stop_row = 3
 
-        mid_prices = ((df['ask_px_00'] + df['bid_px_00']) / 2).to_numpy()
+        mid_prices = ((df["ask_px_00"] + df["bid_px_00"]) / 2).to_numpy()
 
-        lookback_mean = np.mean(mid_prices[0:3])    # 1.001
-        lookforward_mean = np.mean(mid_prices[5:7]) # 1.0055
+        lookback_mean = np.mean(mid_prices[0:3])  # 1.001
+        lookforward_mean = np.mean(mid_prices[5:7])  # 1.0055
         expected_movement = (lookforward_mean - lookback_mean) / lookback_mean
 
-        actual_movement = result_df['price_movement'].to_numpy()[stop_row]
+        actual_movement = result_df["price_movement"].to_numpy()[stop_row]
 
         assert abs(actual_movement - expected_movement) < 1e-10, (
             f"Price movement calculation imprecise. Expected {expected_movement:.10f}, "

@@ -49,17 +49,15 @@ class WorkflowDemo:
         print("=" * len(title))
         print(content)
 
-        self.report_sections.append({
-            'title': title,
-            'content': content,
-            'timestamp': datetime.now().strftime("%H:%M:%S")
-        })
+        self.report_sections.append(
+            {"title": title, "content": content, "timestamp": datetime.now().strftime("%H:%M:%S")}
+        )
 
     def step1_global_thresholds(self):
         """Step 1: Demonstrate Global Threshold Calculator with focused configuration."""
         self.log_section(
             "🎯 STEP 1: Global Threshold Calculation",
-            "Demonstrating the new focused configuration architecture for threshold calculation..."
+            "Demonstrating the new focused configuration architecture for threshold calculation...",
         )
 
         # NEW APPROACH: Use focused GlobalThresholdConfig
@@ -71,7 +69,7 @@ class WorkflowDemo:
             lookforward_offset=100,
             max_samples_per_file=10000,
             sample_fraction=0.5,
-            jump_size=100
+            jump_size=100,
         )
 
         # Show configuration details
@@ -115,7 +113,7 @@ class WorkflowDemo:
             # Create mock threshold data for demo purposes
             self.log_section(
                 "ℹ️  Mock Threshold Generation",
-                "No DBN files found, generating mock thresholds for demonstration..."
+                "No DBN files found, generating mock thresholds for demonstration...",
             )
 
             # Create mock thresholds object
@@ -135,18 +133,18 @@ class WorkflowDemo:
                 sample_size=50000,
                 files_analyzed=1,
                 price_movement_stats={
-                    'mean': float(mock_movements.mean()),
-                    'std': float(mock_movements.std()),
-                    'min': float(mock_movements.min()),
-                    'max': float(mock_movements.max())
-                }
+                    "mean": float(mock_movements.mean()),
+                    "std": float(mock_movements.std()),
+                    "min": float(mock_movements.min()),
+                    "max": float(mock_movements.max()),
+                },
             )
 
             results = {
-                'thresholds': thresholds,
-                'sample_files': ['mock_data_generation'],
-                'total_movements': 50000,
-                'config': threshold_config
+                "thresholds": thresholds,
+                "sample_files": ["mock_data_generation"],
+                "total_movements": 50000,
+                "config": threshold_config,
             }
 
         else:
@@ -156,14 +154,14 @@ class WorkflowDemo:
                     config=threshold_config,
                     data_directory=dbn_files[0].parent,
                     sample_fraction=threshold_config.sample_fraction,
-                    verbose=True
+                    verbose=True,
                 )
 
                 results = {
-                    'thresholds': thresholds,
-                    'sample_files': [f.name for f in dbn_files[:3]],  # Show first 3
-                    'total_movements': thresholds.sample_size,
-                    'config': threshold_config
+                    "thresholds": thresholds,
+                    "sample_files": [f.name for f in dbn_files[:3]],  # Show first 3
+                    "total_movements": thresholds.sample_size,
+                    "config": threshold_config,
                 }
 
             except Exception as e:
@@ -175,21 +173,21 @@ class WorkflowDemo:
 ✅ Global thresholds calculated successfully using focused GlobalThresholdConfig!
 
 📊 Threshold Statistics:
-   • Number of bins: {results['thresholds'].nbins}
-   • Sample size: {results['total_movements']:,} price movements
-   • Files analyzed: {results['thresholds'].files_analyzed}
+   • Number of bins: {results["thresholds"].nbins}
+   • Sample size: {results["total_movements"]:,} price movements
+   • Files analyzed: {results["thresholds"].files_analyzed}
    • Currency: {threshold_config.currency}
    • Lookback rows: {threshold_config.lookback_rows}
    • Lookforward input: {threshold_config.lookforward_input}
    • Sample fraction: {threshold_config.sample_fraction}
 
-📁 Source files analyzed: {len(results['sample_files'])}
-   {chr(10).join(f'   • {f}' for f in results['sample_files'][:5])}
-   {'   • ... and more' if len(results['sample_files']) > 5 else ''}
+📁 Source files analyzed: {len(results["sample_files"])}
+   {chr(10).join(f"   • {f}" for f in results["sample_files"][:5])}
+   {"   • ... and more" if len(results["sample_files"]) > 5 else ""}
 
 🎯 Classification boundaries:
-   {chr(10).join(f'   Bin {i:2d}: {boundary:+.6f}' for i, boundary in enumerate(results['thresholds'].quantile_boundaries[:5]))}
-   {'   ... (showing first 5)' if len(results['thresholds'].quantile_boundaries) > 5 else ''}
+   {chr(10).join(f"   Bin {i:2d}: {boundary:+.6f}" for i, boundary in enumerate(results["thresholds"].quantile_boundaries[:5]))}
+   {"   ... (showing first 5)" if len(results["thresholds"].quantile_boundaries) > 5 else ""}
 
 🆕 Configuration approach: Using focused GlobalThresholdConfig with only relevant parameters
 """
@@ -197,7 +195,7 @@ class WorkflowDemo:
         self.log_section("📊 Threshold Results", threshold_info)
 
         # Create threshold visualization
-        self._visualize_thresholds(results['thresholds'])
+        self._visualize_thresholds(results["thresholds"])
 
         return results
 
@@ -209,27 +207,32 @@ class WorkflowDemo:
         boundaries = np.array(thresholds.quantile_boundaries)
         bin_centers = (boundaries[:-1] + boundaries[1:]) / 2
 
-        ax1.bar(range(len(bin_centers)), np.ones(len(bin_centers)),
-                color='steelblue', alpha=0.7, edgecolor='darkblue')
-        ax1.set_title('Classification Bins (Uniform Distribution)', fontsize=14, fontweight='bold')
-        ax1.set_xlabel('Classification Bin', fontsize=12)
-        ax1.set_ylabel('Expected Frequency', fontsize=12)
+        ax1.bar(
+            range(len(bin_centers)),
+            np.ones(len(bin_centers)),
+            color="steelblue",
+            alpha=0.7,
+            edgecolor="darkblue",
+        )
+        ax1.set_title("Classification Bins (Uniform Distribution)", fontsize=14, fontweight="bold")
+        ax1.set_xlabel("Classification Bin", fontsize=12)
+        ax1.set_ylabel("Expected Frequency", fontsize=12)
         ax1.set_xticks(range(0, len(bin_centers), 2))
         ax1.grid(True, alpha=0.3)
 
         # Plot 2: Boundary values
-        ax2.plot(boundaries, 'o-', color='darkred', linewidth=2, markersize=6)
-        ax2.set_title('Threshold Boundary Values', fontsize=14, fontweight='bold')
-        ax2.set_xlabel('Boundary Index', fontsize=12)
-        ax2.set_ylabel('Price Movement Threshold', fontsize=12)
+        ax2.plot(boundaries, "o-", color="darkred", linewidth=2, markersize=6)
+        ax2.set_title("Threshold Boundary Values", fontsize=14, fontweight="bold")
+        ax2.set_xlabel("Boundary Index", fontsize=12)
+        ax2.set_ylabel("Price Movement Threshold", fontsize=12)
         ax2.grid(True, alpha=0.3)
-        ax2.axhline(y=0, color='black', linestyle='--', alpha=0.5)
+        ax2.axhline(y=0, color="black", linestyle="--", alpha=0.5)
 
         plt.tight_layout()
 
         # Save threshold plot
         threshold_path = self.output_dir / "step1_global_thresholds.png"
-        fig.savefig(threshold_path, dpi=300, bbox_inches='tight', facecolor='white')
+        fig.savefig(threshold_path, dpi=300, bbox_inches="tight", facecolor="white")
         plt.close(fig)
 
         self.threshold_plot_path = threshold_path
@@ -243,15 +246,12 @@ class WorkflowDemo:
 
         self.log_section(
             "🏗️ STEP 2: Dataset Building",
-            "Demonstrating the focused DatasetBuilderConfig for symbol dataset creation..."
+            "Demonstrating the focused DatasetBuilderConfig for symbol dataset creation...",
         )
 
         # NEW APPROACH: Use focused DatasetBuilderConfig
         dataset_builder_config = DatasetBuilderConfig(
-            currency="AUDUSD",
-            lookback_rows=1000,
-            lookforward_input=1000,
-            lookforward_offset=100
+            currency="AUDUSD", lookback_rows=1000, lookforward_input=1000, lookforward_offset=100
         )
 
         # Show the configuration benefits
@@ -282,10 +282,10 @@ class WorkflowDemo:
         # Create dataset build configuration using calculated thresholds
         dataset_config = DatasetBuildConfig(
             currency="AUDUSD",
-            global_thresholds=threshold_results['thresholds'],
+            global_thresholds=threshold_results["thresholds"],
             force_uniform=True,
             keep_intermediate=False,
-            nbins=threshold_results['thresholds'].nbins
+            nbins=threshold_results["thresholds"].nbins,
         )
 
         # Look for DBN files
@@ -306,21 +306,23 @@ class WorkflowDemo:
             # Create mock dataset for demonstration
             self.log_section(
                 "ℹ️  Mock Dataset Generation",
-                "No DBN files found, generating mock symbol dataset for demonstration..."
+                "No DBN files found, generating mock symbol dataset for demonstration...",
             )
 
             # Generate realistic mock market data using focused config
-            mock_dataset = self._generate_mock_dataset(dataset_builder_config, threshold_results['thresholds'])
+            mock_dataset = self._generate_mock_dataset(
+                dataset_builder_config, threshold_results["thresholds"]
+            )
 
             # Save mock dataset
             dataset_path = self.output_dir / "AUDUSD_M6AM4_dataset.parquet"
             mock_dataset.write_parquet(dataset_path)
 
             results = {
-                'datasets_created': {'AUDUSD_M6AM4_dataset.parquet': dataset_path},
-                'total_samples': len(mock_dataset),
-                'symbols': ['M6AM4'],
-                'source_files': ['mock_generation']
+                "datasets_created": {"AUDUSD_M6AM4_dataset.parquet": dataset_path},
+                "total_samples": len(mock_dataset),
+                "symbols": ["M6AM4"],
+                "source_files": ["mock_generation"],
             }
 
         else:
@@ -331,22 +333,22 @@ class WorkflowDemo:
                     dbn_files=dbn_files,
                     output_dir=str(self.output_dir),
                     dataset_config=dataset_config,
-                    verbose=True
+                    verbose=True,
                 )
 
                 # Convert results to our format
                 results = {
-                    'datasets_created': {},
-                    'total_samples': build_results.get('phase_2_stats', {}).get('total_samples', 0),
-                    'symbols': [],
-                    'source_files': [f.name for f in dbn_files]
+                    "datasets_created": {},
+                    "total_samples": build_results.get("phase_2_stats", {}).get("total_samples", 0),
+                    "symbols": [],
+                    "source_files": [f.name for f in dbn_files],
                 }
 
                 # Find created datasets
                 for dataset_file in self.output_dir.glob("*_dataset.parquet"):
-                    results['datasets_created'][dataset_file.name] = dataset_file
-                    symbol = dataset_file.name.split('_')[1]  # Extract symbol from filename
-                    results['symbols'].append(symbol)
+                    results["datasets_created"][dataset_file.name] = dataset_file
+                    symbol = dataset_file.name.split("_")[1]  # Extract symbol from filename
+                    results["symbols"].append(symbol)
 
             except Exception as e:
                 self.log_section("❌ Dataset Building Error", str(e))
@@ -357,27 +359,27 @@ class WorkflowDemo:
 ✅ Symbol datasets created successfully!
 
 📊 Dataset Statistics:
-   • Datasets created: {len(results['datasets_created'])}
-   • Total samples: {results['total_samples']:,}
-   • Symbols processed: {len(results['symbols'])}
+   • Datasets created: {len(results["datasets_created"])}
+   • Total samples: {results["total_samples"]:,}
+   • Symbols processed: {len(results["symbols"])}
    • Classification: {dataset_config.nbins} bins
    • Uniform distribution: {dataset_config.force_uniform}
 
 📁 Output datasets:
-   {chr(10).join(f'   • {name} ({path.stat().st_size // 1024} KB)' for name, path in results['datasets_created'].items())}
+   {chr(10).join(f"   • {name} ({path.stat().st_size // 1024} KB)" for name, path in results["datasets_created"].items())}
 
 🎯 Symbols available:
-   {', '.join(results['symbols']) if results['symbols'] else 'M6AM4 (mock)'}
+   {", ".join(results["symbols"]) if results["symbols"] else "M6AM4 (mock)"}
 
-📁 Source files: {len(results['source_files'])}
-   {chr(10).join(f'   • {f}' for f in results['source_files'])}
+📁 Source files: {len(results["source_files"])}
+   {chr(10).join(f"   • {f}" for f in results["source_files"])}
 """
 
         self.log_section("🏗️ Dataset Results", dataset_info)
 
         # Create dataset analysis visualization
-        if results['datasets_created']:
-            first_dataset = list(results['datasets_created'].values())[0]
+        if results["datasets_created"]:
+            first_dataset = list(results["datasets_created"].values())[0]
             self._analyze_dataset(first_dataset)
 
         return results
@@ -395,21 +397,21 @@ class WorkflowDemo:
         prices = [base_price + np.random.normal(0, 0.0001, 20) for _ in range(n_samples)]
 
         # Create bid/ask price columns
-        data = {'ts_event': timestamps}
+        data = {"ts_event": timestamps}
 
         for i in range(10):
             bid_prices = [price_array[i] - 0.0001 for price_array in prices]
             ask_prices = [price_array[i] + 0.0001 for price_array in prices]
 
-            data[f'bid_px_{i:02d}'] = bid_prices
-            data[f'ask_px_{i:02d}'] = ask_prices
-            data[f'bid_sz_{i:02d}'] = np.random.exponential(1000, n_samples).astype(int)
-            data[f'ask_sz_{i:02d}'] = np.random.exponential(1000, n_samples).astype(int)
+            data[f"bid_px_{i:02d}"] = bid_prices
+            data[f"ask_px_{i:02d}"] = ask_prices
+            data[f"bid_sz_{i:02d}"] = np.random.exponential(1000, n_samples).astype(int)
+            data[f"ask_sz_{i:02d}"] = np.random.exponential(1000, n_samples).astype(int)
 
         # Add classification labels using the thresholds
         np.random.seed(42)
         classifications = np.random.randint(0, thresholds.nbins, n_samples)
-        data['classification_label'] = classifications
+        data["classification_label"] = classifications
 
         return pl.DataFrame(data)
 
@@ -420,52 +422,60 @@ class WorkflowDemo:
         fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 12))
 
         # Plot 1: Sample count over time
-        ax1.plot(range(len(df)), color='steelblue', linewidth=1)
-        ax1.set_title('Dataset Size Over Time', fontsize=14, fontweight='bold')
-        ax1.set_xlabel('Sample Index', fontsize=12)
-        ax1.set_ylabel('Cumulative Samples', fontsize=12)
+        ax1.plot(range(len(df)), color="steelblue", linewidth=1)
+        ax1.set_title("Dataset Size Over Time", fontsize=14, fontweight="bold")
+        ax1.set_xlabel("Sample Index", fontsize=12)
+        ax1.set_ylabel("Cumulative Samples", fontsize=12)
         ax1.grid(True, alpha=0.3)
 
         # Plot 2: Classification distribution
-        if 'classification_label' in df.columns:
-            class_counts = df['classification_label'].value_counts().sort('classification_label')
-            ax2.bar(class_counts['classification_label'], class_counts['count'],
-                   color='darkgreen', alpha=0.7)
-            ax2.set_title('Classification Distribution', fontsize=14, fontweight='bold')
-            ax2.set_xlabel('Classification Bin', fontsize=12)
-            ax2.set_ylabel('Sample Count', fontsize=12)
+        if "classification_label" in df.columns:
+            class_counts = df["classification_label"].value_counts().sort("classification_label")
+            ax2.bar(
+                class_counts["classification_label"],
+                class_counts["count"],
+                color="darkgreen",
+                alpha=0.7,
+            )
+            ax2.set_title("Classification Distribution", fontsize=14, fontweight="bold")
+            ax2.set_xlabel("Classification Bin", fontsize=12)
+            ax2.set_ylabel("Sample Count", fontsize=12)
             ax2.grid(True, alpha=0.3)
 
         # Plot 3: Price spread analysis
-        if 'bid_px_00' in df.columns and 'ask_px_00' in df.columns:
-            spreads = df['ask_px_00'] - df['bid_px_00']
-            ax3.hist(spreads, bins=50, color='orange', alpha=0.7, edgecolor='darkorange')
-            ax3.set_title('Bid-Ask Spread Distribution', fontsize=14, fontweight='bold')
-            ax3.set_xlabel('Spread (Price Units)', fontsize=12)
-            ax3.set_ylabel('Frequency', fontsize=12)
+        if "bid_px_00" in df.columns and "ask_px_00" in df.columns:
+            spreads = df["ask_px_00"] - df["bid_px_00"]
+            ax3.hist(spreads, bins=50, color="orange", alpha=0.7, edgecolor="darkorange")
+            ax3.set_title("Bid-Ask Spread Distribution", fontsize=14, fontweight="bold")
+            ax3.set_xlabel("Spread (Price Units)", fontsize=12)
+            ax3.set_ylabel("Frequency", fontsize=12)
             ax3.grid(True, alpha=0.3)
 
         # Plot 4: Data quality metrics
         quality_metrics = {
-            'Total Samples': len(df),
-            'Columns': len(df.columns),
-            'Price Levels': len([col for col in df.columns if '_px_' in col]),
-            'Size Columns': len([col for col in df.columns if '_sz_' in col])
+            "Total Samples": len(df),
+            "Columns": len(df.columns),
+            "Price Levels": len([col for col in df.columns if "_px_" in col]),
+            "Size Columns": len([col for col in df.columns if "_sz_" in col]),
         }
 
-        ax4.bar(range(len(quality_metrics)), list(quality_metrics.values()),
-               color=['blue', 'green', 'red', 'purple'], alpha=0.7)
-        ax4.set_title('Dataset Quality Metrics', fontsize=14, fontweight='bold')
+        ax4.bar(
+            range(len(quality_metrics)),
+            list(quality_metrics.values()),
+            color=["blue", "green", "red", "purple"],
+            alpha=0.7,
+        )
+        ax4.set_title("Dataset Quality Metrics", fontsize=14, fontweight="bold")
         ax4.set_xticks(range(len(quality_metrics)))
         ax4.set_xticklabels(list(quality_metrics.keys()), rotation=45)
-        ax4.set_ylabel('Count', fontsize=12)
+        ax4.set_ylabel("Count", fontsize=12)
         ax4.grid(True, alpha=0.3)
 
         plt.tight_layout()
 
         # Save dataset analysis plot
         analysis_path = self.output_dir / "step2_dataset_analysis.png"
-        fig.savefig(analysis_path, dpi=300, bbox_inches='tight', facecolor='white')
+        fig.savefig(analysis_path, dpi=300, bbox_inches="tight", facecolor="white")
         plt.close(fig)
 
         self.dataset_plot_path = analysis_path
@@ -473,25 +483,25 @@ class WorkflowDemo:
 
     def step3_market_depth_visualization(self, dataset_results):
         """Step 3: Demonstrate Market Depth Processor with focused configuration."""
-        if not dataset_results or not dataset_results['datasets_created']:
+        if not dataset_results or not dataset_results["datasets_created"]:
             self.log_section("❌ Step 3 Skipped", "Cannot proceed without datasets from Step 2")
             return None
 
         self.log_section(
             "⚡ STEP 3: Market Depth Processing & Visualization",
-            "Demonstrating the focused MarketDepthProcessorConfig for tensor generation..."
+            "Demonstrating the focused MarketDepthProcessorConfig for tensor generation...",
         )
 
         # Get the first available dataset
-        first_dataset_path = list(dataset_results['datasets_created'].values())[0]
+        first_dataset_path = list(dataset_results["datasets_created"].values())[0]
         df = pl.read_parquet(first_dataset_path)
 
         # NEW APPROACH: Use focused MarketDepthProcessorConfig
         processor_config = MarketDepthProcessorConfig(
-            features=['volume', 'variance', 'trade_counts'],
+            features=["volume", "variance", "trade_counts"],
             samples=min(25000, len(df)),  # Use available samples or default
             ticks_per_bin=100,
-            micro_pip_size=0.00001
+            micro_pip_size=0.00001,
         )
 
         # Show configuration details
@@ -504,7 +514,7 @@ class WorkflowDemo:
    • Ticks per bin: {processor_config.ticks_per_bin}
    • Micro pip size: {processor_config.micro_pip_size}
    • Computed time bins: {processor_config.samples // processor_config.ticks_per_bin}
-   • Computed output shape: {processor_config.output_shape if hasattr(processor_config, 'output_shape') else 'Computed at runtime'}
+   • Computed output shape: {processor_config.output_shape if hasattr(processor_config, "output_shape") else "Computed at runtime"}
 
 ✅ Benefits of focused MarketDepthProcessorConfig:
    • Only parameters needed for tensor generation
@@ -514,7 +524,7 @@ class WorkflowDemo:
    • Feature-specific validation
 
 🎯 Output tensor shape for {len(processor_config.features)} features:
-   • {'2D tensor' if len(processor_config.features) == 1 else '3D tensor'}: {processor_config.output_shape if hasattr(processor_config, 'output_shape') else 'Shape computed at runtime'}
+   • {"2D tensor" if len(processor_config.features) == 1 else "3D tensor"}: {processor_config.output_shape if hasattr(processor_config, "output_shape") else "Shape computed at runtime"}
 """
 
         self.log_section("🔧 Market Depth Processor Configuration", processor_config_info)
@@ -525,15 +535,13 @@ class WorkflowDemo:
 
         self.log_section(
             "🔄 Feature Processing",
-            f"Processing {sample_size} samples with features: {processor_config.features}"
+            f"Processing {sample_size} samples with features: {processor_config.features}",
         )
 
         try:
             # Generate multi-feature tensor using focused configuration
             multi_feature_tensor = process_market_data(
-                sample_data,
-                config=processor_config,
-                features=processor_config.features
+                sample_data, config=processor_config, features=processor_config.features
             )
 
             if multi_feature_tensor is not None and multi_feature_tensor.size > 0:
@@ -547,7 +555,7 @@ class WorkflowDemo:
    • Value range: [{multi_feature_tensor.min():.6f}, {multi_feature_tensor.max():.6f}]
 
 🎯 Feature Analysis:
-   • Non-zero elements: {np.count_nonzero(multi_feature_tensor):,}/{multi_feature_tensor.size:,} ({100*np.count_nonzero(multi_feature_tensor)/multi_feature_tensor.size:.1f}%)
+   • Non-zero elements: {np.count_nonzero(multi_feature_tensor):,}/{multi_feature_tensor.size:,} ({100 * np.count_nonzero(multi_feature_tensor) / multi_feature_tensor.size:.1f}%)
    • Negative values: {np.sum(multi_feature_tensor < 0):,}
    • Positive values: {np.sum(multi_feature_tensor > 0):,}
    • Zero values: {np.sum(multi_feature_tensor == 0):,}
@@ -556,19 +564,23 @@ class WorkflowDemo:
                 self.log_section("⚡ Processing Results", feature_info)
 
                 # Create comprehensive visualizations
-                self._create_market_depth_visualizations(multi_feature_tensor, processor_config.features)
+                self._create_market_depth_visualizations(
+                    multi_feature_tensor, processor_config.features
+                )
 
                 results = {
-                    'tensor_shape': multi_feature_tensor.shape,
-                    'features': processor_config.features,
-                    'samples_processed': sample_size,
-                    'memory_usage_kb': multi_feature_tensor.nbytes / 1024,
-                    'config': processor_config,
-                    'success': True
+                    "tensor_shape": multi_feature_tensor.shape,
+                    "features": processor_config.features,
+                    "samples_processed": sample_size,
+                    "memory_usage_kb": multi_feature_tensor.nbytes / 1024,
+                    "config": processor_config,
+                    "success": True,
                 }
 
             else:
-                self.log_section("❌ Processing Failed", "Unable to generate tensor from market data")
+                self.log_section(
+                    "❌ Processing Failed", "Unable to generate tensor from market data"
+                )
                 return None
 
         except Exception as e:
@@ -592,25 +604,25 @@ class WorkflowDemo:
 
             # Create individual feature visualization
             fig, ax = plt.subplots(figsize=(14, 8))
-            im = ax.imshow(feature_array, cmap='RdBu', aspect='auto', interpolation='bilinear')
-            ax.set_title(f"Market Depth Feature: {feature.upper()}", fontsize=18, fontweight='bold')
+            im = ax.imshow(feature_array, cmap="RdBu", aspect="auto", interpolation="bilinear")
+            ax.set_title(f"Market Depth Feature: {feature.upper()}", fontsize=18, fontweight="bold")
             ax.set_xlabel(f"Time Bins ({feature_array.shape[1]} total)", fontsize=14)
             ax.set_ylabel("Price Levels (402 total: 200 Ask + 2 Mid + 200 Bid)", fontsize=14)
 
             # Add grid and styling
-            ax.set_xticks(range(0, feature_array.shape[1], max(1, feature_array.shape[1]//10)))
+            ax.set_xticks(range(0, feature_array.shape[1], max(1, feature_array.shape[1] // 10)))
             ax.set_yticks(range(0, 402, 50))
-            ax.grid(True, alpha=0.3, linestyle='--')
+            ax.grid(True, alpha=0.3, linestyle="--")
 
             # Enhanced colorbar
             cbar = fig.colorbar(im, shrink=0.8)
-            cbar.set_label(f"Normalized {feature.title()} Value", fontsize=12, fontweight='bold')
+            cbar.set_label(f"Normalized {feature.title()} Value", fontsize=12, fontweight="bold")
 
             plt.tight_layout()
 
             # Save individual plot
             plot_path = self.output_dir / f"step3_{feature}_feature.png"
-            fig.savefig(plot_path, dpi=300, bbox_inches='tight', facecolor='white')
+            fig.savefig(plot_path, dpi=300, bbox_inches="tight", facecolor="white")
             plt.close(fig)
             feature_plots.append(plot_path)
 
@@ -625,6 +637,7 @@ class WorkflowDemo:
 
     def _create_rgb_combination(self, tensor, features):
         """Create RGB combination visualization."""
+
         def normalize_for_rgb(arr):
             arr_min, arr_max = arr.min(), arr.max()
             if arr_max > arr_min:
@@ -633,9 +646,9 @@ class WorkflowDemo:
                 return np.zeros_like(arr)
 
         # Get first three features for RGB
-        red_norm = normalize_for_rgb(tensor[0])    # volume
+        red_norm = normalize_for_rgb(tensor[0])  # volume
         green_norm = normalize_for_rgb(tensor[1])  # variance
-        blue_norm = normalize_for_rgb(tensor[2])   # trade_counts
+        blue_norm = normalize_for_rgb(tensor[2])  # trade_counts
 
         # Create RGB array
         rgb_array = np.stack([red_norm, green_norm, blue_norm], axis=-1)
@@ -644,26 +657,29 @@ class WorkflowDemo:
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 8))
 
         # RGB combination
-        ax1.imshow(rgb_array, aspect='auto', interpolation='bilinear')
-        ax1.set_title(f"RGB Feature Combination\n(Red={features[0]}, Green={features[1]}, Blue={features[2]})",
-                     fontsize=16, fontweight='bold')
+        ax1.imshow(rgb_array, aspect="auto", interpolation="bilinear")
+        ax1.set_title(
+            f"RGB Feature Combination\n(Red={features[0]}, Green={features[1]}, Blue={features[2]})",
+            fontsize=16,
+            fontweight="bold",
+        )
         ax1.set_xlabel(f"Time Bins ({rgb_array.shape[1]} total)", fontsize=14)
         ax1.set_ylabel("Price Levels (402 total)", fontsize=14)
-        ax1.grid(True, alpha=0.3, linestyle='--')
+        ax1.grid(True, alpha=0.3, linestyle="--")
 
         # Channel intensities over time
-        channel_data = np.stack([
-            red_norm.mean(axis=0),
-            green_norm.mean(axis=0),
-            blue_norm.mean(axis=0)
-        ])
+        channel_data = np.stack(
+            [red_norm.mean(axis=0), green_norm.mean(axis=0), blue_norm.mean(axis=0)]
+        )
 
-        im2 = ax2.imshow(channel_data, cmap='RdBu', aspect='auto')
-        ax2.set_title("Average Channel Intensities", fontsize=16, fontweight='bold')
+        im2 = ax2.imshow(channel_data, cmap="RdBu", aspect="auto")
+        ax2.set_title("Average Channel Intensities", fontsize=16, fontweight="bold")
         ax2.set_xlabel("Time Bins", fontsize=14)
         ax2.set_ylabel("RGB Channels", fontsize=14)
         ax2.set_yticks([0, 1, 2])
-        ax2.set_yticklabels([f'{features[i]} ({c})' for i, c in enumerate(['Red', 'Green', 'Blue'])])
+        ax2.set_yticklabels(
+            [f"{features[i]} ({c})" for i, c in enumerate(["Red", "Green", "Blue"])]
+        )
 
         cbar = fig.colorbar(im2, ax=ax2, shrink=0.8)
         cbar.set_label("Normalized Intensity", fontsize=12)
@@ -672,7 +688,7 @@ class WorkflowDemo:
 
         # Save RGB combination
         rgb_path = self.output_dir / "step3_rgb_combination.png"
-        fig.savefig(rgb_path, dpi=300, bbox_inches='tight', facecolor='white')
+        fig.savefig(rgb_path, dpi=300, bbox_inches="tight", facecolor="white")
         plt.close(fig)
 
         self.rgb_plot_path = rgb_path
@@ -687,24 +703,26 @@ class WorkflowDemo:
             stats = []
             for i, feature in enumerate(features):
                 feature_data = tensor[i]
-                stats.append({
-                    'Feature': feature,
-                    'Mean': feature_data.mean(),
-                    'Std': feature_data.std(),
-                    'Min': feature_data.min(),
-                    'Max': feature_data.max()
-                })
+                stats.append(
+                    {
+                        "Feature": feature,
+                        "Mean": feature_data.mean(),
+                        "Std": feature_data.std(),
+                        "Min": feature_data.min(),
+                        "Max": feature_data.max(),
+                    }
+                )
 
-            feature_names = [s['Feature'] for s in stats]
-            means = [s['Mean'] for s in stats]
-            stds = [s['Std'] for s in stats]
+            feature_names = [s["Feature"] for s in stats]
+            means = [s["Mean"] for s in stats]
+            stds = [s["Std"] for s in stats]
 
             x_pos = range(len(feature_names))
-            axes[0].bar(x_pos, means, yerr=stds, capsize=5, color='steelblue', alpha=0.7)
-            axes[0].set_title('Feature Statistics', fontsize=14, fontweight='bold')
+            axes[0].bar(x_pos, means, yerr=stds, capsize=5, color="steelblue", alpha=0.7)
+            axes[0].set_title("Feature Statistics", fontsize=14, fontweight="bold")
             axes[0].set_xticks(x_pos)
             axes[0].set_xticklabels(feature_names, rotation=45)
-            axes[0].set_ylabel('Normalized Value')
+            axes[0].set_ylabel("Normalized Value")
             axes[0].grid(True, alpha=0.3)
 
         # Plot 2: Value distribution
@@ -712,9 +730,9 @@ class WorkflowDemo:
             for i, feature in enumerate(features[:3]):  # Show first 3 features
                 feature_data = tensor[i].flatten()
                 axes[1].hist(feature_data, bins=50, alpha=0.6, label=feature, density=True)
-            axes[1].set_title('Value Distribution by Feature', fontsize=14, fontweight='bold')
-            axes[1].set_xlabel('Normalized Value')
-            axes[1].set_ylabel('Density')
+            axes[1].set_title("Value Distribution by Feature", fontsize=14, fontweight="bold")
+            axes[1].set_xlabel("Normalized Value")
+            axes[1].set_ylabel("Density")
             axes[1].legend()
             axes[1].grid(True, alpha=0.3)
 
@@ -726,38 +744,45 @@ class WorkflowDemo:
                 non_zero_ratio = np.count_nonzero(feature_data) / feature_data.size
                 sparsity_data.append(non_zero_ratio)
 
-            axes[2].bar(range(len(features)), sparsity_data, color='darkgreen', alpha=0.7)
-            axes[2].set_title('Feature Density (Non-zero Ratio)', fontsize=14, fontweight='bold')
+            axes[2].bar(range(len(features)), sparsity_data, color="darkgreen", alpha=0.7)
+            axes[2].set_title("Feature Density (Non-zero Ratio)", fontsize=14, fontweight="bold")
             axes[2].set_xticks(range(len(features)))
             axes[2].set_xticklabels(features, rotation=45)
-            axes[2].set_ylabel('Non-zero Ratio')
+            axes[2].set_ylabel("Non-zero Ratio")
             axes[2].set_ylim(0, 1)
             axes[2].grid(True, alpha=0.3)
 
         # Plot 4: Tensor properties
         properties = {
-            'Shape': f"{tensor.shape}",
-            'Size': f"{tensor.size:,}",
-            'Memory (KB)': f"{tensor.nbytes/1024:.1f}",
-            'Non-zeros': f"{np.count_nonzero(tensor):,}"
+            "Shape": f"{tensor.shape}",
+            "Size": f"{tensor.size:,}",
+            "Memory (KB)": f"{tensor.nbytes / 1024:.1f}",
+            "Non-zeros": f"{np.count_nonzero(tensor):,}",
         }
 
-        axes[3].text(0.1, 0.9, "Tensor Properties:", fontsize=14, fontweight='bold',
-                    transform=axes[3].transAxes)
+        axes[3].text(
+            0.1,
+            0.9,
+            "Tensor Properties:",
+            fontsize=14,
+            fontweight="bold",
+            transform=axes[3].transAxes,
+        )
 
         for i, (key, value) in enumerate(properties.items()):
-            axes[3].text(0.1, 0.8 - i*0.15, f"{key}: {value}", fontsize=12,
-                        transform=axes[3].transAxes)
+            axes[3].text(
+                0.1, 0.8 - i * 0.15, f"{key}: {value}", fontsize=12, transform=axes[3].transAxes
+            )
 
         axes[3].set_xlim(0, 1)
         axes[3].set_ylim(0, 1)
-        axes[3].axis('off')
+        axes[3].axis("off")
 
         plt.tight_layout()
 
         # Save summary plot
         summary_path = self.output_dir / "step3_feature_summary.png"
-        fig.savefig(summary_path, dpi=300, bbox_inches='tight', facecolor='white')
+        fig.savefig(summary_path, dpi=300, bbox_inches="tight", facecolor="white")
         plt.close(fig)
 
         self.summary_plot_path = summary_path
@@ -765,8 +790,7 @@ class WorkflowDemo:
     def generate_report(self):
         """Generate unified HTML report."""
         self.log_section(
-            "📊 Generating Unified Report",
-            "Creating comprehensive HTML report with all results..."
+            "📊 Generating Unified Report", "Creating comprehensive HTML report with all results..."
         )
 
         # Create HTML report
@@ -813,9 +837,9 @@ class WorkflowDemo:
         # Add each section
         for section in self.report_sections:
             html_content += f"""
-        <h2>{section['title']} <span class="timestamp">{section['timestamp']}</span></h2>
+        <h2>{section["title"]} <span class="timestamp">{section["timestamp"]}</span></h2>
         <div class="section">
-            <pre>{section['content']}</pre>
+            <pre>{section["content"]}</pre>
         </div>
 """
 
@@ -827,7 +851,7 @@ class WorkflowDemo:
             ("step3_variance_feature.png", "Variance Feature"),
             ("step3_trade_counts_feature.png", "Trade Counts Feature"),
             ("step3_rgb_combination.png", "RGB Feature Combination"),
-            ("step3_feature_summary.png", "Feature Summary Analysis")
+            ("step3_feature_summary.png", "Feature Summary Analysis"),
         ]
 
         for plot_file, plot_title in plot_sections:
@@ -869,7 +893,7 @@ class WorkflowDemo:
 
         # Save HTML report
         report_path = self.output_dir / "complete_workflow_report.html"
-        with open(report_path, 'w') as f:
+        with open(report_path, "w") as f:
             f.write(html_content)
 
         final_info = f"""
@@ -877,7 +901,7 @@ class WorkflowDemo:
 
 📊 Report Summary:
    • Total sections: {len(self.report_sections)}
-   • Visualizations created: {len(list(self.output_dir.glob('*.png')))}
+   • Visualizations created: {len(list(self.output_dir.glob("*.png")))}
    • Output directory: {self.output_dir}
    • HTML report: {report_path}
 
@@ -897,7 +921,7 @@ class WorkflowDemo:
         """Demonstrate the create_compatible_configs convenience function."""
         self.log_section(
             "🔗 BONUS: Compatible Configuration Creation",
-            "Demonstrating create_compatible_configs() - one function for all three modules..."
+            "Demonstrating create_compatible_configs() - one function for all three modules...",
         )
 
         # Show the convenience function for creating compatible configs
@@ -910,7 +934,7 @@ class WorkflowDemo:
             nbins=9,
             samples=30000,
             micro_pip_size=0.00001,
-            jump_size=50
+            jump_size=50,
         )
 
         compatible_info = f"""

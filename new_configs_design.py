@@ -13,24 +13,18 @@ class PriceMovementConfig(BaseModel):
     Configuration for price movement calculation.
     Used by both DatasetBuilder and GlobalThresholdCalculator.
     """
+
     currency: str = Field(
-        default="AUDUSD",
-        description="Currency pair identifier (e.g., 'AUDUSD', 'EURUSD')"
+        default="AUDUSD", description="Currency pair identifier (e.g., 'AUDUSD', 'EURUSD')"
     )
     lookback_rows: int = Field(
-        default=5000,
-        gt=0,
-        description="Number of historical rows for baseline calculation"
+        default=5000, gt=0, description="Number of historical rows for baseline calculation"
     )
     lookforward_input: int = Field(
-        default=5000,
-        gt=0,
-        description="Size of lookforward window for classification"
+        default=5000, gt=0, description="Size of lookforward window for classification"
     )
     lookforward_offset: int = Field(
-        default=500,
-        ge=0,
-        description="Offset before starting lookforward window"
+        default=500, ge=0, description="Offset before starting lookforward window"
     )
 
     @field_validator("currency")
@@ -46,9 +40,9 @@ class DatasetBuilderConfig(BaseModel):
     Configuration for DatasetBuilder module.
     Focused on dataset creation from multiple DBN files.
     """
+
     price_movement: PriceMovementConfig = Field(
-        default_factory=PriceMovementConfig,
-        description="Price movement calculation parameters"
+        default_factory=PriceMovementConfig, description="Price movement calculation parameters"
     )
 
     @property
@@ -62,24 +56,21 @@ class GlobalThresholdConfig(BaseModel):
     Configuration for GlobalThresholdCalculator module.
     Focused on consistent classification thresholds across files.
     """
+
     price_movement: PriceMovementConfig = Field(
-        default_factory=PriceMovementConfig,
-        description="Price movement calculation parameters"
+        default_factory=PriceMovementConfig, description="Price movement calculation parameters"
     )
-    nbins: int = Field(
-        default=13,
-        ge=3, le=20,
-        description="Number of classification bins"
-    )
+    nbins: int = Field(default=13, ge=3, le=20, description="Number of classification bins")
     max_samples_per_file: int = Field(
         default=10000,
         gt=0,
-        description="Maximum samples to extract per file for performance optimization"
+        description="Maximum samples to extract per file for performance optimization",
     )
     sample_fraction: float = Field(
         default=0.5,
-        gt=0.0, le=1.0,
-        description="Fraction of files to use for threshold calculation"
+        gt=0.0,
+        le=1.0,
+        description="Fraction of files to use for threshold calculation",
     )
 
     @field_validator("nbins")
@@ -100,24 +91,19 @@ class MarketDepthProcessorConfig(BaseModel):
     Configuration for MarketDepthProcessor module.
     Focused on converting market data to tensors.
     """
+
     features: list[str] = Field(
         default=["volume"],
-        description="Features to extract: ['volume', 'variance', 'trade_counts']"
+        description="Features to extract: ['volume', 'variance', 'trade_counts']",
     )
     samples: int = Field(
         default=50000,
         ge=25000,
-        description="Number of samples to process (affects tensor dimensions)"
+        description="Number of samples to process (affects tensor dimensions)",
     )
-    ticks_per_bin: int = Field(
-        default=100,
-        gt=0,
-        description="Number of ticks per time bin"
-    )
+    ticks_per_bin: int = Field(default=100, gt=0, description="Number of ticks per time bin")
     micro_pip_size: float = Field(
-        default=0.00001,
-        gt=0.0,
-        description="Micro pip size for price precision"
+        default=0.00001, gt=0.0, description="Micro pip size for price precision"
     )
 
     @field_validator("features")
@@ -140,31 +126,22 @@ class MarketDepthProcessorConfig(BaseModel):
 # Dataset Builder
 dataset_config = DatasetBuilderConfig(
     price_movement=PriceMovementConfig(
-        currency="AUDUSD",
-        lookback_rows=5000,
-        lookforward_input=5000,
-        lookforward_offset=500
+        currency="AUDUSD", lookback_rows=5000, lookforward_input=5000, lookforward_offset=500
     )
 )
 
 # Global Threshold Calculator
 threshold_config = GlobalThresholdConfig(
     price_movement=PriceMovementConfig(
-        currency="AUDUSD",
-        lookback_rows=5000,
-        lookforward_input=5000,
-        lookforward_offset=500
+        currency="AUDUSD", lookback_rows=5000, lookforward_input=5000, lookforward_offset=500
     ),
     nbins=13,
-    max_samples_per_file=10000
+    max_samples_per_file=10000,
 )
 
 # Market Depth Processor
 processor_config = MarketDepthProcessorConfig(
-    features=["volume", "variance"],
-    samples=50000,
-    ticks_per_bin=100,
-    micro_pip_size=0.00001
+    features=["volume", "variance"], samples=50000, ticks_per_bin=100, micro_pip_size=0.00001
 )
 
 print("✅ New focused configuration architecture designed!")

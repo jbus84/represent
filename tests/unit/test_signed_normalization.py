@@ -27,10 +27,7 @@ class TestSignedNormalization:
     def setup_method(self):
         """Setup config for each test."""
         self.config = MarketDepthProcessorConfig(
-            features=["volume"],
-            samples=50000,
-            ticks_per_bin=100,
-            micro_pip_size=0.00001
+            features=["volume"], samples=50000, ticks_per_bin=100, micro_pip_size=0.00001
         )
 
     def test_process_market_data_produces_signed_output(self):
@@ -42,7 +39,7 @@ class TestSignedNormalization:
         n_samples = 1000
 
         # Generate timestamps
-        timestamps = pd.date_range('2024-01-01', periods=n_samples, freq='1s')
+        timestamps = pd.date_range("2024-01-01", periods=n_samples, freq="1s")
 
         # Create ask/bid prices with clear patterns
         base_price = 1.25000
@@ -51,22 +48,22 @@ class TestSignedNormalization:
 
         # Create volumes with intentional ask/bid imbalances
         ask_volumes = np.full(n_samples, 100)  # Higher ask volume
-        bid_volumes = np.full(n_samples, 50)   # Lower bid volume
+        bid_volumes = np.full(n_samples, 50)  # Lower bid volume
 
         # Build DataFrame
         data = {
-            'ts_event': timestamps,
-            'symbol': ['AUDUSD'] * n_samples,
+            "ts_event": timestamps,
+            "symbol": ["AUDUSD"] * n_samples,
         }
 
         # Add price levels
         for i in range(10):
-            data[f'ask_px_{i:02d}'] = ask_prices + (i * 0.00001)
-            data[f'bid_px_{i:02d}'] = bid_prices - (i * 0.00001)
-            data[f'ask_sz_{i:02d}'] = ask_volumes
-            data[f'bid_sz_{i:02d}'] = bid_volumes
-            data[f'ask_ct_{i:02d}'] = np.full(n_samples, 5)
-            data[f'bid_ct_{i:02d}'] = np.full(n_samples, 3)
+            data[f"ask_px_{i:02d}"] = ask_prices + (i * 0.00001)
+            data[f"bid_px_{i:02d}"] = bid_prices - (i * 0.00001)
+            data[f"ask_sz_{i:02d}"] = ask_volumes
+            data[f"bid_sz_{i:02d}"] = bid_volumes
+            data[f"ask_ct_{i:02d}"] = np.full(n_samples, 5)
+            data[f"bid_ct_{i:02d}"] = np.full(n_samples, 3)
 
         df = pl.DataFrame(data)
 
@@ -90,26 +87,28 @@ class TestSignedNormalization:
         """Test that all features produce signed [-1,1] output."""
         # Create synthetic data
         n_samples = 1000
-        timestamps = pd.date_range('2024-01-01', periods=n_samples, freq='1s')
+        timestamps = pd.date_range("2024-01-01", periods=n_samples, freq="1s")
         base_price = 1.25000
 
         data = {
-            'ts_event': timestamps,
-            'symbol': ['AUDUSD'] * n_samples,
+            "ts_event": timestamps,
+            "symbol": ["AUDUSD"] * n_samples,
         }
 
         for i in range(10):
-            data[f'ask_px_{i:02d}'] = np.full(n_samples, base_price + 0.00001 + (i * 0.00001))
-            data[f'bid_px_{i:02d}'] = np.full(n_samples, base_price - 0.00001 - (i * 0.00001))
-            data[f'ask_sz_{i:02d}'] = np.random.randint(50, 150, n_samples)
-            data[f'bid_sz_{i:02d}'] = np.random.randint(50, 150, n_samples)
-            data[f'ask_ct_{i:02d}'] = np.random.randint(1, 10, n_samples)
-            data[f'bid_ct_{i:02d}'] = np.random.randint(1, 10, n_samples)
+            data[f"ask_px_{i:02d}"] = np.full(n_samples, base_price + 0.00001 + (i * 0.00001))
+            data[f"bid_px_{i:02d}"] = np.full(n_samples, base_price - 0.00001 - (i * 0.00001))
+            data[f"ask_sz_{i:02d}"] = np.random.randint(50, 150, n_samples)
+            data[f"bid_sz_{i:02d}"] = np.random.randint(50, 150, n_samples)
+            data[f"ask_ct_{i:02d}"] = np.random.randint(1, 10, n_samples)
+            data[f"bid_ct_{i:02d}"] = np.random.randint(1, 10, n_samples)
 
         df = pl.DataFrame(data)
 
         # Test all features
-        result = process_market_data(df, config=self.config, features=["volume", "variance", "trade_counts"])
+        result = process_market_data(
+            df, config=self.config, features=["volume", "variance", "trade_counts"]
+        )
 
         assert result.shape[0] == 3, "Should have 3 feature channels"
 
@@ -117,8 +116,12 @@ class TestSignedNormalization:
             feature_data = result[i]
 
             # Each feature must be in [-1, 1] range
-            assert feature_data.min() >= -1.0, f"{feature} minimum {feature_data.min()} should be >= -1.0"
-            assert feature_data.max() <= 1.0, f"{feature} maximum {feature_data.max()} should be <= 1.0"
+            assert feature_data.min() >= -1.0, (
+                f"{feature} minimum {feature_data.min()} should be >= -1.0"
+            )
+            assert feature_data.max() <= 1.0, (
+                f"{feature} maximum {feature_data.max()} should be <= 1.0"
+            )
 
             # Should not be all zeros (indicating processing worked)
             assert not np.allclose(feature_data, 0), f"{feature} should not be all zeros"
@@ -131,20 +134,22 @@ class TestSignedNormalization:
         buffer = OutputBuffer()
 
         # Create scenario where bid > ask (should produce negative values)
-        ask_grid = np.ones((402, 500)) * 30   # Low ask volume
+        ask_grid = np.ones((402, 500)) * 30  # Low ask volume
         bid_grid = np.ones((402, 500)) * 100  # High bid volume (bid dominance)
 
         result = buffer.prepare_output(ask_grid, bid_grid)
 
         # CRITICAL: This should produce negative values (bid dominance)
         # If this assertion fails, someone broke the signed normalization!
-        assert np.all(result <= 0), \
-            "REGRESSION DETECTED: Bid dominance should produce negative values. " \
+        assert np.all(result <= 0), (
+            "REGRESSION DETECTED: Bid dominance should produce negative values. "
             "Someone may have implemented unsigned [0,1] normalization!"
+        )
 
-        assert result.min() == -1.0, \
-            "REGRESSION DETECTED: Maximum bid dominance should produce -1.0. " \
+        assert result.min() == -1.0, (
+            "REGRESSION DETECTED: Maximum bid dominance should produce -1.0. "
             "Signed normalization may be broken!"
+        )
 
     def test_directional_information_preservation(self):
         """
@@ -209,8 +214,9 @@ class TestSignedNormalization:
         our_result = buffer.prepare_output(ask_grid, bid_grid)
 
         # Should match exactly
-        assert np.allclose(our_result, normed_abs_combined), \
+        assert np.allclose(our_result, normed_abs_combined), (
             "Our implementation should match notebook approach exactly"
+        )
 
     def test_cnn_compatibility_range(self):
         """
