@@ -103,11 +103,11 @@ distribution-analysis:
 	@echo "=============================================="
 	@echo "⚠️  Research only - Not part of main represent package"
 	@echo "🎯 Focus: Tail prediction for financial returns classification"
-	cd distributions && python enhanced_distribution_analyzer.py
+	cd distributions && python scripts/enhanced_distribution_analyzer.py
 	@echo "📁 Reports generated:"
-	@echo "   • distributions/final_comprehensive_report_2024.html"
-	@echo "   • distributions/distribution_comparison_report_enhanced.html"
-	@echo "   • distributions/metrics_explanation_detailed.html"
+	@echo "   • distributions/html/final_comprehensive_report_2024.html"
+	@echo "   • distributions/html/distribution_comparison_report_enhanced.html"
+	@echo "   • distributions/html/metrics_explanation_detailed.html"
 	@echo "🌟 Recommended approach: Merton Jump Diffusion"
 
 # Production
