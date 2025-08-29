@@ -2,6 +2,17 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Modular Target Generation Architecture
+
+**IMPORTANT: The represent package uses a modular target generation architecture. See `docs/MODULAR_TARGET_ARCHITECTURE.md` for complete details on how target generation works.**
+
+Key points:
+- All target generation (classification/regression) uses pluggable `TargetGenerator` interface
+- New labeling logic is added by implementing `TargetGenerator` and registering with `TargetGeneratorFactory`
+- `ModularDatasetBuilder` combines multiple target generators in a single dataset
+- Classification and regression targets can be mixed freely
+- Custom/ML-based labeling models can be easily integrated
+
 ## Project Overview
 
 This is a **high-performance** Python package called "represent" that creates normalized market depth representations from limit order book (LOB) data using a **parquet-based machine learning pipeline**. The core objective is to produce comprehensive symbol datasets from multiple DBN files for efficient ML training.
@@ -32,42 +43,37 @@ The package now follows a **symbol-split-merge architecture** for creating compr
 
 ## Core Workflow
 
-### New Primary Workflow: Symbol-Split-Merge Dataset Building
+### Primary Workflow: Modular Target Generation
 
 ```python
-from represent import DatasetBuilder, DatasetBuildConfig, build_datasets_from_dbn_files
-
-# Build comprehensive symbol datasets from multiple DBN files
-config = create_represent_config("AUDUSD", features=['volume', 'variance'])
-dataset_config = DatasetBuildConfig(
-    currency="AUDUSD",
-    min_symbol_samples=60500,          # Must be >= samples + lookback + lookforward + offset (50K + 5K + 5K + 500)
-    force_uniform=True,                # Ensure uniform class distribution
-    keep_intermediate=False            # Clean up intermediate split files
+from represent import (
+    ModularDatasetBuilder,
+    TargetGeneratorFactory,
+    create_modular_builder
 )
 
-# Process multiple DBN files into comprehensive symbol datasets
-# Use at least 10 DBN files to ensure sufficient data for minimum sample requirements
-results = build_datasets_from_dbn_files(
-    config=config,
-    dbn_files=[
-        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240101.dbn.zst",
-        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240102.dbn.zst", 
-        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240103.dbn.zst",
-        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240104.dbn.zst",
-        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240105.dbn.zst",
-        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240106.dbn.zst",
-        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240107.dbn.zst",
-        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240108.dbn.zst",
-        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240109.dbn.zst",
-        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240110.dbn.zst"
-    ],
-    output_dir="/data/symbol_datasets/",
-    dataset_config=dataset_config
-)
+# Method 1: Direct generator creation
+generators = [
+    TargetGeneratorFactory.create("quantile_classification", nbins=13),
+    TargetGeneratorFactory.create("directional_mfe", lookforward_horizon=3000),
+    TargetGeneratorFactory.create("volatility", window_size=1000)
+]
+builder = ModularDatasetBuilder(generators)
 
-# Output: /data/symbol_datasets/AUDUSD_M6AM4_dataset.parquet
-#         /data/symbol_datasets/AUDUSD_M6AM5_dataset.parquet (comprehensive symbol datasets)
+# Method 2: Configuration-based creation
+configs = [
+    {"type": "quantile_classification", "nbins": 13},
+    {"type": "directional_mfe", "lookforward_horizon": 3000},
+    {"type": "volatility", "window_size": 1000}
+]
+builder = create_modular_builder(configs)
+
+# Build dataset with multiple target types from parquet
+dataset = builder.build_from_parquet("symbol_data.parquet")
+# Result: classification_label, mfe_buy_bps, mfe_sell_bps, volatility_target
+
+# Save with targets
+builder.save_dataset(dataset, "output/symbol_with_targets.parquet")
 ```
 
 **Processing Flow:**

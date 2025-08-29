@@ -1,4 +1,4 @@
-.PHONY: install test lint typecheck format build clean help test-performance test-fast test-unit test-e2e demo examples process-production check-commit coverage-report coverage-html distribution-analysis
+.PHONY: install test lint typecheck format build clean help test-performance test-fast test-unit test-e2e demo examples process-production create-mfe-datasets check-commit coverage-report coverage-html distribution-analysis
 
 # Default target
 help:
@@ -31,6 +31,7 @@ help:
 	@echo ""
 	@echo "🏭 PRODUCTION:"
 	@echo "  process-production     - Process AUDUSD-micro data for production ML training"
+	@echo "  create-mfe-datasets    - Create MFE buy/sell datasets for ML training"
 
 # Setup & Development
 install:
@@ -137,3 +138,9 @@ process-production:
 	@echo "📊 Using first-half training approach to prevent data leakage"
 	python scripts/process_production_datasets.py
 	@echo "🎉 Production datasets created! Ready for ML training in external repository."
+
+create-mfe-datasets:
+	@echo "🎯 Creating MFE buy/sell datasets for ML training..."
+	@echo "📊 Processing symbol datasets with directional MFE targets"
+	python scripts/create_mfe_datasets.py
+	@echo "🎉 MFE datasets created! Ready for dual-model ML training."
