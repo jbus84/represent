@@ -31,12 +31,31 @@ sys.path.insert(0, str(project_root / "scripts"))
 from build_label_set import LABEL_SET_PRESETS  # noqa: E402
 
 
+def is_outright_contract(symbol: str) -> bool:
+    """
+    Check if symbol is an outright contract (not a spread).
+
+    Outright contracts are single instruments without spread notation.
+    Spread instruments contain '-' or other combination characters.
+
+    Args:
+        symbol: The symbol to check
+
+    Returns:
+        True if outright contract, False if spread instrument
+    """
+    symbol_str = str(symbol)
+    # Filter out spread instruments that contain '-', '/', or other spread indicators
+    return "-" not in symbol_str and "/" not in symbol_str and "+" not in symbol_str
+
+
 def load_and_process_dbn_files(
     dbn_directory: Path,
     output_dir: Path,
     target_generators: list,
     preset_name: str = None,
     chunk_size: int = 100000,
+    exclude_spreads: bool = True,
 ) -> dict[str, Any]:
     """
     Load DBN files using streaming approach, split by symbol, apply labeling, and create comprehensive datasets.
@@ -134,12 +153,32 @@ def load_and_process_dbn_files(
                 # Split by symbol within this chunk
                 symbols = df_pl.select(symbol_col).unique().to_series().to_list()
 
-                if chunk_num == 0:
-                    print(
-                        f"   📋 Found {len(symbols)} symbols in file: {', '.join(str(s) for s in symbols[:5])}{'...' if len(symbols) > 5 else ''}"
-                    )
+                # Filter symbols based on exclude_spreads setting
+                if exclude_spreads:
+                    outright_symbols = [s for s in symbols if is_outright_contract(s)]
+                    spread_symbols = [s for s in symbols if not is_outright_contract(s)]
+                    symbols_to_process = outright_symbols
 
-                for symbol in symbols:
+                    if chunk_num == 0:
+                        print(
+                            f"   📋 Found {len(symbols)} total symbols in file: {len(outright_symbols)} outright, {len(spread_symbols)} spreads"
+                        )
+                        if outright_symbols:
+                            print(
+                                f"   ✅ Processing outright contracts: {', '.join(str(s) for s in outright_symbols[:5])}{'...' if len(outright_symbols) > 5 else ''}"
+                            )
+                        if spread_symbols:
+                            print(
+                                f"   ⏭️  Skipping spread instruments: {', '.join(str(s) for s in spread_symbols[:3])}{'...' if len(spread_symbols) > 3 else ''}"
+                            )
+                else:
+                    symbols_to_process = symbols
+                    if chunk_num == 0:
+                        print(
+                            f"   📋 Processing all {len(symbols)} symbols: {', '.join(str(s) for s in symbols[:5])}{'...' if len(symbols) > 5 else ''}"
+                        )
+
+                for symbol in symbols_to_process:
                     symbol_df = df_pl.filter(pl.col(symbol_col) == symbol)
 
                     if len(symbol_df) < 100:  # Skip symbols with too little data in this chunk
@@ -338,6 +377,11 @@ Examples:
         default=100000,
         help="Chunk size for streaming processing (default: 100,000 samples per chunk)",
     )
+    parser.add_argument(
+        "--include-spreads",
+        action="store_true",
+        help="Include spread instruments in processing (default: exclude spreads, process only outright contracts)",
+    )
 
     args = parser.parse_args()
 
@@ -390,6 +434,7 @@ Examples:
             target_generators=generators,
             preset_name=preset_name,
             chunk_size=args.chunk_size,
+            exclude_spreads=not args.include_spreads,
         )
 
         print("\n🎉 SUCCESS!")
@@ -397,6 +442,10 @@ Examples:
         print(f"📊 Processed {results['total_symbols']} symbols using streaming approach")
         print(f"📈 Total samples: {results['total_samples']:,}")
         print(f"🔄 Chunk size used: {results['streaming_chunks_used']:,} samples per chunk")
+        if not args.include_spreads:
+            print("📋 Symbol filter: Outright contracts only (spreads excluded)")
+        else:
+            print("📋 Symbol filter: All symbols included (outright contracts + spreads)")
         print(f"📁 Output directory: {results['output_directory']}")
         print("\n📋 Created datasets:")
 
@@ -412,6 +461,12 @@ Examples:
         print(
             f"🧠 Memory-efficient: Processed using {results['streaming_chunks_used']:,}-sample chunks"
         )
+        if not args.include_spreads:
+            print(
+                "🎯 Clean data: Only outright contracts processed (spread instruments filtered out)"
+            )
+        else:
+            print("📊 Complete data: All instruments processed (including spreads)")
 
     except Exception as e:
         print(f"\n❌ ERROR: {e}")

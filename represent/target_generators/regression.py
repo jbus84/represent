@@ -357,8 +357,8 @@ class VolatilityScaledReturnsGenerator(TargetGenerator):
     def __init__(
         self,
         volatility_window: int = 500,
-        vol_multiplier: float = 2.5,  # Balanced multiplier
-        horizon_ticks: int = 1500,  # Reasonable horizon
+        vol_multiplier: float = 2.0,  # Default multiplier
+        horizon_ticks: int = 2000,  # Default horizon
         min_barrier_bps: float = 3.0,  # Reasonable minimum to avoid tiny barriers
         target_name: str = "vol_scaled_returns_bps",
     ):
@@ -488,7 +488,7 @@ class VolatilityScaledReturnsGenerator(TargetGenerator):
         return {
             "target_names": [self.target_name],
             "target_type": "regression",
-            "description": f"Volatility-scaled returns with {self.vol_multiplier}x vol barriers (min {self.min_barrier_bps} bps) over {self.horizon_ticks} ticks",
+            "description": f"Volatility-scaled returns with {self.vol_multiplier}x vol barriers over {self.horizon_ticks} ticks",
             "parameters": {
                 "volatility_window": self.volatility_window,
                 "vol_multiplier": self.vol_multiplier,
