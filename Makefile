@@ -1,4 +1,4 @@
-.PHONY: install test lint typecheck format build clean help test-performance test-fast test-unit test-e2e demo examples process-production create-mfe-datasets check-commit coverage-report coverage-html distribution-analysis
+.PHONY: install test lint typecheck format build clean help test-performance test-fast test-unit test-e2e check-commit coverage-report coverage-html visualize-approaches build-labels list-presets build-trading-labels build-research-labels build-mfe-labels build-trend-labels build-vol-labels
 
 # Default target
 help:
@@ -22,16 +22,18 @@ help:
 	@echo "  format                 - Format code with ruff"
 	@echo "  check-commit           - Run pre-commit checks and commit"
 	@echo ""
-	@echo "🚀 EXAMPLES & DEMOS:"
-	@echo "  demo                   - Run complete workflow demo (three core modules)"
-	@echo "  examples               - Alias for demo"
+	@echo "🚀 VISUALIZATION:"
+	@echo "  visualize-approaches   - Create comprehensive visualization of all labeling approaches"
 	@echo ""
-	@echo "📊 RESEARCH & ANALYSIS:"
-	@echo "  distribution-analysis  - Run comprehensive distribution analysis (research only)"
+	@echo "🎯 LABEL SET BUILDING:"
+	@echo "  list-presets           - List all available label set presets"
+	@echo "  build-labels           - Interactive label set builder (prompts for configuration)"
+	@echo "  build-trading-labels   - Build trading strategy focused label set"
+	@echo "  build-research-labels  - Build academic research focused label set"
+	@echo "  build-mfe-labels       - Build MFE analysis focused label set"
+	@echo "  build-trend-labels     - Build trend analysis focused label set" 
+	@echo "  build-vol-labels       - Build volatility analysis focused label set"
 	@echo ""
-	@echo "🏭 PRODUCTION:"
-	@echo "  process-production     - Process AUDUSD-micro data for production ML training"
-	@echo "  create-mfe-datasets    - Create MFE buy/sell datasets for ML training"
 
 # Setup & Development
 install:
@@ -90,57 +92,75 @@ check-commit:
 	.venv/bin/pre-commit run --all-files
 	.venv/bin/cz commit --all
 
-# Examples & Demos
-demo:
-	@echo "🚀 Running Complete Workflow Demo"
+# Labeling Approaches Visualization
+visualize-approaches:
+	@echo "📊 Creating comprehensive labeling approaches visualization..."
+	@echo "🎯 Generating all available target types with real market data"
+	PYTHONPATH=. python examples/labeling_approaches_visualization.py
+	@echo "✅ Visualizations created in examples/:"
+	@echo "   • classification_approaches_comparison.png"
+	@echo "   • regression_approaches_comparison.png" 
+	@echo "   • academic_vs_traditional_comparison.png"
+	@echo "   • complete_labeling_overview.png"
+
+# Label Set Building
+list-presets:
+	@echo "🎯 Available Label Set Presets:"
+	@echo "================================"
+	python scripts/build_label_set.py --list-presets
+
+build-labels:
+	@echo "🎯 Interactive Label Set Builder"
 	@echo "================================="
-	python examples/complete_workflow_demo.py
+	@echo "Choose your configuration approach:"
+	@echo "1. Use a preset configuration (recommended)"
+	@echo "2. Create from custom YAML file"
+	@echo ""
+	@echo "Available presets:"
+	@python scripts/build_label_set.py --list-presets
+	@echo ""
+	@echo "💡 Run one of the specific targets below, or use:"
+	@echo "   make build-[preset]-labels"
+	@echo ""
+	@echo "📋 For custom config:"
+	@echo "   python scripts/build_label_set.py --config your_config.yaml"
 
-examples: demo
+build-trading-labels:
+	@echo "🎯 Building Trading Strategy Label Set"
+	@echo "======================================="
+	@echo "🎯 Optimized for: Systematic trading strategies with risk management"
+	@echo "📊 Includes: Multi-horizon MFE, volatility scaling, trend analysis"
+	python scripts/build_label_set.py --config configs/label_sets/trading_strategy.yaml --data /Users/danielfisher/data/databento/AUDUSD-micro/
+	@echo "✅ Trading strategy labels built successfully!"
 
-# Research & Analysis
-distribution-analysis:
-	@echo "📊 Running Comprehensive Distribution Analysis"
-	@echo "=============================================="
-	@echo "⚠️  Research only - Not part of main represent package"
-	@echo "🎯 Focus: Tail prediction for financial returns classification"
-	cd distributions && python scripts/enhanced_distribution_analyzer.py
-	@echo "📁 Reports generated:"
-	@echo "   • distributions/html/final_comprehensive_report_2024.html"
-	@echo "   • distributions/html/distribution_comparison_report_enhanced.html"
-	@echo "   • distributions/html/metrics_explanation_detailed.html"
-	@echo "🌟 Recommended approach: Merton Jump Diffusion"
-
-# Merton Jump Diffusion Dataset Creation
-create-merton-dataset:
-	@echo "🎯 Creating Merton Jump Diffusion Classified Dataset"
-	@echo "================================================="
-	@echo "🌟 Using optimal distribution approach (68% better tail prediction)"
-	@echo "📊 Expected: Tail score ~4.6 vs 14.4 baseline"
-	@echo "🎲 Method: Merton Jump Diffusion model for financial returns"
-	python create_merton_dataset.py
-	@echo "📁 Merton datasets created in: /Users/danielfisher/data/databento/AUDUSD_merton_datasets/"
-	@echo "✅ Ready for enhanced ML training with superior tail prediction!"
-
-# Dataset Comparison Assessment  
-compare-datasets:
-	@echo "🔍 Creating Dataset Comparison Assessment"
+build-research-labels:
+	@echo "🎯 Building Academic Research Label Set"
 	@echo "========================================"
-	@echo "📊 Comparing: Quantile (Original) vs Merton Jump Diffusion (New)"
-	@echo "🎯 Focus: Classification quality, tail prediction, ML training readiness"
-	python create_dataset_comparison.py
-	@echo "📋 HTML assessment: distributions/html/dataset_comparison_assessment.html"
-	@echo "🌟 View detailed comparison results in your browser!"
+	@echo "🎯 Optimized for: Comprehensive financial research and academic analysis"
+	@echo "📊 Includes: Multi-horizon analysis, trend sensitivities, volatility regimes"
+	python scripts/build_label_set.py --config configs/label_sets/research_academic.yaml --data /Users/danielfisher/data/databento/AUDUSD-micro/
+	@echo "✅ Research labels built successfully!"
 
-# Production
-process-production:
-	@echo "🏭 Processing AUDUSD-micro data for production ML training..."
-	@echo "📊 Using first-half training approach to prevent data leakage"
-	python scripts/process_production_datasets.py
-	@echo "🎉 Production datasets created! Ready for ML training in external repository."
+build-mfe-labels:
+	@echo "🎯 Building MFE Analysis Label Set"
+	@echo "==================================="
+	@echo "🎯 Optimized for: Maximum Favorable Excursion analysis"
+	@echo "📊 Includes: Buy/sell directional signals with multiple horizons"
+	python scripts/build_label_set.py --preset mfe_analysis --data /Users/danielfisher/data/databento/AUDUSD-micro/
+	@echo "✅ MFE analysis labels built successfully!"
 
-create-mfe-datasets:
-	@echo "🎯 Creating MFE buy/sell datasets for ML training..."
-	@echo "📊 Processing symbol datasets with directional MFE targets"
-	python scripts/create_mfe_datasets.py
-	@echo "🎉 MFE datasets created! Ready for dual-model ML training."
+build-trend-labels:
+	@echo "🎯 Building Trend Analysis Label Set" 
+	@echo "====================================="
+	@echo "🎯 Optimized for: Trend detection and remaining value analysis"
+	@echo "📊 Includes: Multi-horizon trend signals and quantile classification"
+	python scripts/build_label_set.py --preset trend_analysis --data /Users/danielfisher/data/databento/AUDUSD-micro/
+	@echo "✅ Trend analysis labels built successfully!"
+
+build-vol-labels:
+	@echo "🎯 Building Volatility Analysis Label Set"
+	@echo "=========================================="
+	@echo "🎯 Optimized for: Volatility-based risk management and adaptive strategies"
+	@echo "📊 Includes: Vol-scaled returns, rolling volatility, adaptive barriers"
+	python scripts/build_label_set.py --preset volatility_analysis --data /Users/danielfisher/data/databento/AUDUSD-micro/
+	@echo "✅ Volatility analysis labels built successfully!"

@@ -47,10 +47,9 @@ from .constants import (
     FeatureType,
     get_output_shape,
 )
+
 # Legacy dataset builder removed - use ModularDatasetBuilder instead
-
 # Legacy directional MFE system removed - use modular target generators instead
-
 # Global Threshold Calculation
 from .global_threshold_calculator import (
     GlobalThresholdCalculator,
@@ -60,18 +59,21 @@ from .global_threshold_calculator import (
 
 # Core processing and configuration
 from .market_depth_processor import MarketDepthProcessor, create_processor, process_market_data
+from .modular_dataset_builder import ModularDatasetBuilder, create_modular_builder
 
 # Modular Target Generation System
 from .target_generators import (
+    CumulativeReturnsGenerator,
+    DirectionalMFEGenerator,
+    GlobalThresholdClassificationGenerator,
+    PriceMovementGenerator,
+    QuantileClassificationGenerator,
+    RemainingValueTunerGenerator,
     TargetGenerator,
     TargetGeneratorFactory,
-    QuantileClassificationGenerator,
-    GlobalThresholdClassificationGenerator,
-    DirectionalMFEGenerator,
-    PriceMovementGenerator,
     VolatilityGenerator,
+    VolatilityScaledReturnsGenerator,
 )
-from .modular_dataset_builder import ModularDatasetBuilder, create_modular_builder
 
 # Public API
 __all__ = [
@@ -86,8 +88,11 @@ __all__ = [
     "create_processor",
     "MarketDepthProcessor",
     # Focused configurations
-    "GlobalThresholdConfig", 
+    "DatasetBuilderConfig",
+    "GlobalThresholdConfig",
     "MarketDepthProcessorConfig",
+    "create_compatible_configs",
+    "create_dataset_builder_config",
     "create_threshold_config",
     "create_processor_config",
     # Legacy compatibility functions (deprecated - use modular system)
@@ -108,12 +113,15 @@ __all__ = [
     # Legacy functionality moved to modular target generation system
     # Modular Target Generation System
     "TargetGenerator",
-    "TargetGeneratorFactory", 
+    "TargetGeneratorFactory",
     "QuantileClassificationGenerator",
     "GlobalThresholdClassificationGenerator",
     "DirectionalMFEGenerator",
     "PriceMovementGenerator",
     "VolatilityGenerator",
+    "CumulativeReturnsGenerator",
+    "VolatilityScaledReturnsGenerator",
+    "RemainingValueTunerGenerator",
     "ModularDatasetBuilder",
     "create_modular_builder",
 ]

@@ -9,26 +9,30 @@ See docs/MODULAR_TARGET_ARCHITECTURE.md for complete documentation.
 """
 
 from .base import TargetGenerator
-from .factory import TargetGeneratorFactory
 from .classification import (
-    QuantileClassificationGenerator,
     GlobalThresholdClassificationGenerator,
+    QuantileClassificationGenerator,
 )
+from .factory import TargetGeneratorFactory
 from .regression import (
+    CumulativeReturnsGenerator,
     DirectionalMFEGenerator,
     PriceMovementGenerator,
+    RemainingValueTunerGenerator,
     VolatilityGenerator,
+    VolatilityScaledReturnsGenerator,
 )
 
 # TStrends-based generators (optional - requires tstrends library)
 try:
-    from .tstrends_labeling import (
+    from .tstrends_labeling import (  # noqa: F401
         BinaryCTLGenerator,
-        TernaryCTLGenerator,
         OracleBinaryTrendGenerator,
         OracleTernaryTrendGenerator,
+        TernaryCTLGenerator,
         TunedTrendGenerator,
     )
+
     TSTRENDS_GENERATORS_AVAILABLE = True
 except ImportError:
     TSTRENDS_GENERATORS_AVAILABLE = False
@@ -38,20 +42,25 @@ __all__ = [
     "TargetGenerator",
     "TargetGeneratorFactory",
     # Classification generators
-    "QuantileClassificationGenerator", 
+    "QuantileClassificationGenerator",
     "GlobalThresholdClassificationGenerator",
     # Regression generators
     "DirectionalMFEGenerator",
-    "PriceMovementGenerator", 
+    "PriceMovementGenerator",
     "VolatilityGenerator",
+    "CumulativeReturnsGenerator",
+    "VolatilityScaledReturnsGenerator",
+    "RemainingValueTunerGenerator",
 ]
 
 # Add TStrends generators to exports if available
 if TSTRENDS_GENERATORS_AVAILABLE:
-    __all__.extend([
-        "BinaryCTLGenerator",
-        "TernaryCTLGenerator", 
-        "OracleBinaryTrendGenerator",
-        "OracleTernaryTrendGenerator",
-        "TunedTrendGenerator",
-    ])
+    __all__.extend(
+        [
+            "BinaryCTLGenerator",
+            "TernaryCTLGenerator",
+            "OracleBinaryTrendGenerator",
+            "OracleTernaryTrendGenerator",
+            "TunedTrendGenerator",
+        ]
+    )
