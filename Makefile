@@ -25,14 +25,14 @@ help:
 	@echo "🚀 VISUALIZATION:"
 	@echo "  visualize-approaches   - Create comprehensive visualization of all labeling approaches"
 	@echo ""
-	@echo "🎯 LABEL SET BUILDING:"
+	@echo "🎯 SYMBOL DATASET BUILDING:"
 	@echo "  list-presets           - List all available label set presets"
 	@echo "  build-labels           - Interactive label set builder (prompts for configuration)"
-	@echo "  build-trading-labels   - Build trading strategy focused label set"
-	@echo "  build-research-labels  - Build academic research focused label set"
-	@echo "  build-mfe-labels       - Build MFE analysis focused label set"
-	@echo "  build-trend-labels     - Build trend analysis focused label set" 
-	@echo "  build-vol-labels       - Build volatility analysis focused label set"
+	@echo "  build-trading-labels   - Build trading strategy symbol datasets from all DBN files"
+	@echo "  build-research-labels  - Build academic research symbol datasets from all DBN files"
+	@echo "  build-mfe-labels       - Build MFE analysis symbol datasets from all DBN files"
+	@echo "  build-trend-labels     - Build trend analysis symbol datasets from all DBN files" 
+	@echo "  build-vol-labels       - Build volatility analysis symbol datasets from all DBN files"
 	@echo ""
 
 # Setup & Development
@@ -110,57 +110,62 @@ list-presets:
 	python scripts/build_label_set.py --list-presets
 
 build-labels:
-	@echo "🎯 Interactive Label Set Builder"
-	@echo "================================="
-	@echo "Choose your configuration approach:"
-	@echo "1. Use a preset configuration (recommended)"
-	@echo "2. Create from custom YAML file"
+	@echo "🎯 Interactive Symbol Dataset Builder"
+	@echo "====================================="
+	@echo "Choose your approach:"
+	@echo "1. Build full symbol datasets from DBN files (recommended)"
+	@echo "2. Build simple label sets from parquet files (legacy)"
 	@echo ""
 	@echo "Available presets:"
 	@python scripts/build_label_set.py --list-presets
 	@echo ""
-	@echo "💡 Run one of the specific targets below, or use:"
-	@echo "   make build-[preset]-labels"
+	@echo "💡 For full symbol datasets (includes ALL DBN columns + labels):"
+	@echo "   make build-mfe-labels     # MFE analysis with all DBN data"
+	@echo "   make build-trend-labels   # Trend analysis with all DBN data"  
+	@echo "   make build-vol-labels     # Volatility analysis with all DBN data"
 	@echo ""
-	@echo "📋 For custom config:"
-	@echo "   python scripts/build_label_set.py --config your_config.yaml"
+	@echo "📋 For custom symbol datasets:"
+	@echo "   python scripts/build_symbol_datasets_from_dbn.py --config your_config.yaml --dbn-dir /path/to/dbn --output-dir /Users/danielfisher/data/databento/symbol_datasets"
+	@echo ""
+	@echo "📋 For simple label sets (legacy):"
+	@echo "   python scripts/build_label_set.py --config your_config.yaml --data your_data.parquet"
 
 build-trading-labels:
-	@echo "🎯 Building Trading Strategy Label Set"
-	@echo "======================================="
+	@echo "🎯 Building Trading Strategy Symbol Datasets"
+	@echo "============================================="
 	@echo "🎯 Optimized for: Systematic trading strategies with risk management"
-	@echo "📊 Includes: Multi-horizon MFE, volatility scaling, trend analysis"
-	python scripts/build_label_set.py --config configs/label_sets/trading_strategy.yaml --data /Users/danielfisher/data/databento/AUDUSD-micro/
-	@echo "✅ Trading strategy labels built successfully!"
+	@echo "📊 Processing: All DBN files → Symbol datasets with ALL columns + labels"
+	python scripts/build_symbol_datasets_from_dbn.py --config configs/label_sets/trading_strategy.yaml --dbn-dir /Users/danielfisher/data/databento/AUDUSD-micro --output-dir /Users/danielfisher/data/databento/symbol_datasets
+	@echo "✅ Trading strategy symbol datasets created successfully!"
 
 build-research-labels:
-	@echo "🎯 Building Academic Research Label Set"
-	@echo "========================================"
+	@echo "🎯 Building Academic Research Symbol Datasets"
+	@echo "=============================================="
 	@echo "🎯 Optimized for: Comprehensive financial research and academic analysis"
-	@echo "📊 Includes: Multi-horizon analysis, trend sensitivities, volatility regimes"
-	python scripts/build_label_set.py --config configs/label_sets/research_academic.yaml --data /Users/danielfisher/data/databento/AUDUSD-micro/
-	@echo "✅ Research labels built successfully!"
+	@echo "📊 Processing: All DBN files → Symbol datasets with ALL columns + labels"
+	python scripts/build_symbol_datasets_from_dbn.py --config configs/label_sets/research_academic.yaml --dbn-dir /Users/danielfisher/data/databento/AUDUSD-micro --output-dir /Users/danielfisher/data/databento/symbol_datasets
+	@echo "✅ Research symbol datasets created successfully!"
 
 build-mfe-labels:
-	@echo "🎯 Building MFE Analysis Label Set"
-	@echo "==================================="
+	@echo "🎯 Building MFE Analysis Symbol Datasets"
+	@echo "========================================="
 	@echo "🎯 Optimized for: Maximum Favorable Excursion analysis"
-	@echo "📊 Includes: Buy/sell directional signals with multiple horizons"
-	python scripts/build_label_set.py --preset mfe_analysis --data /Users/danielfisher/data/databento/AUDUSD-micro/
-	@echo "✅ MFE analysis labels built successfully!"
+	@echo "📊 Processing: All DBN files → Symbol datasets with ALL columns + MFE labels (BPS)"
+	python scripts/build_symbol_datasets_from_dbn.py --preset mfe_analysis --dbn-dir /Users/danielfisher/data/databento/AUDUSD-micro --output-dir /Users/danielfisher/data/databento/symbol_datasets
+	@echo "✅ MFE analysis symbol datasets created successfully!"
 
 build-trend-labels:
-	@echo "🎯 Building Trend Analysis Label Set" 
-	@echo "====================================="
+	@echo "🎯 Building Trend Analysis Symbol Datasets" 
+	@echo "==========================================="
 	@echo "🎯 Optimized for: Trend detection and remaining value analysis"
-	@echo "📊 Includes: Multi-horizon trend signals and quantile classification"
-	python scripts/build_label_set.py --preset trend_analysis --data /Users/danielfisher/data/databento/AUDUSD-micro/
-	@echo "✅ Trend analysis labels built successfully!"
+	@echo "📊 Processing: All DBN files → Symbol datasets with ALL columns + trend labels"
+	python scripts/build_symbol_datasets_from_dbn.py --preset trend_analysis --dbn-dir /Users/danielfisher/data/databento/AUDUSD-micro --output-dir /Users/danielfisher/data/databento/symbol_datasets
+	@echo "✅ Trend analysis symbol datasets created successfully!"
 
 build-vol-labels:
-	@echo "🎯 Building Volatility Analysis Label Set"
-	@echo "=========================================="
+	@echo "🎯 Building Volatility Analysis Symbol Datasets"
+	@echo "==============================================="
 	@echo "🎯 Optimized for: Volatility-based risk management and adaptive strategies"
-	@echo "📊 Includes: Vol-scaled returns, rolling volatility, adaptive barriers"
-	python scripts/build_label_set.py --preset volatility_analysis --data /Users/danielfisher/data/databento/AUDUSD-micro/
-	@echo "✅ Volatility analysis labels built successfully!"
+	@echo "📊 Processing: All DBN files → Symbol datasets with ALL columns + volatility labels"
+	python scripts/build_symbol_datasets_from_dbn.py --preset volatility_analysis --dbn-dir /Users/danielfisher/data/databento/AUDUSD-micro --output-dir /Users/danielfisher/data/databento/symbol_datasets
+	@echo "✅ Volatility analysis symbol datasets created successfully!"

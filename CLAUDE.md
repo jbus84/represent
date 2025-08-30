@@ -73,7 +73,7 @@ dataset = builder.build_from_parquet("symbol_data.parquet")
 # Result: classification_label, mfe_buy_bps, mfe_sell_bps, volatility_target
 
 # Save with targets
-builder.save_dataset(dataset, "output/symbol_with_targets.parquet")
+builder.save_dataset(dataset, "/Users/danielfisher/data/databento/symbol_datasets/symbol_with_targets.parquet")
 ```
 
 **Processing Flow:**

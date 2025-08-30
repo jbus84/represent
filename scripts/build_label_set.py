@@ -402,7 +402,7 @@ Examples:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("output/label_sets"),
+        default=Path("/Users/danielfisher/data/databento/label_sets"),
         help="Output directory for generated label sets",
     )
     parser.add_argument("--symbol", type=str, help="Filter for specific symbol (optional)")
