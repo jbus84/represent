@@ -122,11 +122,99 @@ class DirectionalMFEGenerator(TargetGenerator):
         return ["mid_price"]
 
 
+class LogReturnHorizonsGenerator(TargetGenerator):
+    """
+    Generates log return targets across multiple horizon windows.
+
+    This generator calculates log returns over multiple lookforward horizons
+    ranging from 1k to 5k ticks, providing a comprehensive view of price
+    movements across different time scales.
+    """
+
+    def __init__(
+        self,
+        horizons: list[int] | None = None,
+        lookback_window: int = 1000,
+        target_prefix: str = "log_return",
+    ):
+        """
+        Initialize log return horizons generator.
+
+        Args:
+            horizons: List of horizon windows in ticks (defaults to [1000, 2000, 3000, 4000, 5000])
+            lookback_window: Size of lookback window for baseline
+            target_prefix: Prefix for target column names
+        """
+        self.horizons = horizons or [1000, 2000, 3000, 4000, 5000]
+        self.lookback_window = lookback_window
+        self.target_prefix = target_prefix
+
+        # Generate target names for each horizon
+        self.target_names = [f"{target_prefix}_{horizon}t" for horizon in self.horizons]
+
+    def generate_targets(self, df: pl.DataFrame) -> dict[str, np.ndarray]:
+        """Generate log return targets for all horizons."""
+        self.validate_input(df)
+
+        mid_prices = df["mid_price"].to_numpy()
+
+        # Calculate log returns for all horizons
+        targets = {}
+        for i, horizon in enumerate(self.horizons):
+            target_name = self.target_names[i]
+            log_returns = self._calculate_log_returns(mid_prices, horizon)
+            targets[target_name] = log_returns
+
+        return targets
+
+    def _calculate_log_returns(self, mid_prices: np.ndarray, horizon: int) -> np.ndarray:
+        """Calculate log returns for a specific horizon in basis points."""
+        n = len(mid_prices)
+        log_returns = np.full(n, np.nan)
+
+        max_lookforward = max(self.horizons)
+
+        for i in range(self.lookback_window, n - max_lookforward):
+            # Current price (end of lookback window)
+            current_price = mid_prices[i]
+
+            # Future price at specific horizon
+            future_price = mid_prices[i + horizon]
+
+            # Calculate log return in basis points
+            if current_price > 0 and future_price > 0:
+                log_return = np.log(future_price / current_price)
+                log_returns[i] = log_return * 10000  # Convert to basis points
+
+        return log_returns
+
+    def get_target_info(self) -> dict[str, Any]:
+        """Return metadata about this generator."""
+        return {
+            "target_names": self.target_names,
+            "target_type": "regression",
+            "description": f"Log returns across {len(self.horizons)} horizon windows ({min(self.horizons)}-{max(self.horizons)} ticks)",
+            "parameters": {
+                "horizons": self.horizons,
+                "lookback_window": self.lookback_window,
+            },
+        }
+
+    @property
+    def target_type(self) -> str:
+        return "regression"
+
+    @property
+    def required_columns(self) -> list[str]:
+        return ["mid_price"]
+
+
 class PriceMovementGenerator(TargetGenerator):
     """
     Generates simple price movement regression targets.
 
     This generator calculates the percentage price change over a lookforward window.
+    DEPRECATED: Use LogReturnHorizonsGenerator for log return based calculations.
     """
 
     def __init__(

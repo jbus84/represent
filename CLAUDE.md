@@ -52,10 +52,12 @@ from represent import (
     create_modular_builder
 )
 
-# Method 1: Direct generator creation
+# Method 1: Direct generator creation with NEW log return horizons
 generators = [
     TargetGeneratorFactory.create("quantile_classification", nbins=13),
     TargetGeneratorFactory.create("directional_mfe", lookforward_horizon=3000),
+    TargetGeneratorFactory.create("log_return_horizons", 
+                                horizons=[1000, 2000, 3000, 4000, 5000]),
     TargetGeneratorFactory.create("volatility", window_size=1000)
 ]
 builder = ModularDatasetBuilder(generators)
@@ -64,13 +66,15 @@ builder = ModularDatasetBuilder(generators)
 configs = [
     {"type": "quantile_classification", "nbins": 13},
     {"type": "directional_mfe", "lookforward_horizon": 3000},
+    {"type": "log_return_horizons", "horizons": [1000, 2000, 3000, 4000, 5000]},
     {"type": "volatility", "window_size": 1000}
 ]
 builder = create_modular_builder(configs)
 
 # Build dataset with multiple target types from parquet
 dataset = builder.build_from_parquet("symbol_data.parquet")
-# Result: classification_label, mfe_buy_bps, mfe_sell_bps, volatility_target
+# Result: classification_label, mfe_buy_bps, mfe_sell_bps, log_return_1000t, 
+#         log_return_2000t, log_return_3000t, log_return_4000t, log_return_5000t, volatility_target
 
 # Save with targets
 builder.save_dataset(dataset, "/Users/danielfisher/data/databento/symbol_datasets/symbol_with_targets.parquet")
@@ -339,6 +343,39 @@ uv build
 - **Merge Phase Memory**: <8GB RAM during symbol dataset creation
 - **Training Memory**: <4GB RAM regardless of comprehensive dataset size
 - **Cache Efficiency**: >90% cache hit rate for frequently accessed samples
+
+## Target Generators
+
+### Log Return Horizons Generator (NEW)
+
+The `LogReturnHorizonsGenerator` produces multiple horizon-based log return targets from 1k-5k ticks:
+
+```python
+from represent import TargetGeneratorFactory
+
+# Multi-horizon log return analysis
+generator = TargetGeneratorFactory.create(
+    "log_return_horizons",
+    horizons=[1000, 2000, 3000, 4000, 5000],  # Multiple horizons in ticks
+    lookback_window=1000,                     # Baseline window
+    target_prefix="log_return"                # Prefix for target names
+)
+
+# Generates targets: log_return_1000t, log_return_2000t, log_return_3000t, 
+#                   log_return_4000t, log_return_5000t
+```
+
+**Key Features:**
+- **Multi-Horizon Analysis**: Simultaneous prediction across different time scales
+- **Log Return Based**: More statistically robust than simple price changes
+- **Configurable Horizons**: Customize horizon windows for specific strategies
+- **Basis Point Output**: Standardized output format for easy interpretation
+
+**Use Cases:**
+- **Multi-Scale Trading**: Strategies operating across different time horizons
+- **Risk Management**: Understand risk across various holding periods
+- **Strategy Optimization**: Identify optimal holding periods for market conditions
+- **Feature Engineering**: Rich multi-horizon features for ML models
 
 ## Key Components
 

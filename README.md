@@ -656,7 +656,43 @@ movement_generator = TargetGeneratorFactory.create(
 
 ---
 
-#### 3. **Rolling Volatility** (`volatility`)
+#### 3. **Log Return Horizons** (`log_return_horizons`) ⭐ *NEW*
+**Multiple horizon log return predictions for comprehensive market analysis**
+
+```python
+# Multi-horizon log return analysis
+log_return_generator = TargetGeneratorFactory.create(
+    "log_return_horizons",
+    horizons=[1000, 2000, 3000, 4000, 5000],  # Multiple horizons in ticks
+    lookback_window=1000,                     # Baseline window
+    target_prefix="log_return"                # Prefix for target names
+)
+
+# Custom horizons for specific trading strategies
+custom_generator = TargetGeneratorFactory.create(
+    "log_return_horizons",
+    horizons=[500, 1500, 2500],  # Short, medium, long horizons
+    target_prefix="strategy_returns"
+)
+```
+
+**Key Features:**
+- **Multi-Horizon Analysis**: Simultaneous prediction across 1k-5k tick horizons
+- **Log Return Based**: More statistically robust than simple price changes
+- **Configurable Horizons**: Customize horizon windows for specific strategies
+- **Basis Point Output**: Standardized output format for easy interpretation
+
+**Use Cases:**
+- **Multi-Scale Trading**: Strategies operating across different time horizons
+- **Risk Management**: Understand risk across various holding periods
+- **Strategy Optimization**: Identify optimal holding periods for specific market conditions
+- **Feature Engineering**: Rich multi-horizon features for ML models
+
+**Output**: Multiple continuous targets (e.g., `log_return_1000t`, `log_return_2000t`, etc.) in basis points
+
+---
+
+#### 4. **Rolling Volatility** (`volatility`)
 **Rolling volatility estimation over configurable windows**
 
 ```python
@@ -677,7 +713,7 @@ vol_generator = TargetGeneratorFactory.create(
 
 ---
 
-#### 4. **Cumulative Returns** (`cumulative_returns`)
+#### 5. **Cumulative Returns** (`cumulative_returns`)
 **Accumulation of returns over specified lookforward period**
 
 ```python
@@ -698,7 +734,7 @@ cumret_generator = TargetGeneratorFactory.create(
 
 ---
 
-#### 5. **Volatility-Scaled Returns** (`volatility_scaled_returns`)
+#### 6. **Volatility-Scaled Returns** (`volatility_scaled_returns`)
 **Adaptive returns with dynamic stop-loss/take-profit barriers**
 
 ```python
@@ -728,7 +764,7 @@ vol_scaled_generator = TargetGeneratorFactory.create(
 
 ---
 
-#### 6. **Remaining Value Tuner** (`remaining_value_tuner`) ⭐ *NEW*
+#### 7. **Remaining Value Tuner** (`remaining_value_tuner`) ⭐ *NEW*
 **Advanced trend potential labeling inspired by TStrends research**
 
 ```python
@@ -882,6 +918,14 @@ make format             # Code formatting
 
 # Build package
 make build              # Build distribution packages
+
+# Label dataset building presets
+make build-mfe-labels      # Build MFE analysis datasets
+make build-trend-labels    # Build trend analysis datasets  
+make build-vol-labels      # Build volatility analysis datasets
+make build-log-return-labels # Build log return horizons datasets ⭐ NEW
+make build-trading-labels  # Build trading strategy datasets
+make build-research-labels # Build academic research datasets
 ```
 
 ### Testing

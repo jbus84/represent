@@ -1,4 +1,4 @@
-.PHONY: install test lint typecheck format build clean help test-performance test-fast test-unit test-e2e check-commit coverage-report coverage-html visualize-approaches build-labels list-presets build-trading-labels build-research-labels build-mfe-labels build-trend-labels build-vol-labels
+.PHONY: install test lint typecheck format build clean help test-performance test-fast test-unit test-e2e check-commit coverage-report coverage-html visualize-approaches build-labels list-presets build-trading-labels build-research-labels build-mfe-labels build-trend-labels build-vol-labels build-log-return-labels
 
 # Default target
 help:
@@ -33,6 +33,7 @@ help:
 	@echo "  build-mfe-labels       - Build MFE analysis symbol datasets from all DBN files"
 	@echo "  build-trend-labels     - Build trend analysis symbol datasets from all DBN files" 
 	@echo "  build-vol-labels       - Build volatility analysis symbol datasets from all DBN files"
+	@echo "  build-log-return-labels - Build log return horizons symbol datasets from all DBN files"
 	@echo ""
 
 # Setup & Development
@@ -169,3 +170,11 @@ build-vol-labels:
 	@echo "📊 Processing: All DBN files → Symbol datasets with ALL columns + volatility labels"
 	python scripts/build_symbol_datasets_from_dbn.py --preset volatility_analysis --dbn-dir /Users/danielfisher/data/databento/AUDUSD-micro --output-dir /Users/danielfisher/data/databento/symbol_datasets
 	@echo "✅ Volatility analysis symbol datasets created successfully!"
+
+build-log-return-labels:
+	@echo "🎯 Building Log Return Horizons Symbol Datasets"
+	@echo "==============================================="
+	@echo "🎯 Optimized for: Multi-horizon log return analysis (1k-5k ticks)"
+	@echo "📊 Processing: All DBN files → Symbol datasets with ALL columns + log return horizon labels"
+	python scripts/build_symbol_datasets_from_dbn.py --preset log_return_horizons --dbn-dir /Users/danielfisher/data/databento/AUDUSD-micro --output-dir /Users/danielfisher/data/databento/symbol_datasets
+	@echo "✅ Log return horizons symbol datasets created successfully!"

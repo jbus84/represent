@@ -8,6 +8,7 @@ import polars as pl
 
 from represent.target_generators.regression import (
     DirectionalMFEGenerator,
+    LogReturnHorizonsGenerator,
     RemainingValueTunerGenerator,
 )
 
@@ -146,6 +147,198 @@ class TestDirectionalMFEGenerator:
             assert np.allclose(mfe_sell[valid_mask], 0.0, atol=0.1), (
                 "Flat prices should give ~0 MFE"
             )
+
+
+class TestLogReturnHorizonsGenerator:
+    """Test suite for LogReturnHorizonsGenerator."""
+
+    def test_basic_log_return_calculation(self):
+        """Test log return calculation with simple price data."""
+        # Create simple exponential growth: price increases by 1% every 1000 ticks
+        initial_price = 1.0000
+        n_samples = 6000
+        prices = []
+
+        for i in range(n_samples):
+            # Exponential growth: 0.01% per tick for smooth log returns
+            growth_factor = 1.0001 ** i
+            prices.append(initial_price * growth_factor)
+
+        df = pl.DataFrame({"mid_price": prices, "ts_event": range(len(prices))})
+
+        generator = LogReturnHorizonsGenerator(
+            horizons=[1000, 2000, 3000],
+            lookback_window=500,
+            target_prefix="test_log_return"
+        )
+
+        targets = generator.generate_targets(df)
+
+        # Should have all expected target names
+        expected_names = ["test_log_return_1000t", "test_log_return_2000t", "test_log_return_3000t"]
+        for name in expected_names:
+            assert name in targets, f"Missing target {name}"
+
+        # Test that longer horizons generally have larger log returns (due to exponential growth)
+        log_1000 = targets["test_log_return_1000t"]
+        log_2000 = targets["test_log_return_2000t"]
+        log_3000 = targets["test_log_return_3000t"]
+
+        # Find a test index where all horizons have valid values
+        valid_mask = (~np.isnan(log_1000) & ~np.isnan(log_2000) & ~np.isnan(log_3000))
+        if np.any(valid_mask):
+            test_idx = np.where(valid_mask)[0][len(np.where(valid_mask)[0]) // 2]  # Middle valid index
+
+            # Due to exponential growth, longer horizons should have larger returns
+            assert log_3000[test_idx] > log_2000[test_idx], "3000 tick horizon should have larger return than 2000"
+            assert log_2000[test_idx] > log_1000[test_idx], "2000 tick horizon should have larger return than 1000"
+
+    def test_log_return_with_flat_prices(self):
+        """Test log return calculation with flat prices."""
+        # Constant prices
+        prices = np.full(2000, 1.2345)
+        df = pl.DataFrame({"mid_price": prices, "ts_event": range(len(prices))})
+
+        generator = LogReturnHorizonsGenerator(
+            horizons=[500, 1000, 1500],
+            lookback_window=100,
+            target_prefix="flat_test"
+        )
+
+        targets = generator.generate_targets(df)
+
+        # All log returns should be very close to zero
+        for name in ["flat_test_500t", "flat_test_1000t", "flat_test_1500t"]:
+            log_returns = targets[name]
+            valid_values = log_returns[~np.isnan(log_returns)]
+
+            if len(valid_values) > 0:
+                assert np.allclose(valid_values, 0.0, atol=0.1), f"Flat prices should give ~0 log returns for {name}"
+
+    def test_log_return_with_controlled_movement(self):
+        """Test log return with controlled price movement."""
+        # Create price series that increases by exactly 1% (100 bps) every 1000 ticks
+        prices = []
+        base_price = 1.0000
+
+        for i in range(3000):
+            # Increase by 1% every 1000 ticks
+            multiplier = (1.01) ** (i // 1000)
+            prices.append(base_price * multiplier)
+
+        df = pl.DataFrame({"mid_price": prices, "ts_event": range(len(prices))})
+
+        generator = LogReturnHorizonsGenerator(
+            horizons=[1000],  # Single horizon for precise testing
+            lookback_window=100,
+            target_prefix="controlled"
+        )
+
+        targets = generator.generate_targets(df)
+        log_returns = targets["controlled_1000t"]
+
+        # Test at position where we expect exactly 1% growth over 1000 ticks
+        # Position 500 (current) -> Position 1500 (future) spans the transition from 1.00 to 1.01
+        test_idx = 500
+
+        if not np.isnan(log_returns[test_idx]):
+            # Log return of 1% is approximately 99.5 bps (ln(1.01) * 10000)
+            expected_return = np.log(1.01) * 10000
+            actual_return = log_returns[test_idx]
+
+            assert abs(actual_return - expected_return) < 5.0, (
+                f"Expected ~{expected_return:.1f} bps, got {actual_return:.1f} bps"
+            )
+
+    def test_log_return_default_parameters(self):
+        """Test log return generator with default parameters."""
+        # Simple price data
+        prices = np.linspace(1.0000, 1.0050, 8000)  # 50 bps increase over 8000 ticks
+        df = pl.DataFrame({"mid_price": prices, "ts_event": range(len(prices))})
+
+        # Use default parameters
+        generator = LogReturnHorizonsGenerator()
+
+        targets = generator.generate_targets(df)
+
+        # Should have default horizons
+        expected_defaults = ["log_return_1000t", "log_return_2000t", "log_return_3000t",
+                           "log_return_4000t", "log_return_5000t"]
+
+        for name in expected_defaults:
+            assert name in targets, f"Missing default target {name}"
+
+        # Should have some valid values
+        for name in expected_defaults:
+            log_returns = targets[name]
+            valid_count = np.sum(~np.isnan(log_returns))
+            assert valid_count > 0, f"Should have some valid values for {name}"
+
+    def test_log_return_custom_horizons(self):
+        """Test log return generator with custom horizons."""
+        prices = np.linspace(1.0000, 1.0100, 4000)  # 100 bps increase
+        df = pl.DataFrame({"mid_price": prices, "ts_event": range(len(prices))})
+
+        # Custom configuration
+        generator = LogReturnHorizonsGenerator(
+            horizons=[250, 750, 1250],
+            lookback_window=50,
+            target_prefix="custom_horizon"
+        )
+
+        targets = generator.generate_targets(df)
+
+        # Should have custom target names
+        expected_custom = ["custom_horizon_250t", "custom_horizon_750t", "custom_horizon_1250t"]
+
+        for name in expected_custom:
+            assert name in targets, f"Missing custom target {name}"
+
+    def test_log_return_edge_cases(self):
+        """Test log return generator with edge cases."""
+        # Very small dataset
+        prices = [1.0000, 1.0001, 1.0002, 1.0003, 1.0004]
+        df = pl.DataFrame({"mid_price": prices, "ts_event": range(len(prices))})
+
+        generator = LogReturnHorizonsGenerator(
+            horizons=[1, 2],  # Very short horizons for small dataset
+            lookback_window=1,
+            target_prefix="edge"
+        )
+
+        targets = generator.generate_targets(df)
+
+        # Should handle small dataset gracefully
+        assert "edge_1t" in targets
+        assert "edge_2t" in targets
+
+        # Most values might be NaN due to boundary conditions, but shouldn't crash
+        assert len(targets["edge_1t"]) == len(prices)
+        assert len(targets["edge_2t"]) == len(prices)
+
+    def test_log_return_target_info(self):
+        """Test target info metadata."""
+        generator = LogReturnHorizonsGenerator(
+            horizons=[1000, 2000, 3000],
+            lookback_window=500,
+            target_prefix="info_test"
+        )
+
+        info = generator.get_target_info()
+
+        # Check required fields
+        assert "target_names" in info
+        assert "target_type" in info
+        assert "description" in info
+        assert "parameters" in info
+
+        # Check values
+        expected_names = ["info_test_1000t", "info_test_2000t", "info_test_3000t"]
+        assert info["target_names"] == expected_names
+        assert info["target_type"] == "regression"
+        assert "1000-3000" in info["description"]  # Should mention horizon range
+        assert info["parameters"]["horizons"] == [1000, 2000, 3000]
+        assert info["parameters"]["lookback_window"] == 500
 
 
 class TestRemainingValueTunerGenerator:
@@ -363,6 +556,18 @@ class TestRegressionGeneratorIntegration:
         assert rv_generator.lookforward_offset == 100
         assert rv_generator.trend_threshold_bps == 25.0
 
+        # Test LogReturnHorizons creation
+        log_return_generator = TargetGeneratorFactory.create(
+            "log_return_horizons",
+            horizons=[1000, 2000, 3000],
+            lookback_window=500,
+            target_prefix="test_log"
+        )
+        assert isinstance(log_return_generator, LogReturnHorizonsGenerator)
+        assert log_return_generator.horizons == [1000, 2000, 3000]
+        assert log_return_generator.lookback_window == 500
+        assert log_return_generator.target_prefix == "test_log"
+
     def test_generators_with_real_data_structure(self):
         """Test generators with realistic data structure."""
         # Create realistic market data structure
@@ -409,21 +614,37 @@ class TestRegressionGeneratorIntegration:
             target_name="remaining_value",
         )
 
-        # Both should process successfully
+        log_return_generator = LogReturnHorizonsGenerator(
+            horizons=[200, 400, 800],
+            lookback_window=50,
+            target_prefix="realistic_log"
+        )
+
+        # All should process successfully
         mfe_targets = mfe_generator.generate_targets(df)
         rv_targets = rv_generator.generate_targets(df)
+        log_targets = log_return_generator.generate_targets(df)
 
         # Verify output structure
         assert "mfe_buy" in mfe_targets
         assert "mfe_sell" in mfe_targets
         assert "remaining_value" in rv_targets
+        assert "realistic_log_200t" in log_targets
+        assert "realistic_log_400t" in log_targets
+        assert "realistic_log_800t" in log_targets
 
         # Verify output lengths match input
         assert len(mfe_targets["mfe_buy"]) == n_samples
         assert len(mfe_targets["mfe_sell"]) == n_samples
         assert len(rv_targets["remaining_value"]) == n_samples
+        assert len(log_targets["realistic_log_200t"]) == n_samples
+        assert len(log_targets["realistic_log_400t"]) == n_samples
+        assert len(log_targets["realistic_log_800t"]) == n_samples
 
         # Should have some valid values
         assert np.any(~np.isnan(mfe_targets["mfe_buy"]))
         assert np.any(~np.isnan(mfe_targets["mfe_sell"]))
+        assert np.any(~np.isnan(log_targets["realistic_log_200t"]))
+        assert np.any(~np.isnan(log_targets["realistic_log_400t"]))
+        assert np.any(~np.isnan(log_targets["realistic_log_800t"]))
         # RemainingValue may have fewer valid values depending on trend detection

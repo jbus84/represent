@@ -130,6 +130,7 @@ def _register_builtin_generators():
         from .regression import (
             CumulativeReturnsGenerator,
             DirectionalMFEGenerator,
+            LogReturnHorizonsGenerator,
             PriceMovementGenerator,
             RemainingValueTunerGenerator,
             VolatilityGenerator,
@@ -137,6 +138,7 @@ def _register_builtin_generators():
         )
 
         TargetGeneratorFactory.register("directional_mfe", DirectionalMFEGenerator)
+        TargetGeneratorFactory.register("log_return_horizons", LogReturnHorizonsGenerator)
         TargetGeneratorFactory.register("price_movement", PriceMovementGenerator)
         TargetGeneratorFactory.register("volatility", VolatilityGenerator)
         TargetGeneratorFactory.register("cumulative_returns", CumulativeReturnsGenerator)

@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from represent import (  # noqa: E402
     CumulativeReturnsGenerator,
     DirectionalMFEGenerator,
+    LogReturnHorizonsGenerator,
     ModularDatasetBuilder,
     PriceMovementGenerator,
     QuantileClassificationGenerator,
@@ -347,6 +348,11 @@ def apply_all_labeling_approaches(market_data: pl.DataFrame) -> dict[str, np.nda
                 target_name="quantile_3class",
             ),
             DirectionalMFEGenerator(lookforward_horizon=1000, target_names=("mfe_buy", "mfe_sell")),
+            LogReturnHorizonsGenerator(
+                horizons=[1000, 2000, 3000, 4000, 5000],
+                lookback_window=1000,
+                target_prefix="log_return",
+            ),
             PriceMovementGenerator(lookforward_window=100, target_name="price_movement"),
             VolatilityGenerator(window_size=50, target_name="volatility"),
             CumulativeReturnsGenerator(lookforward_samples=500, target_name="cumret_500_samples"),
@@ -484,6 +490,7 @@ def create_comprehensive_visualization(
                 "cumret",
                 "vol_scaled",
                 "remaining_value",
+                "log_return",
             ]
         )
     }
@@ -952,6 +959,15 @@ def create_regression_comparison_plot(
                 elif "ticks" in part:
                     ticks = part.replace("ticks", "")
             title = f"Remaining Value Tuner ({threshold} threshold, {ticks} ticks)"
+        elif "log_return" in name.lower():
+            # Extract horizon from name like "log_return_3000t"
+            parts = name.split("_")
+            horizon = "unknown"
+            for part in parts:
+                if part.endswith("t") and part[:-1].isdigit():
+                    horizon = part[:-1]
+                    break
+            title = f"Log Return Horizon ({horizon} ticks)"
         elif "movement" in name.lower():
             title = "Price Movement"
         elif "volatility" in name.lower() and "scaled" not in name.lower():
@@ -964,6 +980,7 @@ def create_regression_comparison_plot(
             or "cumret" in name.lower()
             or "vol_scaled" in name.lower()
             or "remaining_value" in name.lower()
+            or "log_return" in name.lower()
             else "Value"
         )
         ax.grid(True, alpha=0.3)
@@ -1419,6 +1436,15 @@ def create_complete_overview_plot(
                     elif "ticks" in part:
                         ticks = part.replace("ticks", "")
                 title = f"Remaining Value Tuner\n({threshold} threshold, {ticks} ticks)"
+            elif "log_return" in name.lower():
+                # Extract horizon from name like "log_return_3000t"
+                parts = name.split("_")
+                horizon = "unknown"
+                for part in parts:
+                    if part.endswith("t") and part[:-1].isdigit():
+                        horizon = part[:-1]
+                        break
+                title = f"Log Return Horizon\n({horizon} ticks)"
             elif "mfe" in name.lower():
                 if "buy" in name.lower():
                     title = "MFE Buy-side"

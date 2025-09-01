@@ -156,6 +156,25 @@ LABEL_SET_PRESETS = {
         ],
         "visualization": True,
     },
+    "log_return_horizons": {
+        "name": "Log Return Horizons - Multi-scale Return Analysis",
+        "description": "Log return predictions across multiple time horizons (1k-5k ticks)",
+        "generators": [
+            {
+                "type": "log_return_horizons",
+                "horizons": [1000, 2000, 3000, 4000, 5000],
+                "lookback_window": 1000,
+                "target_prefix": "log_return",
+            },
+            {
+                "type": "log_return_horizons",
+                "horizons": [500, 1500, 2500],
+                "lookback_window": 500,
+                "target_prefix": "short_log_return",
+            },
+        ],
+        "visualization": True,
+    },
 }
 
 

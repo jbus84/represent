@@ -17,6 +17,7 @@ from .factory import TargetGeneratorFactory
 from .regression import (
     CumulativeReturnsGenerator,
     DirectionalMFEGenerator,
+    LogReturnHorizonsGenerator,
     PriceMovementGenerator,
     RemainingValueTunerGenerator,
     VolatilityGenerator,
@@ -46,6 +47,7 @@ __all__ = [
     "GlobalThresholdClassificationGenerator",
     # Regression generators
     "DirectionalMFEGenerator",
+    "LogReturnHorizonsGenerator",
     "PriceMovementGenerator",
     "VolatilityGenerator",
     "CumulativeReturnsGenerator",
