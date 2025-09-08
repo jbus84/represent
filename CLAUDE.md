@@ -43,52 +43,63 @@ The package now follows a **symbol-split-merge architecture** for creating compr
 
 ## Core Workflow
 
-### Primary Workflow: Modular Target Generation
+### Primary Workflow: Target-Only Generation (NEW)
+
+**BREAKING CHANGE**: The represent package now generates standalone target files that map to input data via keys, dramatically reducing storage requirements.
 
 ```python
 from represent import (
-    ModularDatasetBuilder,
-    TargetGeneratorFactory,
-    create_modular_builder
+    generate_targets_from_parquet,
+    generate_targets_from_dataframe, 
+    batch_generate_targets,
+    create_target_config_template
 )
 
-# Method 1: Direct generator creation with NEW log return horizons
-generators = [
-    TargetGeneratorFactory.create("quantile_classification", nbins=13),
-    TargetGeneratorFactory.create("directional_mfe", lookforward_horizon=3000),
-    TargetGeneratorFactory.create("log_return_horizons", 
-                                horizons=[1000, 2000, 3000, 4000, 5000]),
-    TargetGeneratorFactory.create("volatility", window_size=1000)
-]
-builder = ModularDatasetBuilder(generators)
-
-# Method 2: Configuration-based creation
-configs = [
+# Method 1: High-level API for target-only generation
+generator_configs = [
     {"type": "quantile_classification", "nbins": 13},
     {"type": "directional_mfe", "lookforward_horizon": 3000},
     {"type": "log_return_horizons", "horizons": [1000, 2000, 3000, 4000, 5000]},
     {"type": "volatility", "window_size": 1000}
 ]
-builder = create_modular_builder(configs)
 
-# Build dataset with multiple target types from parquet
-dataset = builder.build_from_parquet("symbol_data.parquet")
-# Result: classification_label, mfe_buy_bps, mfe_sell_bps, log_return_1000t, 
-#         log_return_2000t, log_return_3000t, log_return_4000t, log_return_5000t, volatility_target
+# Generate standalone target file (no input data duplication)
+stats = generate_targets_from_parquet(
+    input_path="symbol_data.parquet",
+    output_path="symbol_targets.parquet",  # MUCH smaller file
+    generator_configs=generator_configs,
+    symbol="AUDUSD_M6AM4"
+)
 
-# Save with targets
-builder.save_dataset(dataset, "/Users/danielfisher/data/databento/symbol_datasets/symbol_with_targets.parquet")
+# Target file contains: row_idx, symbol, timestamp, classification_label, 
+# mfe_buy_bps, mfe_sell_bps, log_return_1000t, log_return_2000t, etc.
+
+# Method 2: Template-based configuration
+config = create_target_config_template(
+    target_types=["classification", "mfe", "log_returns", "volatility"]
+)
+
+batch_generate_targets(
+    input_files=["symbol1_data.parquet", "symbol2_data.parquet"],
+    output_dir="targets/",
+    generator_configs=config
+)
 ```
 
-**Processing Flow:**
+**New Target-Only Processing Flow:**
 ```
-DBN File 1 → Split by Symbol → M6AM4.parquet, M6AM5.parquet, ...
-DBN File 2 → Split by Symbol → M6AM4.parquet, M6AM5.parquet, ...
-DBN File 3 → Split by Symbol → M6AM4.parquet, M6AM5.parquet, ...
-                                        ↓
-Merge Phase: M6AM4_dataset.parquet ← All M6AM4.parquet files
-             M6AM5_dataset.parquet ← All M6AM5.parquet files
+Input Data: symbol_data.parquet (features, market data)
+                      ↓
+Target Generation: target_generators → symbol_targets.parquet (keys + targets only)
+                      ↓
+Training: Lazy join input_data[row_idx] + targets[row_idx] → batches
 ```
+
+**Storage Benefits:**
+- **Input data**: Store once, reuse for multiple target experiments
+- **Target files**: ~90% smaller than combined input+target files
+- **Flexibility**: Generate different target configurations without re-processing input data
+- **Efficiency**: Lazy loading joins only required data during training
 
 **Key Features:**
 - **Two-Phase Processing**: Split all DBN files, then merge by symbol
@@ -113,30 +124,51 @@ results = batch_build_datasets_from_directory(
 )
 ```
 
-### ML Training (External Implementation)
+### ML Training with Target-Only Files
 
-The comprehensive symbol datasets are ready for ML training. **Dataloader functionality has been moved out of the represent package** to allow for customization in your ML training repository.
+**New Approach**: Input data and targets are stored separately and joined during training for maximum efficiency.
 
-**Expected Workflow:**
 ```python
-# In your ML training repository, implement a custom dataloader
-# that reads the comprehensive symbol datasets
+from represent import load_targets_and_join
+import polars as pl
 
-# Standard PyTorch training loop structure:
-for features, labels in your_custom_dataloader:
-    # features: torch.Tensor shape (batch_size, [N_features,] 402, 500)  
-    # labels: torch.Tensor shape (batch_size,) with uniform distribution
+# Method 1: Load and join for training
+combined_df = load_targets_and_join(
+    input_data_path="symbol_data.parquet",  # Features, market depth
+    targets_path="symbol_targets.parquet"   # Keys + targets only
+)
+
+# Method 2: Custom dataloader with lazy joining
+class TargetDataLoader:
+    def __init__(self, input_path, targets_path, batch_size=32):
+        self.input_df = pl.read_parquet(input_path)
+        self.targets_df = pl.read_parquet(targets_path)
+        self.batch_size = batch_size
+    
+    def __iter__(self):
+        for batch_indices in self.get_batch_indices():
+            # Lazy join only required rows
+            batch_input = self.input_df[batch_indices]
+            batch_targets = self.targets_df.filter(
+                pl.col('row_idx').is_in(batch_indices)
+            )
+            yield batch_input, batch_targets
+
+# Standard PyTorch training loop:
+for features, targets in dataloader:
+    # features: torch.Tensor shape (batch_size, [N_features,] 402, 500)
+    # targets: torch.Tensor shape (batch_size,) - multiple target types available
     outputs = model(features)
-    loss = criterion(outputs, labels)
+    loss = criterion(outputs, targets['classification_label'])  # or any target
     # ... training logic
 ```
 
 **Key Benefits:**
-- **Comprehensive Training Data**: Each symbol's full history for robust training
-- **Large Dataset Support**: Train on multi-GB symbol datasets efficiently
-- **Symbol-Specific Training**: Focus on specific symbols or use all available
-- **Uniform Distribution**: Guaranteed class balance within each symbol dataset
-- **Memory Efficient**: Lazy loading supports datasets larger than RAM
+- **Storage Efficiency**: 90% reduction in total storage requirements
+- **Target Flexibility**: Generate different targets without re-processing input data
+- **Memory Efficiency**: Load only required data during training
+- **Multi-Target Support**: Single input dataset, multiple target experiments
+- **Symbol-Specific Datasets**: Each symbol gets optimized target generation
 
 ## Core Data Structures
 
@@ -501,57 +533,52 @@ When working on this codebase:
 
 ## Example Workflows
 
-### Complete Symbol-Split-Merge Pipeline
+### Complete Target-Only Generation Pipeline
 
 ```python
-from represent import create_represent_config, DatasetBuildConfig
-from represent import build_datasets_from_dbn_files
-
-# Create configuration
-config = create_represent_config(
-    currency="AUDUSD",
-    features=['volume', 'variance'],
-    lookback_rows=5000,
-    lookforward_input=5000,
-    lookforward_offset=500
+from represent import (
+    generate_targets_from_parquet,
+    batch_generate_targets,
+    create_target_config_template,
+    load_targets_and_join
 )
 
-# Create dataset building configuration  
-dataset_config = DatasetBuildConfig(
-    currency="AUDUSD",
-    min_symbol_samples=60500,     # Auto-calculated: samples + lookback + lookforward + offset
-    force_uniform=True,           # Guarantee uniform class distribution
-    keep_intermediate=False       # Clean up intermediate split files
+# Step 1: Create target configuration
+target_config = create_target_config_template(
+    target_types=["classification", "mfe", "log_returns", "volatility"],
+    classification_bins=13,
+    mfe_horizon=3000,
+    log_return_horizons=[1000, 2000, 3000, 4000, 5000]
 )
 
-# Build comprehensive symbol datasets from multiple DBN files
-# Use at least 10 DBN files to ensure sufficient data for each symbol
-print("Building comprehensive symbol datasets...")
-results = build_datasets_from_dbn_files(
-    config=config,
-    dbn_files=[
-        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240101.dbn.zst",
-        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240102.dbn.zst", 
-        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240103.dbn.zst",
-        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240104.dbn.zst",
-        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240105.dbn.zst",
-        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240106.dbn.zst",
-        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240107.dbn.zst",
-        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240108.dbn.zst",
-        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240109.dbn.zst",
-        "/Users/danielfisher/data/databento/AUDUSD-micro/AUDUSD-20240110.dbn.zst"
-    ],
-    output_dir="/data/symbol_datasets/",
-    dataset_config=dataset_config,
+# Step 2: Generate targets for all symbol datasets (assuming they already exist)
+symbol_input_files = [
+    "/Users/danielfisher/data/databento/symbol_datasets/AUDUSD_M6AM4_dataset.parquet",
+    "/Users/danielfisher/data/databento/symbol_datasets/AUDUSD_M6AM5_dataset.parquet",
+    "/Users/danielfisher/data/databento/symbol_datasets/AUDUSD_M6AH5_dataset.parquet",
+]
+
+print("Generating standalone target files...")
+results = batch_generate_targets(
+    input_files=symbol_input_files,
+    output_dir="/Users/danielfisher/data/databento/symbol_targets/",
+    generator_configs=target_config,
+    output_suffix="_targets.parquet",
     verbose=True
 )
 
-print(f"Created {results['phase_2_stats']['datasets_created']} comprehensive symbol datasets")
-print(f"Total samples: {results['phase_2_stats']['total_samples']:,}")
-print("Ready for ML training with comprehensive symbol data!")
+print(f"Generated {results['processed']} target files")
+print(f"Total target storage: {results['total_size_mb']:.1f} MB")  # Much smaller!
+print("Ready for ML training with efficient target-only storage!")
 
-# ML Training (implement custom dataloader in your ML repo)
-# See DATALOADER_MIGRATION_GUIDE.md for implementation instructions
+# Step 3: Training with target files
+combined_df = load_targets_and_join(
+    input_data_path="/Users/danielfisher/data/databento/symbol_datasets/AUDUSD_M6AM4_dataset.parquet",
+    targets_path="/Users/danielfisher/data/databento/symbol_targets/AUDUSD_M6AM4_dataset_targets.parquet"
+)
+
+print(f"Combined training data: {len(combined_df)} rows")
+print(f"Available targets: {[col for col in combined_df.columns if col.endswith(('_bps', '_label', '_target', '_1000t', '_2000t', '_3000t', '_4000t', '_5000t'))]}")
 ```
 
 ### Directory-Based Dataset Building

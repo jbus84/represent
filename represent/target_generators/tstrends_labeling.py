@@ -58,7 +58,7 @@ class BinaryCTLGenerator(TargetGenerator):
         self.target_name = target_name
         self.labeller = BinaryCTL(omega=omega)
 
-    def generate_targets(self, df: pl.DataFrame) -> dict[str, np.ndarray]:
+    def generate_targets(self, df: pl.DataFrame, symbol: str | None = None) -> pl.DataFrame:
         """Generate binary CTL targets."""
         self.validate_input(df)
 
@@ -68,7 +68,11 @@ class BinaryCTLGenerator(TargetGenerator):
         # Ensure we have valid numeric data
         prices = prices[~np.isnan(prices)]
         if len(prices) == 0:
-            return {self.target_name: np.array([], dtype=np.int32)}
+            # Create base target DataFrame with keys and empty labels
+            target_df = self._create_base_target_df(df, symbol)
+            empty_labels = np.zeros(len(df), dtype=np.int32)
+            target_df = target_df.with_columns(pl.Series(self.target_name, empty_labels))
+            return target_df
 
         # Convert to list of native Python floats
         price_list = [float(p) for p in prices.tolist()]
@@ -95,7 +99,13 @@ class BinaryCTLGenerator(TargetGenerator):
             else:
                 labels = labels[: prices.shape[0]]
 
-        return {self.target_name: labels}
+        # Create base target DataFrame with keys
+        target_df = self._create_base_target_df(df, symbol)
+
+        # Add target column
+        target_df = target_df.with_columns(pl.Series(self.target_name, labels))
+
+        return target_df
 
     def get_target_info(self) -> dict[str, Any]:
         """Return metadata about this generator."""
@@ -152,7 +162,7 @@ class TernaryCTLGenerator(TargetGenerator):
             marginal_change_thres=marginal_change_thres, window_size=window_size
         )
 
-    def generate_targets(self, df: pl.DataFrame) -> dict[str, np.ndarray]:
+    def generate_targets(self, df: pl.DataFrame, symbol: str | None = None) -> pl.DataFrame:
         """Generate ternary CTL targets."""
         self.validate_input(df)
 
@@ -169,7 +179,13 @@ class TernaryCTLGenerator(TargetGenerator):
         # -1 (down) -> 0, 0 (neutral) -> 1, 1 (up) -> 2
         labels = labels + 1
 
-        return {self.target_name: labels}
+        # Create base target DataFrame with keys
+        target_df = self._create_base_target_df(df, symbol)
+
+        # Add target column
+        target_df = target_df.with_columns(pl.Series(self.target_name, labels))
+
+        return target_df
 
     def get_target_info(self) -> dict[str, Any]:
         """Return metadata about this generator."""
@@ -222,7 +238,7 @@ class OracleBinaryTrendGenerator(TargetGenerator):
         self.target_name = target_name
         self.labeller = OracleBinaryTrendLabeller(transaction_cost=transaction_cost)
 
-    def generate_targets(self, df: pl.DataFrame) -> dict[str, np.ndarray]:
+    def generate_targets(self, df: pl.DataFrame, symbol: str | None = None) -> pl.DataFrame:
         """Generate oracle binary targets."""
         self.validate_input(df)
 
@@ -238,7 +254,13 @@ class OracleBinaryTrendGenerator(TargetGenerator):
         # -1 (down) -> 0, 1 (up) -> 1
         labels = np.where(labels == -1, 0, labels)
 
-        return {self.target_name: labels}
+        # Create base target DataFrame with keys
+        target_df = self._create_base_target_df(df, symbol)
+
+        # Add target column
+        target_df = target_df.with_columns(pl.Series(self.target_name, labels))
+
+        return target_df
 
     def get_target_info(self) -> dict[str, Any]:
         """Return metadata about this generator."""
@@ -295,7 +317,7 @@ class OracleTernaryTrendGenerator(TargetGenerator):
             transaction_cost=transaction_cost, neutral_reward_factor=neutral_reward_factor
         )
 
-    def generate_targets(self, df: pl.DataFrame) -> dict[str, np.ndarray]:
+    def generate_targets(self, df: pl.DataFrame, symbol: str | None = None) -> pl.DataFrame:
         """Generate oracle ternary targets."""
         self.validate_input(df)
 
@@ -311,7 +333,13 @@ class OracleTernaryTrendGenerator(TargetGenerator):
         # -1 (down) -> 0, 0 (neutral) -> 1, 1 (up) -> 2
         labels = labels + 1
 
-        return {self.target_name: labels}
+        # Create base target DataFrame with keys
+        target_df = self._create_base_target_df(df, symbol)
+
+        # Add target column
+        target_df = target_df.with_columns(pl.Series(self.target_name, labels))
+
+        return target_df
 
     def get_target_info(self) -> dict[str, Any]:
         """Return metadata about this generator."""
@@ -382,7 +410,7 @@ class TunedTrendGenerator(TargetGenerator):
         # Simple stub: keep API available but avoid complex tuning to satisfy lints/runtime
         self.tuner = None
 
-    def generate_targets(self, df: pl.DataFrame) -> dict[str, np.ndarray]:
+    def generate_targets(self, df: pl.DataFrame, symbol: str | None = None) -> pl.DataFrame:
         """Generate tuned trend targets."""
         self.validate_input(df)
 
@@ -394,7 +422,13 @@ class TunedTrendGenerator(TargetGenerator):
         raw_labels = self.base_labeller.get_labels(price_list)
         labels = np.asarray(raw_labels, dtype=np.int32)
 
-        return {self.target_name: labels}
+        # Create base target DataFrame with keys
+        target_df = self._create_base_target_df(df, symbol)
+
+        # Add target column
+        target_df = target_df.with_columns(pl.Series(self.target_name, labels))
+
+        return target_df
 
     def get_target_info(self) -> dict[str, Any]:
         """Return metadata about this generator."""

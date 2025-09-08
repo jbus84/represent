@@ -44,9 +44,12 @@ class DirectionalMFEGenerator(TargetGenerator):
         self.winsorize_percentiles = winsorize_percentiles
         self.target_names = target_names
 
-    def generate_targets(self, df: pl.DataFrame) -> dict[str, np.ndarray]:
+    def generate_targets(self, df: pl.DataFrame, symbol: str | None = None) -> pl.DataFrame:
         """Generate directional MFE regression targets."""
         self.validate_input(df)
+
+        # Create base target DataFrame with keys
+        target_df = self._create_base_target_df(df, symbol)
 
         mid_prices = df["mid_price"].to_numpy()
         mfe_buy, mfe_sell = self._calculate_directional_mfe(mid_prices)
@@ -55,7 +58,13 @@ class DirectionalMFEGenerator(TargetGenerator):
         mfe_buy = self._winsorize(mfe_buy, self.winsorize_percentiles)
         mfe_sell = self._winsorize(mfe_sell, self.winsorize_percentiles)
 
-        return {self.target_names[0]: mfe_buy, self.target_names[1]: mfe_sell}
+        # Add target columns
+        target_df = target_df.with_columns([
+            pl.Series(self.target_names[0], mfe_buy),
+            pl.Series(self.target_names[1], mfe_sell)
+        ])
+
+        return target_df
 
     def _calculate_directional_mfe(self, mid_prices: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Calculate directional MFE targets for both buy and sell sides."""
@@ -152,20 +161,26 @@ class LogReturnHorizonsGenerator(TargetGenerator):
         # Generate target names for each horizon
         self.target_names = [f"{target_prefix}_{horizon}t" for horizon in self.horizons]
 
-    def generate_targets(self, df: pl.DataFrame) -> dict[str, np.ndarray]:
+    def generate_targets(self, df: pl.DataFrame, symbol: str | None = None) -> pl.DataFrame:
         """Generate log return targets for all horizons."""
         self.validate_input(df)
+
+        # Create base target DataFrame with keys
+        target_df = self._create_base_target_df(df, symbol)
 
         mid_prices = df["mid_price"].to_numpy()
 
         # Calculate log returns for all horizons
-        targets = {}
+        target_columns = []
         for i, horizon in enumerate(self.horizons):
             target_name = self.target_names[i]
             log_returns = self._calculate_log_returns(mid_prices, horizon)
-            targets[target_name] = log_returns
+            target_columns.append(pl.Series(target_name, log_returns))
 
-        return targets
+        # Add all target columns
+        target_df = target_df.with_columns(target_columns)
+
+        return target_df
 
     def _calculate_log_returns(self, mid_prices: np.ndarray, horizon: int) -> np.ndarray:
         """Calculate log returns for a specific horizon in basis points."""
@@ -235,14 +250,20 @@ class PriceMovementGenerator(TargetGenerator):
         self.lookback_window = lookback_window
         self.target_name = target_name
 
-    def generate_targets(self, df: pl.DataFrame) -> dict[str, np.ndarray]:
+    def generate_targets(self, df: pl.DataFrame, symbol: str | None = None) -> pl.DataFrame:
         """Generate price movement regression targets."""
         self.validate_input(df)
+
+        # Create base target DataFrame with keys
+        target_df = self._create_base_target_df(df, symbol)
 
         mid_prices = df["mid_price"].to_numpy()
         price_movements = self._calculate_price_movements(mid_prices)
 
-        return {self.target_name: price_movements}
+        # Add target column
+        target_df = target_df.with_columns(pl.Series(self.target_name, price_movements))
+
+        return target_df
 
     def _calculate_price_movements(self, mid_prices: np.ndarray) -> np.ndarray:
         """Calculate price movements in basis points."""
@@ -304,14 +325,20 @@ class VolatilityGenerator(TargetGenerator):
         self.window_size = window_size
         self.target_name = target_name
 
-    def generate_targets(self, df: pl.DataFrame) -> dict[str, np.ndarray]:
+    def generate_targets(self, df: pl.DataFrame, symbol: str | None = None) -> pl.DataFrame:
         """Generate volatility regression targets."""
         self.validate_input(df)
+
+        # Create base target DataFrame with keys
+        target_df = self._create_base_target_df(df, symbol)
 
         mid_prices = df["mid_price"].to_numpy()
         volatility = self._calculate_rolling_volatility(mid_prices)
 
-        return {self.target_name: volatility}
+        # Add target column
+        target_df = target_df.with_columns(pl.Series(self.target_name, volatility))
+
+        return target_df
 
     def _calculate_rolling_volatility(self, mid_prices: np.ndarray) -> np.ndarray:
         """Calculate rolling volatility."""
@@ -370,14 +397,20 @@ class CumulativeReturnsGenerator(TargetGenerator):
         self.lookforward_samples = lookforward_samples
         self.target_name = target_name
 
-    def generate_targets(self, df: pl.DataFrame) -> dict[str, np.ndarray]:
+    def generate_targets(self, df: pl.DataFrame, symbol: str | None = None) -> pl.DataFrame:
         """Generate cumulative returns regression targets."""
         self.validate_input(df)
+
+        # Create base target DataFrame with keys
+        target_df = self._create_base_target_df(df, symbol)
 
         mid_prices = df["mid_price"].to_numpy()
         cumulative_returns = self._calculate_cumulative_returns(mid_prices)
 
-        return {self.target_name: cumulative_returns}
+        # Add target column
+        target_df = target_df.with_columns(pl.Series(self.target_name, cumulative_returns))
+
+        return target_df
 
     def _calculate_cumulative_returns(self, mid_prices: np.ndarray) -> np.ndarray:
         """Calculate cumulative returns over lookforward window."""
@@ -466,14 +499,20 @@ class VolatilityScaledReturnsGenerator(TargetGenerator):
         self.min_barrier_bps = min_barrier_bps
         self.target_name = target_name
 
-    def generate_targets(self, df: pl.DataFrame) -> dict[str, np.ndarray]:
+    def generate_targets(self, df: pl.DataFrame, symbol: str | None = None) -> pl.DataFrame:
         """Generate volatility-scaled returns regression targets."""
         self.validate_input(df)
+
+        # Create base target DataFrame with keys
+        target_df = self._create_base_target_df(df, symbol)
 
         mid_prices = df["mid_price"].to_numpy()
         vol_scaled_returns = self._calculate_vol_scaled_returns(mid_prices)
 
-        return {self.target_name: vol_scaled_returns}
+        # Add target column
+        target_df = target_df.with_columns(pl.Series(self.target_name, vol_scaled_returns))
+
+        return target_df
 
     def _calculate_vol_scaled_returns(self, mid_prices: np.ndarray) -> np.ndarray:
         """Calculate volatility-scaled returns with adaptive barriers."""
@@ -639,14 +678,20 @@ class RemainingValueTunerGenerator(TargetGenerator):
         self.enforce_monotonicity = enforce_monotonicity
         self.target_name = target_name
 
-    def generate_targets(self, df: pl.DataFrame) -> dict[str, np.ndarray]:
+    def generate_targets(self, df: pl.DataFrame, symbol: str | None = None) -> pl.DataFrame:
         """Generate remaining value tuned regression targets."""
         self.validate_input(df)
+
+        # Create base target DataFrame with keys
+        target_df = self._create_base_target_df(df, symbol)
 
         mid_prices = df["mid_price"].to_numpy()
         remaining_values = self._calculate_remaining_value_tuned(mid_prices)
 
-        return {self.target_name: remaining_values}
+        # Add target column
+        target_df = target_df.with_columns(pl.Series(self.target_name, remaining_values))
+
+        return target_df
 
     def _calculate_remaining_value_tuned(self, mid_prices: np.ndarray) -> np.ndarray:
         """Calculate remaining value tuned targets."""

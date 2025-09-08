@@ -61,6 +61,15 @@ from .global_threshold_calculator import (
 from .market_depth_processor import MarketDepthProcessor, create_processor, process_market_data
 from .modular_dataset_builder import ModularDatasetBuilder, create_modular_builder
 
+# Target-Only Generation API
+from .target_api import (
+    batch_generate_targets,
+    create_target_config_template,
+    generate_targets_from_dataframe,
+    generate_targets_from_parquet,
+    load_targets_and_join,
+)
+
 # Modular Target Generation System
 from .target_generators import (
     CumulativeReturnsGenerator,
@@ -126,6 +135,12 @@ __all__ = [
     "RemainingValueTunerGenerator",
     "ModularDatasetBuilder",
     "create_modular_builder",
+    # Target-Only Generation API
+    "generate_targets_from_parquet",
+    "generate_targets_from_dataframe",
+    "batch_generate_targets",
+    "create_target_config_template",
+    "load_targets_and_join",
 ]
 
 

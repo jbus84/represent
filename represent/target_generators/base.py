@@ -7,7 +7,6 @@ This module defines the core interface that all target generators must implement
 from abc import ABC, abstractmethod
 from typing import Any
 
-import numpy as np
 import polars as pl
 
 
@@ -20,15 +19,16 @@ class TargetGenerator(ABC):
     """
 
     @abstractmethod
-    def generate_targets(self, df: pl.DataFrame) -> dict[str, np.ndarray]:
+    def generate_targets(self, df: pl.DataFrame, symbol: str | None = None) -> pl.DataFrame:
         """
-        Generate target arrays from market data.
+        Generate target DataFrame with keys and target values.
 
         Args:
             df: Market data DataFrame with required columns
+            symbol: Optional symbol identifier for the targets
 
         Returns:
-            Dict mapping target names to numpy arrays of the same length as df
+            DataFrame with columns: row_idx, symbol (optional), timestamp (optional), target columns
 
         Raises:
             ValueError: If required columns are missing or data is invalid
@@ -86,6 +86,31 @@ class TargetGenerator(ABC):
             raise ValueError(
                 f"Missing required columns for {self.__class__.__name__}: {sorted(missing_columns)}"
             )
+
+    def _create_base_target_df(self, input_df: pl.DataFrame, symbol: str | None = None) -> pl.DataFrame:
+        """
+        Create base target DataFrame with row indices and metadata.
+
+        Args:
+            input_df: Input DataFrame to generate targets for
+            symbol: Optional symbol identifier
+
+        Returns:
+            Base DataFrame with row_idx, symbol (if provided), and timestamp (if available)
+        """
+        # Create row indices column
+        result_df = input_df.select().with_row_index("row_idx")
+
+        if symbol:
+            result_df = result_df.with_columns(pl.lit(symbol).alias("symbol"))
+
+        # Add timestamp if available in input
+        if "timestamp" in input_df.columns:
+            result_df = result_df.with_columns(input_df["timestamp"])
+        elif "ts_event" in input_df.columns:
+            result_df = result_df.with_columns(input_df["ts_event"].alias("timestamp"))
+
+        return result_df
 
     def __repr__(self) -> str:
         """Return string representation of the generator."""

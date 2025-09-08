@@ -8,7 +8,6 @@ to create datasets with multiple target types (classification and regression).
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 import polars as pl
 
 from .target_generators.base import TargetGenerator
@@ -35,20 +34,21 @@ class ModularDatasetBuilder:
         self.verbose = verbose
         self._validate_generators()
 
-    def build_dataset(self, symbol_df: pl.DataFrame) -> pl.DataFrame:
+    def build_targets(self, symbol_df: pl.DataFrame, symbol: str | None = None) -> pl.DataFrame:
         """
-        Build dataset with all configured targets.
+        Build standalone target DataFrame with keys mapping to input data.
 
         Args:
             symbol_df: Input DataFrame with market data for a single symbol
+            symbol: Optional symbol identifier to include in targets
 
         Returns:
-            DataFrame with original data plus all generated targets
+            DataFrame with row keys and all generated targets (no input data)
         """
         if self.verbose:
-            print(f"🔄 Building dataset with {len(self.target_generators)} target generators")
+            print(f"🎯 Building targets with {len(self.target_generators)} target generators")
 
-        result_df = symbol_df.clone()
+        target_dfs = []
 
         for i, generator in enumerate(self.target_generators):
             if self.verbose:
@@ -57,37 +57,56 @@ class ModularDatasetBuilder:
             # Validate required columns
             self._validate_required_columns(symbol_df, generator)
 
-            # Generate targets
-            targets = generator.generate_targets(symbol_df)
+            # Generate targets - now returns DataFrame with keys
+            target_df = generator.generate_targets(symbol_df, symbol=symbol)
+            target_dfs.append(target_df)
 
-            # Add targets to DataFrame
-            for target_name, target_array in targets.items():
-                if len(target_array) != len(symbol_df):
-                    raise ValueError(
-                        f"Target array length ({len(target_array)}) doesn't match "
-                        f"DataFrame length ({len(symbol_df)}) for target '{target_name}'"
-                    )
+            if self.verbose:
+                target_cols = [col for col in target_df.columns if col not in ["row_idx", "symbol", "timestamp"]]
+                print(f"      ✅ Generated targets: {target_cols}")
 
-                result_df = result_df.with_columns(pl.Series(target_name, target_array))
+        # Merge all target DataFrames on row_idx
+        if target_dfs:
+            result_df = target_dfs[0]
+            for target_df in target_dfs[1:]:
+                result_df = result_df.join(
+                    target_df,
+                    on=["row_idx"] + ([col for col in ["symbol", "timestamp"] if col in result_df.columns and col in target_df.columns]),
+                    how="outer"
+                )
 
-                if self.verbose:
-                    valid_count = np.sum(~np.isnan(target_array))
-                    print(f"      ✅ {target_name}: {valid_count:,} valid values")
+            if self.verbose:
+                target_cols = [col for col in result_df.columns if col not in ["row_idx", "symbol", "timestamp"]]
+                print(f"   📊 Final targets: {len(result_df)} rows, {len(target_cols)} target columns")
 
-        if self.verbose:
-            print(f"   📊 Final dataset: {len(result_df)} rows, {len(result_df.columns)} columns")
+            return result_df
+        else:
+            raise ValueError("No target generators provided")
 
-        return result_df
-
-    def build_from_parquet(self, parquet_path: str | Path) -> pl.DataFrame:
+    def build_dataset(self, symbol_df: pl.DataFrame) -> pl.DataFrame:
         """
-        Build dataset from parquet file.
+        DEPRECATED: Use build_targets() instead.
+
+        Legacy method for backward compatibility - will be removed.
+        """
+        import warnings
+        warnings.warn(
+            "build_dataset() is deprecated. Use build_targets() for target-only generation.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        return self.build_targets(symbol_df)
+
+    def build_targets_from_parquet(self, parquet_path: str | Path, symbol: str | None = None) -> pl.DataFrame:
+        """
+        Build targets from parquet file.
 
         Args:
             parquet_path: Path to input parquet file
+            symbol: Optional symbol identifier
 
         Returns:
-            DataFrame with generated targets
+            DataFrame with generated targets (keys + targets only)
         """
         parquet_path = Path(parquet_path)
         if not parquet_path.exists():
@@ -102,17 +121,34 @@ class ModularDatasetBuilder:
         if self.verbose:
             print(f"   📊 Loaded {len(symbol_df):,} rows")
 
-        # Build dataset
-        return self.build_dataset(symbol_df)
+        # Extract symbol from filename if not provided
+        if symbol is None:
+            symbol = parquet_path.stem.split('_')[0] if '_' in parquet_path.stem else None
 
-    def save_dataset(
-        self, dataset_df: pl.DataFrame, output_path: str | Path, include_metadata: bool = True
+        # Build targets
+        return self.build_targets(symbol_df, symbol=symbol)
+
+    def build_from_parquet(self, parquet_path: str | Path) -> pl.DataFrame:
+        """
+        DEPRECATED: Use build_targets_from_parquet() instead.
+        Legacy method for backward compatibility - will be removed.
+        """
+        import warnings
+        warnings.warn(
+            "build_from_parquet() is deprecated. Use build_targets_from_parquet().",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        return self.build_targets_from_parquet(parquet_path)
+
+    def save_targets(
+        self, targets_df: pl.DataFrame, output_path: str | Path, include_metadata: bool = True
     ) -> dict[str, Any]:
         """
-        Save dataset to parquet file with optional metadata.
+        Save standalone target DataFrame to parquet file.
 
         Args:
-            dataset_df: Dataset DataFrame to save
+            targets_df: Target DataFrame with keys and targets
             output_path: Output parquet file path
             include_metadata: Whether to include generator metadata
 
@@ -123,16 +159,18 @@ class ModularDatasetBuilder:
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         if self.verbose:
-            print(f"💾 Saving dataset to: {output_path.name}")
+            print(f"🎯 Saving targets to: {output_path.name}")
 
-        # Save dataset
-        dataset_df.write_parquet(output_path)
+        # Save targets
+        targets_df.write_parquet(output_path)
 
         # Collect statistics
+        target_cols = [col for col in targets_df.columns if col not in ["row_idx", "symbol", "timestamp"]]
         stats = {
             "output_path": str(output_path),
-            "total_rows": len(dataset_df),
-            "total_columns": len(dataset_df.columns),
+            "total_rows": len(targets_df),
+            "target_columns": target_cols,
+            "total_columns": len(targets_df.columns),
             "file_size_mb": output_path.stat().st_size / 1024 / 1024,
         }
 
@@ -142,9 +180,24 @@ class ModularDatasetBuilder:
             ]
 
         if self.verbose:
-            print(f"   ✅ Saved {stats['total_rows']:,} rows, {stats['file_size_mb']:.1f} MB")
+            print(f"   ✅ Saved {stats['total_rows']:,} rows, {len(target_cols)} targets, {stats['file_size_mb']:.1f} MB")
 
         return stats
+
+    def save_dataset(
+        self, dataset_df: pl.DataFrame, output_path: str | Path, include_metadata: bool = True
+    ) -> dict[str, Any]:
+        """
+        DEPRECATED: Use save_targets() instead.
+        Legacy method for backward compatibility - will be removed.
+        """
+        import warnings
+        warnings.warn(
+            "save_dataset() is deprecated. Use save_targets() for target-only files.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        return self.save_targets(dataset_df, output_path, include_metadata)
 
     def get_builder_info(self) -> dict[str, Any]:
         """

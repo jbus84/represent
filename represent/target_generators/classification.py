@@ -42,9 +42,12 @@ class QuantileClassificationGenerator(TargetGenerator):
         self.lookback_window = lookback_window
         self.target_name = target_name
 
-    def generate_targets(self, df: pl.DataFrame) -> dict[str, np.ndarray]:
+    def generate_targets(self, df: pl.DataFrame, symbol: str | None = None) -> pl.DataFrame:
         """Generate quantile-based classification targets."""
         self.validate_input(df)
+
+        # Create base target DataFrame with keys
+        target_df = self._create_base_target_df(df, symbol)
 
         # Calculate price movements
         price_movements = self._calculate_price_movements(df)
@@ -63,18 +66,20 @@ class QuantileClassificationGenerator(TargetGenerator):
         if len(valid_training_movements) == 0:
             # No valid movements - create dummy labels
             labels = np.zeros(len(price_movements), dtype=int)
-            return {self.target_name: labels}
+        else:
+            # Calculate quantile boundaries for uniform distribution
+            quantile_boundaries = np.quantile(
+                valid_training_movements, np.linspace(0, 1, self.nbins + 1)
+            )
 
-        # Calculate quantile boundaries for uniform distribution
-        quantile_boundaries = np.quantile(
-            valid_training_movements, np.linspace(0, 1, self.nbins + 1)
-        )
+            # Apply classification to all data
+            labels = np.digitize(price_movements, quantile_boundaries[1:-1])
+            labels = np.clip(labels, 0, self.nbins - 1)
 
-        # Apply classification to all data
-        labels = np.digitize(price_movements, quantile_boundaries[1:-1])
-        labels = np.clip(labels, 0, self.nbins - 1)
+        # Add target column
+        target_df = target_df.with_columns(pl.Series(self.target_name, labels))
 
-        return {self.target_name: labels}
+        return target_df
 
     def _calculate_price_movements(self, df: pl.DataFrame) -> np.ndarray:
         """Calculate price movements for classification."""
@@ -149,9 +154,12 @@ class GlobalThresholdClassificationGenerator(TargetGenerator):
         self.lookback_window = lookback_window
         self.target_name = target_name
 
-    def generate_targets(self, df: pl.DataFrame) -> dict[str, np.ndarray]:
+    def generate_targets(self, df: pl.DataFrame, symbol: str | None = None) -> pl.DataFrame:
         """Generate classification targets using global thresholds."""
         self.validate_input(df)
+
+        # Create base target DataFrame with keys
+        target_df = self._create_base_target_df(df, symbol)
 
         # Calculate price movements
         price_movements = self._calculate_price_movements(df)
@@ -160,7 +168,10 @@ class GlobalThresholdClassificationGenerator(TargetGenerator):
         labels = np.digitize(price_movements, self.global_thresholds.quantile_boundaries[1:-1])
         labels = np.clip(labels, 0, self.global_thresholds.nbins - 1)
 
-        return {self.target_name: labels}
+        # Add target column
+        target_df = target_df.with_columns(pl.Series(self.target_name, labels))
+
+        return target_df
 
     def _calculate_price_movements(self, df: pl.DataFrame) -> np.ndarray:
         """Calculate price movements for classification."""
