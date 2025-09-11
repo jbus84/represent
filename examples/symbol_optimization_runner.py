@@ -408,24 +408,13 @@ def convert_params_for_generator(method: str, params: Dict[str, Any]) -> Dict[st
         'ga_labeling': ['population_size', 'max_generations', 'lookforward_window'],
     }
     
-    # Parameters that should be booleans for various methods
-    bool_params_by_method = {
-        'triple_barrier': ['normalize_by_volatility'],
-        'triple_exceedance': ['adaptive_scaling'],
-    }
     
     # Convert specified parameters to integers
     int_params = int_params_by_method.get(method, [])
     for param in int_params:
         if param in converted:
             converted[param] = int(round(converted[param]))
-    
-    # Convert specified parameters to booleans
-    bool_params = bool_params_by_method.get(method, [])
-    for param in bool_params:
-        if param in converted:
-            converted[param] = bool(round(converted[param]))
-    
+
     return converted
 
 

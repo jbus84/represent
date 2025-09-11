@@ -498,11 +498,8 @@ class ParameterOptimizer:
             value = result.x[i]
             # Convert numpy types to native Python types for JSON serialization
             if param_name in ['population_size', 'max_generations', 'lookforward_window',
-                             'min_trades', 'window_size', 'volatility_window']:
+                             'min_trades', 'window_size']:
                 optimal_params[param_name] = int(value)
-            elif param_name in ['normalize_by_volatility', 'adaptive_scaling']:
-                # Convert float to boolean
-                optimal_params[param_name] = bool(round(value))
             else:
                 optimal_params[param_name] = float(value)
 
@@ -586,11 +583,6 @@ class ParameterOptimizer:
             'lookforward_window': (1000, 3000),  # 1K-3K ticks: proven range around 2K
             'scaling_factor': (2.0, 4.0),     # 2x-4x transaction cost: centered around proven 3x
             'min_exceedance_threshold': (0.1, 0.5),  # Low threshold: allow more signals
-            'volatility_window': (10, 50),     # Faster volatility adaptation  
-            'window_penalty_weight': (0.1, 0.3),  # Moderate window length penalty
-            'balance_weight': (0.2, 0.8),      # Balance constraint for class distribution
-            'target_balance_ratio': (0.25, 0.40),  # Target ratio per class (0.33 = perfect balance)
-            'adaptive_scaling': (0, 1),        # Boolean: adaptive volatility scaling
         }
 
         if custom_bounds:

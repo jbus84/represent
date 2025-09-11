@@ -30,17 +30,13 @@ PROVEN_PARAMETERS = {
     "triple_barrier": {
         "lookforward_window": 2000,  # PROVEN: generates good signal frequency
         "barrier_width": 0.0005,     # FIXED: 5 pip barriers for better signal quality
-        "normalize_by_volatility": False,  # PROVEN: static barriers work better
         "transaction_cost": 0.00007,  # Correct 0.7 pip transaction cost
-        "min_return_threshold": 0.00001,  # Low threshold to not over-filter
     },
     
     "triple_exceedance": {
         "lookforward_window": 2000,  # PROVEN: generates 77% signal frequency
         "scaling_factor": 3.0,       # PROVEN: 3x transaction cost (~2.1 pips)
-        "adaptive_scaling": False,   # PROVEN: static scaling works better  
         "transaction_cost": 0.00007, # Correct 0.7 pip transaction cost
-        "min_exceedance_threshold": 0.5,  # Balanced threshold
     }
 }
 

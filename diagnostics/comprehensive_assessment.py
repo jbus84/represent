@@ -260,12 +260,6 @@ class ComprehensiveAssessment:
             "triple_exceedance": {
                 "lookforward_window": 8000,  # Long window per our fix
                 "scaling_factor": 3.0,       # 3x scaling = 2.1 pip barriers
-                "min_exceedance_threshold": 0.3,
-                "volatility_window": 300,
-                "window_penalty_weight": 0.1,
-                "balance_weight": 0.8,
-                "target_balance_ratio": 0.33,
-                "adaptive_scaling": True,
                 "expected_classes": 3,
                 "description": "Triple exceedance with long windows"
             }

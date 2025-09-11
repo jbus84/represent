@@ -173,7 +173,6 @@ class TripleExceedanceGenerator(TargetGenerator):
             "description": f"Triple exceedance method with {self.scaling_factor}x transaction cost barriers, "
                           f"{self.lookforward_window} tick fixed-duration window, "
                           f"dual-sided binary classification (long/short exceed/fail), "
-                          f"adaptive_scaling={self.adaptive_scaling}, "
                           f"multi-objective optimization (returns + window + balance)",
             "parameters": {
                 "lookforward_window": self.lookforward_window,

@@ -243,14 +243,11 @@ class LargeScaleParameterOptimizer:
                     'population_size', 'max_generations', 'lookforward_window', 'min_trades',
                     'window_size', 'volatility_window'
                 }
-                bool_like_params = {'normalize_by_volatility', 'adaptive_scaling'}
                 
                 casted_params = {}
                 for k, v in filtered_params.items():
                     if k in int_like_params and isinstance(v, (int, float)):
                         casted_params[k] = int(v)
-                    elif k in bool_like_params and isinstance(v, (int, float)):
-                        casted_params[k] = bool(v > 0.5)
                     else:
                         casted_params[k] = v
                 
@@ -838,7 +835,6 @@ class LargeScaleParameterOptimizer:
                     'population_size', 'max_generations', 'lookforward_window', 'min_trades',
                     'window_size', 'volatility_window'
                 }
-                bool_like_params = {'normalize_by_volatility', 'adaptive_scaling'}
                 
                 casted_params = {}
                 for k, v in filtered_params.items():
@@ -847,11 +843,6 @@ class LargeScaleParameterOptimizer:
                             casted_params[k] = int(round(v))
                         except Exception:
                             casted_params[k] = v
-                    elif k in bool_like_params:
-                        try:
-                            casted_params[k] = bool(round(v))
-                        except Exception:
-                            casted_params[k] = bool(v)
                     else:
                         casted_params[k] = v
                 

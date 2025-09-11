@@ -402,12 +402,6 @@ class ComprehensiveMethodDiagnostic:
             'triple_exceedance': lambda: {
                 'lookforward_window': (1000, 10000),
                 'scaling_factor': (2.0, 20.0),
-                'min_exceedance_threshold': (0.3, 0.9),
-                'volatility_window': (100, 500),
-                'window_penalty_weight': (0.05, 0.5),
-                'balance_weight': (0.1, 1.0),
-                'target_balance_ratio': (0.25, 0.40),
-                'adaptive_scaling': (0, 1)
             },
             'quantile_classification': lambda: {'nbins': (3, 10)}
         }

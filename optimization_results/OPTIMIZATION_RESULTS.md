@@ -65,12 +65,7 @@ Optimized for **6** symbols.
 ### Parameter Ranges
 - **lookforward_window**: 2202 to 2987 (avg: 2645.67)
 - **scaling_factor**: 2.26213 to 3.52158 (avg: 3.07011)
-- **min_exceedance_threshold**: 0.108234 to 0.448674 (avg: 0.297679)
-- **volatility_window**: 19.6709 to 48.7964 (avg: 32.6117)
-- **window_penalty_weight**: 0.164634 to 0.276929 (avg: 0.237859)
-- **balance_weight**: 0.244208 to 0.739057 (avg: 0.435851)
-- **target_balance_ratio**: 0.262432 to 0.38237 (avg: 0.327862)
-- **adaptive_scaling**: 0.183405 to 0.732322 (avg: 0.388158)
+
 
 ## Triple Barrier Results
 
@@ -83,10 +78,7 @@ Optimized for **6** symbols.
 
 ### Parameter Ranges
 - **lookforward_window**: 1040 to 2994 (avg: 1689.67)
-- **volatility_window**: 16.78 to 48.0706 (avg: 32.1245)
 - **barrier_width**: 0.000101774 to 0.000199227 (avg: 0.000158916)
-- **min_return_threshold**: 1.01197e-05 to 2.98732e-05 (avg: 2.15486e-05)
-- **normalize_by_volatility**: 0.107161 to 0.482849 (avg: 0.283819)
 
 ## Oracle Ternary Results
 

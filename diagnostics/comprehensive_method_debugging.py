@@ -63,7 +63,7 @@ def get_all_optimization_methods():
         {
             "name": "Triple Barrier", 
             "method": "triple_barrier",
-            "params": {"lookforward_window": 2000, "barrier_width": 0.0001, "normalize_by_volatility": False},
+            "params": {"lookforward_window": 2000, "barrier_width": 0.0001,},
             "color_map": {-1: "red", 0: "gray", 1: "green"},
             "label_names": {-1: "Short", 0: "Timeout", 1: "Long"},
             "has_barriers": True,
@@ -72,7 +72,7 @@ def get_all_optimization_methods():
         {
             "name": "Triple Exceedance (Long)",
             "method": "triple_exceedance",
-            "params": {"lookforward_window": 2000, "scaling_factor": 3.0, "adaptive_scaling": False},
+            "params": {"lookforward_window": 2000, "scaling_factor": 3.0},
             "color_map": {0: "red", 1: "green"}, 
             "label_names": {0: "Fail", 1: "Exceed"},
             "has_barriers": False,
@@ -81,7 +81,7 @@ def get_all_optimization_methods():
         {
             "name": "Triple Exceedance (Short)",
             "method": "triple_exceedance",
-            "params": {"lookforward_window": 2000, "scaling_factor": 3.0, "adaptive_scaling": False},
+            "params": {"lookforward_window": 2000, "scaling_factor": 3.0},
             "color_map": {0: "red", 1: "green"}, 
             "label_names": {0: "Fail", 1: "Exceed"},
             "has_barriers": False,
