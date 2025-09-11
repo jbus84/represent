@@ -311,7 +311,7 @@ def create_all_methods_plot(window_df: pl.DataFrame, methods: list, window_num: 
                 labels_display = labels
             elif method_config["method"] == "triple_exceedance":
                 # Keep {0,1} for binary exceedance display
-                labels_display = labels
+                labels_display = labels > 0
             else:  # triple_barrier, triple_exceedance
                 # Already in {-1,0,1} format
                 labels_display = labels
