@@ -207,7 +207,7 @@ class TestTStreamsGenerators:
         targets = generator.generate_targets(sample_price_data)
 
         labels = targets["test_binary"]
-        valid_labels = labels[~np.isnan(labels)]
+        valid_labels = labels.filter(~labels.is_nan())
         unique_labels = np.unique(valid_labels)
 
         # Should produce exactly 2 classes: {0, 1}
@@ -225,7 +225,7 @@ class TestTStreamsGenerators:
         targets = generator.generate_targets(sample_price_data)
 
         labels = targets["test_ternary"]
-        valid_labels = labels[~np.isnan(labels)]
+        valid_labels = labels.filter(~labels.is_nan())
         unique_labels = np.unique(valid_labels)
 
         # With optimized parameters, should produce 3 classes: {0, 1, 2}
@@ -245,7 +245,7 @@ class TestTStreamsGenerators:
         labels = targets["test_tuned"]
 
         assert len(labels) == 100
-        assert not np.all(np.isnan(labels))  # Should have some valid labels
+        assert not labels.is_nan().all()  # Should have some valid labels
 
         info = generator.get_target_info()
         assert info["target_type"] == "classification"
@@ -260,7 +260,7 @@ class TestTStreamsGenerators:
 
         labels = targets["test_empty"]
         assert len(labels) == 0
-        assert labels.dtype == np.int32
+        assert labels.dtype == pl.Int32
 
     def test_nan_price_handling(self, sample_price_data):
         """Test that generators handle NaN prices properly."""
@@ -278,7 +278,7 @@ class TestTStreamsGenerators:
         labels = targets["test_nans"]
         assert len(labels) > 0
         # Some labels should be valid (for non-NaN prices)
-        assert np.any(~np.isnan(labels))
+        assert (~labels.is_nan()).any()
 
 
 @pytest.mark.skipif(TSTRENDS_IMPORTED, reason="Only test import error when tstrends not available")

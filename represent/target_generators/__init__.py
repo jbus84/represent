@@ -38,6 +38,14 @@ try:
 except ImportError:
     TSTRENDS_GENERATORS_AVAILABLE = False
 
+# GA Labeling generator
+try:
+    from .ga_labeling import GALabelingGenerator  # noqa: F401
+
+    GA_LABELING_AVAILABLE = True
+except ImportError:
+    GA_LABELING_AVAILABLE = False
+
 __all__ = [
     # Core interface
     "TargetGenerator",
@@ -66,3 +74,7 @@ if TSTRENDS_GENERATORS_AVAILABLE:
             "TunedTrendGenerator",
         ]
     )
+
+# Add GA labeling generator to exports if available
+if GA_LABELING_AVAILABLE:
+    __all__.extend(["GALabelingGenerator"])

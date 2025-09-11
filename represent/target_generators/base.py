@@ -98,8 +98,8 @@ class TargetGenerator(ABC):
         Returns:
             Base DataFrame with row_idx, symbol (if provided), and timestamp (if available)
         """
-        # Create row indices column
-        result_df = input_df.select().with_row_index("row_idx")
+        # Create row indices column (start with empty DataFrame of same height)
+        result_df = pl.DataFrame({"__temp": range(len(input_df))}).with_row_index("row_idx").drop("__temp")
 
         if symbol:
             result_df = result_df.with_columns(pl.lit(symbol).alias("symbol"))

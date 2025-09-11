@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from represent import (  # noqa: E402
     CumulativeReturnsGenerator,
     DirectionalMFEGenerator,
+    GALabelingGenerator,
     LogReturnHorizonsGenerator,
     ModularDatasetBuilder,
     PriceMovementGenerator,
@@ -347,6 +348,21 @@ def apply_all_labeling_approaches(market_data: pl.DataFrame) -> dict[str, np.nda
                 lookback_window=2000,
                 target_name="quantile_3class",
             ),
+            # GA labeling with Bayesian-optimized parameters (0.7 pips fees)
+            GALabelingGenerator(
+                population_size=30,
+                max_generations=31,
+                lookforward_window=4,
+                transaction_cost=0.0005,
+                min_trades=8,
+                min_win_rate=0.3578,
+                max_win_rate=0.6201,
+                min_profit_factor=1.0876,
+                mutation_rate=0.0173,
+                crossover_rate=0.7438,
+                target_name="ga_labels_optimized",
+                verbose=False
+            ),
             DirectionalMFEGenerator(lookforward_horizon=1000, target_names=("mfe_buy", "mfe_sell")),
             LogReturnHorizonsGenerator(
                 horizons=[1000, 2000, 3000, 4000, 5000],
@@ -384,13 +400,19 @@ def apply_all_labeling_approaches(market_data: pl.DataFrame) -> dict[str, np.nda
             # Test multiple parameter sets to ensure we get diverse labels
             generators.extend(
                 [
-                    # Binary CTL with balanced parameters for clear trends with responsiveness (~150 tick regimes)
+                    # Binary CTL with OPTIMIZED parameters from Bayesian optimization (0.0 omega)
+                    BinaryCTLGenerator(omega=0.0, target_name="binary_ctl_optimized"),
                     BinaryCTLGenerator(omega=balanced_omega, target_name="binary_ctl_balanced"),
                     BinaryCTLGenerator(
                         omega=balanced_omega * 0.8, target_name="binary_ctl_responsive"
                     ),
                     BinaryCTLGenerator(omega=balanced_omega * 1.2, target_name="binary_ctl_stable"),
-                    # Ternary CTL with ULTRA-AGGRESSIVE parameters for maximum 3-class separation
+                    # Ternary CTL with OPTIMIZED parameters from Bayesian optimization
+                    TernaryCTLGenerator(
+                        marginal_change_thres=0.04458382945260628,  # Optimized: ~4.46%
+                        window_size=501,  # Optimized window
+                        target_name="ternary_ctl_optimized",
+                    ),
                     TernaryCTLGenerator(
                         marginal_change_thres=0.0005,  # 0.05% - ultra aggressive
                         window_size=2,  # Minimal window
@@ -399,26 +421,35 @@ def apply_all_labeling_approaches(market_data: pl.DataFrame) -> dict[str, np.nda
                     TernaryCTLGenerator(
                         marginal_change_thres=0.0008,  # 0.08% - very aggressive
                         window_size=3,  # Very small window
-                        target_name="ternary_ctl_optimized",
+                        target_name="ternary_ctl_alternative",
                     ),
                     TernaryCTLGenerator(
                         marginal_change_thres=0.0012,  # 0.12% - aggressive
                         window_size=5,  # Small window
                         target_name="ternary_ctl_stable",
                     ),
-                    # Oracle approaches with OPTIMIZED parameters for guaranteed 3-class output
+                    # Oracle approaches with OPTIMIZED parameters from Bayesian optimization
+                    OracleBinaryTrendGenerator(
+                        transaction_cost=9.326802124287607e-07,  # Optimized: ~9.33e-07
+                        target_name="oracle_binary_optimized"
+                    ),
                     OracleBinaryTrendGenerator(
                         transaction_cost=balanced_tx_binary, target_name="oracle_binary_balanced"
                     ),
                     OracleTernaryTrendGenerator(
+                        transaction_cost=0.00796542986860233,  # Optimized: ~0.008
+                        neutral_reward_factor=0.18343478986616382,  # Optimized: ~0.183
+                        target_name="oracle_ternary_optimized",
+                    ),
+                    OracleTernaryTrendGenerator(
                         transaction_cost=0.0001,  # Very low cost - more responsive
                         neutral_reward_factor=0.3,  # Low neutral factor - favor up/down over neutral
-                        target_name="oracle_ternary_optimized",
+                        target_name="oracle_ternary_alternative",
                     ),
                 ]
             )
             print(
-                f"   ✅ Added {7} TStrends generators with OPTIMIZED parameters for guaranteed 3-class ternary output"
+                f"   ✅ Added {9} TStrends generators with OPTIMIZED parameters from Bayesian optimization"
             )
         except Exception as e:
             print(f"   ⚠️  TStrends generators failed: {e}")
@@ -451,7 +482,7 @@ def apply_all_labeling_approaches(market_data: pl.DataFrame) -> dict[str, np.nda
 
 
 def create_comprehensive_visualization(
-    market_data: pl.DataFrame, targets: dict[str, np.ndarray], output_dir: str = "examples"
+    market_data: pl.DataFrame, targets: dict[str, np.ndarray], output_dir: str = "plots/optimisation"
 ) -> list[str]:
     """Create comprehensive visualization of all labeling approaches."""
     print("\n📊 Creating comprehensive visualization...")
@@ -468,7 +499,7 @@ def create_comprehensive_visualization(
     classification_targets = {
         name: labels
         for name, labels in targets.items()
-        if any(keyword in name.lower() for keyword in ["class", "ctl", "oracle"])
+        if any(keyword in name.lower() for keyword in ["class", "ctl", "oracle", "ga"])
     }
 
     if classification_targets:
@@ -1272,7 +1303,7 @@ def create_complete_overview_plot(
 
     for name, values in targets.items():
         if (
-            any(keyword in name.lower() for keyword in ["class", "ctl", "oracle"])
+            any(keyword in name.lower() for keyword in ["class", "ctl", "oracle", "ga"])
             and "mfe" not in name.lower()
         ):
             classification_targets[name] = values

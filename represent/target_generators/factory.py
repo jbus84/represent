@@ -168,6 +168,30 @@ def _register_builtin_generators():
     except ImportError:
         pass  # TStrends generators not available
 
+    # GA Labeling generator
+    try:
+        from .ga_labeling import GALabelingGenerator
+
+        TargetGeneratorFactory.register("ga_labeling", GALabelingGenerator)
+    except ImportError:
+        pass  # GA labeling dependencies not available
+
+    # Triple Barrier generator
+    try:
+        from .triple_barrier import TripleBarrierGenerator
+
+        TargetGeneratorFactory.register("triple_barrier", TripleBarrierGenerator)
+    except ImportError:
+        pass  # Triple barrier dependencies not available
+
+    # Triple Exceedance generator
+    try:
+        from .triple_exceedance import TripleExceedanceGenerator
+
+        TargetGeneratorFactory.register("triple_exceedance", TripleExceedanceGenerator)
+    except ImportError:
+        pass  # Triple exceedance dependencies not available
+
 
 # Register built-in generators
 _register_builtin_generators()

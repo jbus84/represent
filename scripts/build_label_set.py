@@ -29,6 +29,11 @@ from represent.target_generators.factory import TargetGeneratorFactory  # noqa: 
 
 # Preset configurations for common use cases
 LABEL_SET_PRESETS = {
+    "inputs_only": {
+        "name": "Clean Inputs Only - No Target Columns",
+        "description": "Extract clean market microstructure data without any target columns for parameter optimization",
+        "generators": [],  # No generators = no target columns
+    },
     "mfe_analysis": {
         "name": "MFE Analysis - Buy/Sell Directional Signals",
         "description": "Maximum Favorable Excursion analysis for both long and short positions",

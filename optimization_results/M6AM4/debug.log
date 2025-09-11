@@ -1,0 +1,212 @@
+SAMPLED_WINDOWS total=3 coverage=0.298% size=15000
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[15000]
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[15000]
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[15000]
+SAMPLED_WINDOWS total=3 coverage=0.298% size=15000
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[15000]
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[15000]
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[15000]
+SAMPLED_WINDOWS total=3 coverage=0.298% size=15000
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[15000]
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[15000]
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[15000]
+SAMPLED_WINDOWS total=3 coverage=0.298% size=15000
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[15000]
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[15000]
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[15000]
+SAMPLED_WINDOWS total=3 coverage=0.298% size=15000
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[15000]
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[15000]
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[15000]
+SAMPLED_WINDOWS total=3 coverage=0.298% size=15000
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[15000]
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[15000]
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[15000]
+SAMPLED_WINDOWS total=3 coverage=0.398% size=20000
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[20000]
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[20000]
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[20000]
+SAMPLED_WINDOWS total=3 coverage=0.398% size=20000
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[20000]
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[20000]
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[20000]
+SAMPLED_WINDOWS total=3 coverage=0.398% size=20000
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[20000]
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[20000]
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[20000]
+SAMPLED_WINDOWS total=3 coverage=0.398% size=20000
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[20000]
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[20000]
+LABELS method=Binary CTL (Large-Scale) uniq=[0] cnt=[20000]
+SAMPLED_WINDOWS total=3 coverage=0.398% size=20000
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[19828, 172]
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[19999, 1]
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[19999, 1]
+SAMPLED_WINDOWS total=3 coverage=0.398% size=20000
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[19447, 553]
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[19843, 157]
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[19270, 730]
+SAMPLED_WINDOWS total=3 coverage=0.398% size=20000
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[19105, 895]
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[19969, 31]
+LABELS method=Ternary CTL (Large-Scale) uniq=[0, 1] cnt=[242, 19758]
+SAMPLED_WINDOWS total=3 coverage=0.398% size=20000
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[19999, 1]
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[19974, 26]
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[19855, 145]
+SAMPLED_WINDOWS total=3 coverage=0.398% size=20000
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[19675, 325]
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[19940, 60]
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[19999, 1]
+SAMPLED_WINDOWS total=3 coverage=0.398% size=20000
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[19114, 886]
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[19921, 79]
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[19999, 1]
+SAMPLED_WINDOWS total=3 coverage=0.398% size=20000
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[19616, 384]
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[19999, 1]
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[19999, 1]
+SAMPLED_WINDOWS total=3 coverage=0.398% size=20000
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[19971, 29]
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[19776, 224]
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[19999, 1]
+SAMPLED_WINDOWS total=3 coverage=0.398% size=20000
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[19838, 162]
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[19999, 1]
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[19904, 96]
+SAMPLED_WINDOWS total=3 coverage=0.398% size=20000
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[18286, 1714]
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[19587, 413]
+LABELS method=Ternary CTL (Large-Scale) uniq=[1, 2] cnt=[19827, 173]
+SAMPLED_WINDOWS total=3 coverage=0.398% size=20000
+LABELS method=Oracle Binary (Large-Scale) uniq=[0, 1] cnt=[13381, 6619]
+LABELS method=Oracle Binary (Large-Scale) uniq=[0, 1] cnt=[9894, 10106]
+LABELS method=Oracle Binary (Large-Scale) uniq=[0, 1] cnt=[11905, 8095]
+SAMPLED_WINDOWS total=3 coverage=0.398% size=20000
+LABELS method=Oracle Binary (Large-Scale) uniq=[0, 1] cnt=[14664, 5336]
+LABELS method=Oracle Binary (Large-Scale) uniq=[0, 1] cnt=[10985, 9015]
+LABELS method=Oracle Binary (Large-Scale) uniq=[0, 1] cnt=[13532, 6468]
+SAMPLED_WINDOWS total=3 coverage=0.398% size=20000
+LABELS method=Oracle Binary (Large-Scale) uniq=[0, 1] cnt=[13614, 6386]
+LABELS method=Oracle Binary (Large-Scale) uniq=[0, 1] cnt=[11161, 8839]
+LABELS method=Oracle Binary (Large-Scale) uniq=[0, 1] cnt=[14184, 5816]
+SAMPLED_WINDOWS total=3 coverage=0.398% size=20000
+LABELS method=Oracle Binary (Large-Scale) uniq=[0, 1] cnt=[10361, 9639]
+LABELS method=Oracle Binary (Large-Scale) uniq=[0, 1] cnt=[13197, 6803]
+LABELS method=Oracle Binary (Large-Scale) uniq=[0, 1] cnt=[15419, 4581]
+SAMPLED_WINDOWS total=3 coverage=0.398% size=20000
+LABELS method=Oracle Binary (Large-Scale) uniq=[0, 1] cnt=[13315, 6685]
+LABELS method=Oracle Binary (Large-Scale) uniq=[0, 1] cnt=[12347, 7653]
+LABELS method=Oracle Binary (Large-Scale) uniq=[0, 1] cnt=[14009, 5991]
+SAMPLED_WINDOWS total=3 coverage=0.398% size=20000
+LABELS method=Oracle Binary (Large-Scale) uniq=[0, 1] cnt=[11881, 8119]
+LABELS method=Oracle Binary (Large-Scale) uniq=[0, 1] cnt=[14928, 5072]
+LABELS method=Oracle Binary (Large-Scale) uniq=[0, 1] cnt=[10673, 9327]
+SAMPLED_WINDOWS total=3 coverage=0.398% size=20000
+LABELS method=Oracle Ternary (Large-Scale) uniq=[0, 1, 2] cnt=[677, 18782, 541]
+LABELS method=Oracle Ternary (Large-Scale) uniq=[0, 1, 2] cnt=[681, 18170, 1149]
+LABELS method=Oracle Ternary (Large-Scale) uniq=[0, 1, 2] cnt=[807, 18574, 619]
+SAMPLED_WINDOWS total=3 coverage=0.398% size=20000
+LABELS method=Oracle Ternary (Large-Scale) uniq=[1] cnt=[20000]
+LABELS method=Oracle Ternary (Large-Scale) uniq=[0, 1, 2] cnt=[166, 19378, 456]
+LABELS method=Oracle Ternary (Large-Scale) uniq=[0, 1, 2] cnt=[157, 19768, 75]
+SAMPLED_WINDOWS total=3 coverage=0.398% size=20000
+LABELS method=Oracle Ternary (Large-Scale) uniq=[0, 1, 2] cnt=[1320, 17739, 941]
+LABELS method=Oracle Ternary (Large-Scale) uniq=[0, 1, 2] cnt=[2042, 17767, 191]
+LABELS method=Oracle Ternary (Large-Scale) uniq=[0, 1, 2] cnt=[1010, 17952, 1038]
+SAMPLED_WINDOWS total=3 coverage=0.398% size=20000
+LABELS method=Oracle Ternary (Large-Scale) uniq=[0, 1, 2] cnt=[1178, 18122, 700]
+LABELS method=Oracle Ternary (Large-Scale) uniq=[0, 1, 2] cnt=[929, 17590, 1481]
+LABELS method=Oracle Ternary (Large-Scale) uniq=[0, 1, 2] cnt=[253, 19521, 226]
+SAMPLED_WINDOWS total=3 coverage=0.398% size=20000
+LABELS method=Oracle Ternary (Large-Scale) uniq=[0, 1] cnt=[282, 19718]
+LABELS method=Oracle Ternary (Large-Scale) uniq=[0, 1] cnt=[204, 19796]
+LABELS method=Oracle Ternary (Large-Scale) uniq=[0, 1] cnt=[283, 19717]
+SAMPLED_WINDOWS total=3 coverage=0.398% size=20000
+LABELS method=Oracle Ternary (Large-Scale) uniq=[1] cnt=[20000]
+LABELS method=Oracle Ternary (Large-Scale) uniq=[1] cnt=[20000]
+LABELS method=Oracle Ternary (Large-Scale) uniq=[1] cnt=[20000]
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000
+SAMPLED_WINDOWS total=5 coverage=1.657% size=50000

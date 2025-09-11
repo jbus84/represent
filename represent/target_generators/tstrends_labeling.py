@@ -156,10 +156,10 @@ class TernaryCTLGenerator(TargetGenerator):
             )
 
         self.marginal_change_thres = marginal_change_thres
-        self.window_size = window_size
+        self.window_size = int(window_size)  # Ensure window_size is integer
         self.target_name = target_name
         self.labeller = TernaryCTL(
-            marginal_change_thres=marginal_change_thres, window_size=window_size
+            marginal_change_thres=marginal_change_thres, window_size=int(window_size)
         )
 
     def generate_targets(self, df: pl.DataFrame, symbol: str | None = None) -> pl.DataFrame:

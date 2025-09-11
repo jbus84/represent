@@ -85,11 +85,11 @@ class TestVolatilityScaledReturnsGenerator:
         # Should have same length as input data
         assert len(vol_scaled_returns) == len(sample_price_data)
 
-        # Should be numpy array
-        assert isinstance(vol_scaled_returns, np.ndarray)
+        # Should be Polars Series
+        assert isinstance(vol_scaled_returns, pl.Series)
 
         # Should have valid values for positions where we have sufficient data
-        valid_values = vol_scaled_returns[~np.isnan(vol_scaled_returns)]
+        valid_values = vol_scaled_returns.filter(~vol_scaled_returns.is_nan())
         assert len(valid_values) > 0
 
         # Valid positions should be limited by volatility window + horizon
@@ -129,13 +129,13 @@ class TestVolatilityScaledReturnsGenerator:
         low_vol_targets = generator.generate_targets(low_vol_df)["vol_scaled_returns_bps"]
         high_vol_targets = generator.generate_targets(high_vol_df)["vol_scaled_returns_bps"]
 
-        low_vol_valid = low_vol_targets[~np.isnan(low_vol_targets)]
-        high_vol_valid = high_vol_targets[~np.isnan(high_vol_targets)]
+        low_vol_valid = low_vol_targets.filter(~low_vol_targets.is_nan())
+        high_vol_valid = high_vol_targets.filter(~high_vol_targets.is_nan())
 
         if len(low_vol_valid) > 10 and len(high_vol_valid) > 10:
             # High vol regime should have larger magnitude returns (more barrier hits)
-            low_vol_std = np.std(low_vol_valid)
-            high_vol_std = np.std(high_vol_valid)
+            low_vol_std = low_vol_valid.std()
+            high_vol_std = high_vol_valid.std()
 
             # High vol should generally have higher variability in outcomes
             assert high_vol_std > low_vol_std * 0.8  # Allow some tolerance
@@ -150,15 +150,15 @@ class TestVolatilityScaledReturnsGenerator:
                 volatility_window=300, vol_multiplier=vol_mult, horizon_ticks=1000
             )
             targets = generator.generate_targets(sample_price_data)
-            valid_targets = targets["vol_scaled_returns_bps"][
-                ~np.isnan(targets["vol_scaled_returns_bps"])
-            ]
+            valid_targets = targets["vol_scaled_returns_bps"].filter(
+                ~targets["vol_scaled_returns_bps"].is_nan()
+            )
             results[vol_mult] = valid_targets
 
         # Higher volatility multipliers should generally lead to different return distributions
         # (wider barriers should allow for larger moves before hitting barriers)
         if all(len(results[mult]) > 10 for mult in vol_multipliers):
-            stds = {mult: np.std(results[mult]) for mult in vol_multipliers}
+            stds = {mult: results[mult].std() for mult in vol_multipliers}
 
             # Generally, higher multipliers should allow for wider ranges
             # (though this depends on the specific price series)
@@ -206,12 +206,12 @@ class TestVolatilityScaledReturnsGenerator:
         vol_scaled_returns = targets["vol_scaled_returns_bps"]
 
         # Should have some valid targets
-        valid_targets = vol_scaled_returns[~np.isnan(vol_scaled_returns)]
+        valid_targets = vol_scaled_returns.filter(~vol_scaled_returns.is_nan())
         assert len(valid_targets) > 0
 
         # With large price movements and low volatility barriers,
         # should see some significant positive or negative returns
-        assert np.any(np.abs(valid_targets) > 10), "Should capture significant price movements"
+        assert (valid_targets.abs() > 10).any(), "Should capture significant price movements"
 
     def test_insufficient_data_handling(self):
         """Test handling when there's insufficient data."""
@@ -232,7 +232,7 @@ class TestVolatilityScaledReturnsGenerator:
         vol_scaled_returns = targets["vol_scaled_returns_bps"]
 
         # Should all be NaN due to insufficient data
-        assert np.all(np.isnan(vol_scaled_returns))
+        assert vol_scaled_returns.is_nan().all()
 
     def test_nan_price_handling(self):
         """Test handling of NaN prices in input data."""
@@ -278,10 +278,10 @@ class TestVolatilityScaledReturnsGenerator:
 
         # With zero volatility, barriers would be at entry price,
         # so returns should be 0 (no price movement)
-        valid_targets = vol_scaled_returns[~np.isnan(vol_scaled_returns)]
+        valid_targets = vol_scaled_returns.filter(~vol_scaled_returns.is_nan())
         if len(valid_targets) > 0:
             # All returns should be very close to 0 (no price movement)
-            assert np.all(np.abs(valid_targets) < 0.1)
+            assert (valid_targets.abs() < 0.1).all()
 
     def test_empty_dataframe(self):
         """Test handling of empty dataframe."""
@@ -297,7 +297,7 @@ class TestVolatilityScaledReturnsGenerator:
         vol_scaled_returns = targets["vol_scaled_returns_bps"]
 
         assert len(vol_scaled_returns) == 0
-        assert vol_scaled_returns.dtype == np.float64
+        assert vol_scaled_returns.dtype == pl.Float64
 
     def test_get_target_info(self):
         """Test target info metadata."""
@@ -336,7 +336,7 @@ class TestVolatilityScaledReturnsGenerator:
             valid_positions = len(sample_price_data) - 300 - horizon - 1
             if valid_positions > 0:
                 valid_returns = vol_scaled_returns[:valid_positions]
-                valid_count = np.sum(~np.isnan(valid_returns))
+                valid_count = (~valid_returns.is_nan()).sum()
                 assert valid_count > 0, f"No valid returns for horizon={horizon}"
 
     def test_returns_magnitude_reasonable(self, sample_price_data):
@@ -348,18 +348,18 @@ class TestVolatilityScaledReturnsGenerator:
         targets = generator.generate_targets(sample_price_data)
         vol_scaled_returns = targets["vol_scaled_returns_bps"]
 
-        valid_returns = vol_scaled_returns[~np.isnan(vol_scaled_returns)]
+        valid_returns = vol_scaled_returns.filter(~vol_scaled_returns.is_nan())
 
         if len(valid_returns) > 0:
             # For typical FX data, vol-scaled returns should be bounded
             # by the volatility barriers (roughly +/- 2 * vol * 10000 bps)
             max_expected = 1000  # Reasonable upper bound in basis points
-            assert np.all(np.abs(valid_returns) < max_expected), (
+            assert (valid_returns.abs() < max_expected).all(), (
                 f"Returns exceed reasonable bounds: {valid_returns.min():.2f} to {valid_returns.max():.2f}"
             )
 
             # Should have some variability
-            assert np.std(valid_returns) > 0.1, "Returns lack expected variability"
+            assert valid_returns.std() > 0.1, "Returns lack expected variability"
 
     def test_custom_target_name(self, sample_price_data):
         """Test using custom target name."""
@@ -396,8 +396,8 @@ class TestVolatilityScaledReturnsGenerator:
 
         # With very low volatility in the initial constant prices,
         # the small upward trend should be captured
-        valid_targets = vol_scaled_returns[~np.isnan(vol_scaled_returns)]
+        valid_targets = vol_scaled_returns.filter(~vol_scaled_returns.is_nan())
 
         if len(valid_targets) > 0:
             # Should capture the upward price movement
-            assert np.any(valid_targets > 0), "Should capture positive price movements"
+            assert (valid_targets > 0).any(), "Should capture positive price movements"

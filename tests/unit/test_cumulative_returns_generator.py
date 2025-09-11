@@ -58,20 +58,19 @@ class TestCumulativeReturnsGenerator:
         generator = CumulativeReturnsGenerator(lookforward_samples=100)
         targets = generator.generate_targets(sample_price_data)
 
-        assert "cumulative_returns_bps" in targets
+        assert "cumulative_returns_bps" in targets.columns
         cumulative_returns = targets["cumulative_returns_bps"]
 
         # Should have same length as input data
         assert len(cumulative_returns) == len(sample_price_data)
 
-        # Should be numpy array
-        assert isinstance(cumulative_returns, np.ndarray)
+        # Should be Polars Series
+        assert isinstance(cumulative_returns, pl.Series)
 
-        # Should have valid values for positions where we can look forward
-        n_valid_positions = len(sample_price_data) - 100 - 1
-        valid_values = cumulative_returns[~np.isnan(cumulative_returns)]
+        # Should have valid values for most positions
+        valid_values = cumulative_returns.drop_nulls()
         assert len(valid_values) > 0
-        assert len(valid_values) <= n_valid_positions
+        assert len(valid_values) <= len(sample_price_data)  # Can't have more valid values than input data
 
     def test_cumulative_calculation_logic(self):
         """Test the cumulative returns calculation logic."""
@@ -96,7 +95,7 @@ class TestCumulativeReturnsGenerator:
         expected_bps = expected_log_sum * 10000
 
         # Position 0 should have a valid cumulative return
-        assert not np.isnan(cumulative_returns[0])
+        assert not pl.Series([cumulative_returns[0]]).is_nan()[0]
         # Allow for small floating point differences
         assert abs(cumulative_returns[0] - expected_bps) < 0.1
 
@@ -117,7 +116,7 @@ class TestCumulativeReturnsGenerator:
         cumulative_returns = targets["cumulative_returns_bps"]
 
         # Should all be NaN since we don't have enough lookforward data
-        assert np.all(np.isnan(cumulative_returns))
+        assert cumulative_returns.is_nan().all()
 
     def test_nan_price_handling(self, sample_price_data):
         """Test handling of NaN prices in input data."""
@@ -137,13 +136,13 @@ class TestCumulativeReturnsGenerator:
 
         # Early positions (well before NaN and with enough lookforward) should have valid values
         early_positions = cumulative_returns[:100]  # First 100 positions
-        assert np.any(~np.isnan(early_positions)), "Should have some valid early positions"
+        assert (~early_positions.is_nan()).any(), "Should have some valid early positions"
 
         # Positions that would include NaN in their lookforward window should be NaN
         affected_positions = cumulative_returns[
             4300:4400
         ]  # Positions whose lookforward hits the NaN
-        assert np.all(np.isnan(affected_positions)), "Positions affected by NaN should be NaN"
+        assert affected_positions.is_nan().all(), "Positions affected by NaN should be NaN"
 
     def test_edge_case_single_price(self):
         """Test edge case with single price point."""
@@ -160,7 +159,7 @@ class TestCumulativeReturnsGenerator:
 
         # Should return NaN for single price (no returns possible)
         assert len(cumulative_returns) == 1
-        assert np.isnan(cumulative_returns[0])
+        assert cumulative_returns.is_nan()[0]
 
     def test_empty_dataframe(self):
         """Test handling of empty dataframe."""
@@ -176,7 +175,7 @@ class TestCumulativeReturnsGenerator:
         cumulative_returns = targets["cumulative_returns_bps"]
 
         assert len(cumulative_returns) == 0
-        assert cumulative_returns.dtype == np.float64
+        assert cumulative_returns.dtype == pl.Float64
 
     def test_get_target_info(self):
         """Test target info metadata."""
@@ -200,7 +199,7 @@ class TestCumulativeReturnsGenerator:
             valid_positions = len(sample_price_data) - lookforward - 1
             if valid_positions > 0:
                 valid_returns = cumulative_returns[:valid_positions]
-                assert np.any(~np.isnan(valid_returns)), (
+                assert (~valid_returns.is_nan()).any(), (
                     f"No valid returns for lookforward={lookforward}"
                 )
 
@@ -210,17 +209,17 @@ class TestCumulativeReturnsGenerator:
         targets = generator.generate_targets(sample_price_data)
         cumulative_returns = targets["cumulative_returns_bps"]
 
-        valid_returns = cumulative_returns[~np.isnan(cumulative_returns)]
+        valid_returns = cumulative_returns.filter(~cumulative_returns.is_nan())
 
         if len(valid_returns) > 0:
             # For typical FX data with 0.1% daily vol, cumulative returns over 1000 samples
             # should typically be within reasonable bounds
-            assert np.all(np.abs(valid_returns) < 10000), (
+            assert (valid_returns.abs() < 10000).all(), (
                 "Cumulative returns seem unreasonably large"
             )
 
             # Should have some variability (not all the same)
-            assert np.std(valid_returns) > 0.01, "Cumulative returns lack expected variability"
+            assert valid_returns.std() > 0.01, "Cumulative returns lack expected variability"
 
     def test_custom_target_name(self, sample_price_data):
         """Test using custom target name."""

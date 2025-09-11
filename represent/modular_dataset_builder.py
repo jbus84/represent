@@ -69,11 +69,24 @@ class ModularDatasetBuilder:
         if target_dfs:
             result_df = target_dfs[0]
             for target_df in target_dfs[1:]:
+                # Determine join keys (common key columns)
+                join_keys = ["row_idx"]
+                for col in ["symbol", "timestamp"]:
+                    if col in result_df.columns and col in target_df.columns:
+                        join_keys.append(col)
+
+                # Join and then drop duplicate key columns with suffixes
                 result_df = result_df.join(
                     target_df,
-                    on=["row_idx"] + ([col for col in ["symbol", "timestamp"] if col in result_df.columns and col in target_df.columns]),
-                    how="outer"
+                    on=join_keys,
+                    how="full"  # Use "full" instead of deprecated "outer"
                 )
+
+                # Remove duplicate columns created by join (with _right suffix)
+                for col in join_keys:
+                    right_col = f"{col}_right"
+                    if right_col in result_df.columns:
+                        result_df = result_df.drop(right_col)
 
             if self.verbose:
                 target_cols = [col for col in result_df.columns if col not in ["row_idx", "symbol", "timestamp"]]
@@ -81,7 +94,25 @@ class ModularDatasetBuilder:
 
             return result_df
         else:
-            raise ValueError("No target generators provided")
+            # No target generators - return inputs-only dataset with row keys
+            if self.verbose:
+                print("   📊 Creating inputs-only dataset (no target columns)")
+            
+            # Create row index column
+            result_df = symbol_df.with_row_index("row_idx")
+            
+            # Add symbol column if provided
+            if symbol:
+                result_df = result_df.with_columns(pl.lit(symbol).alias("symbol"))
+            
+            # Add timestamp column if ts_event exists
+            if "ts_event" in result_df.columns:
+                result_df = result_df.with_columns(pl.col("ts_event").alias("timestamp"))
+            
+            if self.verbose:
+                print(f"   📊 Inputs-only dataset: {len(result_df)} rows, {len(result_df.columns)} columns")
+            
+            return result_df
 
     def build_dataset(self, symbol_df: pl.DataFrame) -> pl.DataFrame:
         """
@@ -225,8 +256,11 @@ class ModularDatasetBuilder:
 
     def _validate_generators(self) -> None:
         """Validate that all generators are properly configured."""
+        # Allow empty generators for inputs-only datasets
         if not self.target_generators:
-            raise ValueError("At least one target generator must be provided")
+            if self.verbose:
+                print("🔧 No target generators provided - will create inputs-only dataset")
+            return
 
         # Check for duplicate target names
         all_target_names = self._get_all_target_names()

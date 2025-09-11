@@ -70,10 +70,18 @@ from .target_api import (
     load_targets_and_join,
 )
 
+# Parameter Optimization (optional)
+try:
+    from .parameter_optimization import ParameterOptimizer, optimize_all_methods
+    OPTIMIZATION_AVAILABLE = True
+except ImportError:
+    OPTIMIZATION_AVAILABLE = False
+
 # Modular Target Generation System
 from .target_generators import (
     CumulativeReturnsGenerator,
     DirectionalMFEGenerator,
+    GALabelingGenerator,
     GlobalThresholdClassificationGenerator,
     LogReturnHorizonsGenerator,
     PriceMovementGenerator,
@@ -127,6 +135,7 @@ __all__ = [
     "QuantileClassificationGenerator",
     "GlobalThresholdClassificationGenerator",
     "DirectionalMFEGenerator",
+    "GALabelingGenerator",
     "LogReturnHorizonsGenerator",
     "PriceMovementGenerator",
     "VolatilityGenerator",
@@ -141,6 +150,10 @@ __all__ = [
     "batch_generate_targets",
     "create_target_config_template",
     "load_targets_and_join",
+    # Parameter Optimization (if available)
+    "ParameterOptimizer",
+    "optimize_all_methods",
+    "OPTIMIZATION_AVAILABLE",
 ]
 
 

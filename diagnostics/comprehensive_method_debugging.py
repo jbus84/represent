@@ -1,0 +1,455 @@
+#!/usr/bin/env python3
+"""
+Comprehensive Method Debugging - All Methods, Full 100K Samples
+
+Create detailed debugging plots for ALL optimization methods using the full 
+100K sample windows that optimization actually uses. This will reveal:
+1. Triple Barrier logic issues (hits not being detected)
+2. All method behaviors across different market regimes
+3. True optimization sampling patterns
+"""
+
+import numpy as np
+import polars as pl
+import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')  # Non-interactive backend
+import matplotlib.patches as mpatches
+from pathlib import Path
+
+try:
+    from represent.target_generators.factory import TargetGeneratorFactory
+    LIBRARIES_AVAILABLE = True
+except ImportError as e:
+    print(f"❌ Required libraries not available: {e}")
+    LIBRARIES_AVAILABLE = False
+
+
+def get_all_optimization_methods():
+    """Get all methods used in optimization (excluding GA which is too slow)."""
+    return [
+        {
+            "name": "Binary CTL",
+            "method": "binary_ctl", 
+            "params": {"omega": 0.0},  # Optimized parameter
+            "color_map": {-1: "red", 1: "green"},
+            "label_names": {-1: "Short", 1: "Long"},
+            "has_barriers": False
+        },
+        {
+            "name": "Ternary CTL", 
+            "method": "ternary_ctl",
+            "params": {"marginal_change_thres": 0.0446, "window_size": 501},  # Optimized parameters
+            "color_map": {0: "red", 1: "gray", 2: "green"},
+            "label_names": {0: "Down", 1: "Neutral", 2: "Up"},
+            "has_barriers": False
+        },
+        {
+            "name": "Oracle Binary",
+            "method": "oracle_binary",
+            "params": {"transaction_cost": 0.00007},  # Corrected transaction cost
+            "color_map": {-1: "red", 1: "green"},
+            "label_names": {-1: "Short", 1: "Long"},
+            "has_barriers": False
+        },
+        {
+            "name": "Oracle Ternary", 
+            "method": "oracle_ternary",
+            "params": {"transaction_cost": 0.00007, "neutral_reward_factor": 0.1},  # Optimized parameters
+            "color_map": {0: "red", 1: "gray", 2: "green"},
+            "label_names": {0: "Down", 1: "Neutral", 2: "Up"},
+            "has_barriers": False
+        },
+        {
+            "name": "Triple Barrier", 
+            "method": "triple_barrier",
+            "params": {"lookforward_window": 2000, "barrier_width": 0.0001, "normalize_by_volatility": False},
+            "color_map": {-1: "red", 0: "gray", 1: "green"},
+            "label_names": {-1: "Short", 0: "Timeout", 1: "Long"},
+            "has_barriers": True,
+            "barrier_width": 0.0001
+        },
+        {
+            "name": "Triple Exceedance (Long)",
+            "method": "triple_exceedance",
+            "params": {"lookforward_window": 2000, "scaling_factor": 3.0, "adaptive_scaling": False},
+            "color_map": {0: "red", 1: "green"}, 
+            "label_names": {0: "Fail", 1: "Exceed"},
+            "has_barriers": False,
+            "target_column": "long"  # Specify to use long exceedance column
+        },
+        {
+            "name": "Triple Exceedance (Short)",
+            "method": "triple_exceedance",
+            "params": {"lookforward_window": 2000, "scaling_factor": 3.0, "adaptive_scaling": False},
+            "color_map": {0: "red", 1: "green"}, 
+            "label_names": {0: "Fail", 1: "Exceed"},
+            "has_barriers": False,
+            "target_column": "short"  # Specify to use short exceedance column
+        }
+    ]
+
+
+def simulate_optimization_sampling(df: pl.DataFrame, window_size: int = 100000, n_windows: int = 5):
+    """Simulate exact optimization sampling strategy."""
+    total_samples = len(df)
+    
+    if total_samples < window_size:
+        return [df]
+    
+    windows = []
+    step_size = max(1, (total_samples - window_size) // (n_windows - 1))
+    
+    for i in range(n_windows):
+        start_idx = min(i * step_size, total_samples - window_size)
+        windows.append(df.slice(start_idx, window_size))
+        print(f"Window {i+1}: samples {start_idx:,} to {start_idx + window_size - 1:,}")
+    
+    return windows
+
+
+def debug_triple_barrier_logic(window_df: pl.DataFrame, method_config: dict):
+    """Debug Triple Barrier logic to find missing hits."""
+    print(f"\n🔍 DEBUGGING TRIPLE BARRIER LOGIC: {method_config['name']}")
+    print("=" * 60)
+    
+    try:
+        # Generate labels  
+        generator = TargetGeneratorFactory.create(
+            method_config["method"],
+            **method_config["params"]
+        )
+        targets_df = generator.generate_targets(window_df)
+        target_info = generator.get_target_info()
+        target_col = target_info['target_names'][0]
+        labels = targets_df[target_col].to_numpy()
+        
+        prices = window_df["mid_price"].to_numpy()
+        barrier_width = method_config.get("barrier_width", 0.0001)
+        lookforward = method_config["params"].get("lookforward_window", 1000)
+        
+        # Manually check first 1000 samples for debugging
+        debug_samples = min(1000, len(prices) - lookforward)
+        
+        print(f"Manual barrier checking for first {debug_samples} samples:")
+        print(f"Barrier width: {barrier_width} ({barrier_width*10000:.1f} pips)")
+        print(f"Lookforward: {lookforward} ticks")
+        
+        manual_hits = {"profit": 0, "loss": 0, "timeout": 0}
+        discrepancies = []
+        
+        for i in range(debug_samples):
+            if i % 200 == 0:  # Progress indicator
+                print(f"  Checking sample {i:,}...")
+            
+            entry_price = prices[i]
+            upper_barrier = entry_price + barrier_width
+            lower_barrier = entry_price - barrier_width
+            
+            # Check lookforward window
+            window_end = min(i + lookforward, len(prices))
+            future_prices = prices[i+1:window_end]
+            
+            if len(future_prices) == 0:
+                manual_result = 0  # timeout
+            else:
+                # Check for barrier hits
+                hit_upper = np.any(future_prices >= upper_barrier)
+                hit_lower = np.any(future_prices <= lower_barrier)
+                
+                if hit_upper and hit_lower:
+                    # Both hit - which was first?
+                    upper_hit_idx = np.argmax(future_prices >= upper_barrier)
+                    lower_hit_idx = np.argmax(future_prices <= lower_barrier)
+                    
+                    if upper_hit_idx < lower_hit_idx:
+                        manual_result = 1  # profit
+                    else:
+                        manual_result = -1  # loss
+                elif hit_upper:
+                    manual_result = 1  # profit
+                elif hit_lower:
+                    manual_result = -1  # loss
+                else:
+                    manual_result = 0  # timeout
+            
+            # Count manual results
+            if manual_result == 1:
+                manual_hits["profit"] += 1
+            elif manual_result == -1:
+                manual_hits["loss"] += 1
+            else:
+                manual_hits["timeout"] += 1
+            
+            # Compare with generated label
+            generated_label = labels[i]
+            if manual_result != generated_label:
+                discrepancies.append({
+                    "index": i,
+                    "manual": manual_result,
+                    "generated": generated_label,
+                    "price": entry_price,
+                    "max_price": np.max(future_prices) if len(future_prices) > 0 else entry_price,
+                    "min_price": np.min(future_prices) if len(future_prices) > 0 else entry_price
+                })
+        
+        # Report results
+        print(f"\nMANUAL VERIFICATION RESULTS:")
+        print(f"  Manual hits - Profit: {manual_hits['profit']}, Loss: {manual_hits['loss']}, Timeout: {manual_hits['timeout']}")
+        
+        generated_counts = np.bincount(labels[:debug_samples].astype(int) + 1)  # Shift to 0-based
+        generated_loss = generated_counts[0] if len(generated_counts) > 0 else 0
+        generated_timeout = generated_counts[1] if len(generated_counts) > 1 else 0
+        generated_profit = generated_counts[2] if len(generated_counts) > 2 else 0
+        
+        print(f"  Generated labels - Profit: {generated_profit}, Loss: {generated_loss}, Timeout: {generated_timeout}")
+        print(f"  Discrepancies found: {len(discrepancies)}")
+        
+        if len(discrepancies) > 0:
+            print(f"\nFIRST 5 DISCREPANCIES:")
+            for i, disc in enumerate(discrepancies[:5]):
+                print(f"  {i+1}. Index {disc['index']}: Manual={disc['manual']}, Generated={disc['generated']}")
+                print(f"     Price: {disc['price']:.6f}, Max: {disc['max_price']:.6f}, Min: {disc['min_price']:.6f}")
+                print(f"     Upper barrier: {disc['price'] + barrier_width:.6f}, Lower: {disc['price'] - barrier_width:.6f}")
+        
+        return len(discrepancies) == 0  # True if no discrepancies
+        
+    except Exception as e:
+        print(f"❌ Error in Triple Barrier debugging: {e}")
+        return False
+
+
+def create_comprehensive_method_plots():
+    """Create comprehensive plots for all methods using full 100K samples."""
+    if not LIBRARIES_AVAILABLE:
+        return
+    
+    print("🚀 COMPREHENSIVE METHOD DEBUGGING - ALL METHODS, FULL 100K SAMPLES")
+    print("=" * 80)
+    
+    # Load data
+    data_path = Path("/Users/danielfisher/data/databento/symbol_datasets/inputs/M6AM4_inputs_only_dataset_20250909_140944.parquet")
+    df = pl.read_parquet(data_path)
+    df = df.filter(pl.col('mid_price').is_not_null())
+    
+    # Use actual optimization sampling
+    viz_window_size = 100000
+    windows = simulate_optimization_sampling(df, viz_window_size, n_windows=3)  # 3 windows for analysis
+    
+    methods = get_all_optimization_methods()
+    
+    # Test triple barrier logic first
+    print(f"\n🔧 TESTING TRIPLE BARRIER LOGIC")
+    for method_config in methods:
+        if method_config.get("has_barriers") and "triple_barrier" in method_config["method"]:
+            # Test on first window only for debugging
+            logic_ok = debug_triple_barrier_logic(windows[0], method_config)
+            if not logic_ok:
+                print(f"⚠️  Logic issues found in {method_config['name']}")
+            else:
+                print(f"✅ Logic verified for {method_config['name']}")
+    
+    # Create comprehensive plots
+    for window_idx, window_df in enumerate(windows):
+        create_all_methods_plot(window_df, methods, window_idx + 1)
+
+
+def create_all_methods_plot(window_df: pl.DataFrame, methods: list, window_num: int):
+    """Create comprehensive plot showing all methods for one window."""
+    print(f"\n📊 Creating comprehensive plot for Window {window_num}...")
+    
+    prices = window_df["mid_price"].to_numpy()
+    
+    # Subsample for plotting clarity
+    step = max(1, len(prices) // 3000)  # Target 3000 plot points
+    prices_plot = prices[::step]
+    time_axis = np.arange(0, len(prices), step)[:len(prices_plot)]
+    
+    # Create large subplot grid
+    n_methods = len(methods)
+    fig, axes = plt.subplots(n_methods, 1, figsize=(24, 4 * n_methods))
+    if n_methods == 1:
+        axes = [axes]
+    
+    fig.suptitle(f"Comprehensive Method Analysis - Window {window_num} (Full 100K Samples)", 
+                 fontsize=18, fontweight='bold')
+    
+    for i, method_config in enumerate(methods):
+        ax = axes[i]
+        
+        try:
+            print(f"  Processing {method_config['name']}...")
+            
+            # Generate labels
+            generator = TargetGeneratorFactory.create(
+                method_config["method"],
+                **method_config["params"]
+            )
+            targets_df = generator.generate_targets(window_df)
+            target_info = generator.get_target_info()
+            
+            # Handle multiple target columns (e.g., Triple Exceedance)
+            if "target_column" in method_config:
+                # Look for specific column (long or short)
+                target_suffix = method_config["target_column"]
+                matching_cols = [col for col in target_info['target_names'] if col.endswith(f"_{target_suffix}")]
+                if matching_cols:
+                    target_col = matching_cols[0]
+                else:
+                    target_col = target_info['target_names'][0]  # Fallback
+            else:
+                target_col = target_info['target_names'][0]
+                
+            labels = targets_df[target_col].to_numpy()
+            
+            # Convert labels for consistent display
+            if method_config["method"] in ["binary_ctl", "oracle_binary"]:
+                # Convert {0,1} to {-1,1} for display
+                labels_display = np.where(labels == 0, -1, 1)
+            elif method_config["method"] in ["ternary_ctl", "oracle_ternary"]:
+                # Keep {0,1,2} for ternary display
+                labels_display = labels
+            elif method_config["method"] == "triple_exceedance":
+                # Keep {0,1} for binary exceedance display
+                labels_display = labels
+            else:  # triple_barrier, triple_exceedance
+                # Already in {-1,0,1} format
+                labels_display = labels
+            
+            # Subsample labels for plotting
+            labels_plot = labels_display[::step] if len(labels_display) >= len(prices) else labels_display
+            labels_plot = labels_plot[:len(prices_plot)]
+            
+            # Plot price line
+            ax.plot(time_axis, prices_plot, 'black', linewidth=0.8, alpha=0.8, label='Price', zorder=3)
+            
+            # Add barrier visualization if applicable
+            if method_config.get("has_barriers", False) and method_config.get("barrier_width"):
+                barrier_width = method_config["barrier_width"]
+                upper_barrier = prices_plot + barrier_width
+                lower_barrier = prices_plot - barrier_width
+                
+                ax.fill_between(time_axis, lower_barrier, upper_barrier, 
+                               alpha=0.15, color='orange', 
+                               label=f'±{barrier_width*10000:.1f} pip barriers', zorder=1)
+                
+                ax.plot(time_axis, upper_barrier, '--', color='orange', alpha=0.6, linewidth=0.5, zorder=2)
+                ax.plot(time_axis, lower_barrier, '--', color='orange', alpha=0.6, linewidth=0.5, zorder=2)
+            
+            # Color regions by labels
+            current_label = labels_plot[0] if len(labels_plot) > 0 else 0
+            start_idx = 0
+            
+            for j in range(1, len(labels_plot) + 1):
+                if j == len(labels_plot) or (j < len(labels_plot) and labels_plot[j] != current_label):
+                    end_idx = j - 1
+                    
+                    if current_label in method_config["color_map"]:
+                        color = method_config["color_map"][current_label]
+                        start_time = time_axis[start_idx] if start_idx < len(time_axis) else time_axis[-1]
+                        end_time = time_axis[end_idx] if end_idx < len(time_axis) else time_axis[-1]
+                        ax.axvspan(start_time, end_time, alpha=0.3, color=color, zorder=0)
+                    
+                    if j < len(labels_plot):
+                        start_idx = j
+                        current_label = labels_plot[j]
+            
+            # Statistics
+            unique_labels, counts = np.unique(labels_display, return_counts=True)
+            percentages = counts / len(labels_display) * 100
+            num_changes = np.sum(labels_display[1:] != labels_display[:-1])
+            avg_hold = len(labels_display) // max(num_changes, 1)
+            
+            # Title and formatting
+            ax.set_title(f"{method_config['name']} - Full 100K Analysis", fontweight='bold', fontsize=14)
+            ax.set_ylabel('Price')
+            ax.grid(True, alpha=0.3)
+            
+            # Legend
+            legend_elements = [plt.Line2D([0], [0], color='black', linewidth=0.8, label='Price')]
+            
+            if method_config.get("has_barriers", False) and method_config.get("barrier_width"):
+                barrier_width = method_config["barrier_width"]
+                legend_elements.append(
+                    mpatches.Patch(color='orange', alpha=0.15, 
+                                 label=f'±{barrier_width*10000:.1f} pip barriers')
+                )
+            
+            for label_val, pct in zip(unique_labels, percentages):
+                if label_val in method_config["color_map"]:
+                    name = method_config["label_names"].get(label_val, str(label_val))
+                    legend_elements.append(
+                        mpatches.Patch(color=method_config["color_map"][label_val], alpha=0.3, 
+                                     label=f'{name} ({pct:.1f}%)')
+                    )
+            
+            ax.legend(handles=legend_elements, loc='upper left', fontsize=10)
+            
+            # Detailed statistics
+            stats_lines = [
+                f'Changes: {num_changes:,}',
+                f'Avg Hold: {avg_hold:,} ticks', 
+                f'Total: {len(labels_display):,} samples'
+            ]
+            
+            # Add method-specific stats
+            if method_config.get("has_barriers"):
+                profit_pct = percentages[unique_labels == 1][0] if 1 in unique_labels else 0
+                loss_pct = percentages[unique_labels == -1][0] if -1 in unique_labels else 0
+                timeout_pct = percentages[unique_labels == 0][0] if 0 in unique_labels else 0
+                stats_lines.append(f'P/L/T: {profit_pct:.1f}/{loss_pct:.1f}/{timeout_pct:.1f}%')
+            
+            ax.text(0.98, 0.98, '\n'.join(stats_lines), transform=ax.transAxes, 
+                   ha='right', va='top', fontsize=9,
+                   bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.9))
+            
+            # Print summary
+            print(f"    {method_config['name']}:")
+            for label_val, pct in zip(unique_labels, percentages):
+                name = method_config["label_names"].get(label_val, str(label_val))
+                print(f"      {name}: {pct:.1f}%")
+            print(f"      Changes: {num_changes:,}, Avg Hold: {avg_hold:,}")
+            
+        except Exception as e:
+            print(f"❌ Error with {method_config['name']}: {e}")
+            import traceback
+            traceback.print_exc()
+            ax.text(0.5, 0.5, f"Error: {e}", ha='center', va='center', 
+                   transform=ax.transAxes, color='red', fontsize=12)
+            ax.set_title(f"{method_config['name']}: ERROR", color='red', fontweight='bold')
+    
+    axes[-1].set_xlabel('Time (ticks)', fontsize=12)
+    plt.tight_layout()
+    
+    # Save plot
+    output_path = f"plots/optimisation/comprehensive_all_methods_window_{window_num}.png"
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    print(f"✅ Saved comprehensive plot: {output_path}")
+    plt.close()
+
+
+def main():
+    """Run comprehensive method debugging."""
+    try:
+        create_comprehensive_method_plots()
+        
+        print(f"\n🎯 COMPREHENSIVE DEBUGGING COMPLETE")
+        print("=" * 80)
+        print("Created comprehensive plots for ALL optimization methods:")
+        print("✅ Binary CTL, Ternary CTL")
+        print("✅ Oracle Binary, Oracle Ternary") 
+        print("✅ Triple Barrier (Short & Long)")
+        print("✅ Triple Exceedance")
+        print("✅ Full 100K sample analysis")
+        print("✅ Triple Barrier logic verification")
+        print("\nPlots saved to plots/optimisation/comprehensive_all_methods_window_[1-3].png")
+        print("Use these to debug any method issues and verify optimization behavior!")
+        
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+if __name__ == "__main__":
+    main()

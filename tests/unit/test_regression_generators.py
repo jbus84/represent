@@ -34,15 +34,15 @@ class TestDirectionalMFEGenerator:
         mfe_sell = targets["mfe_sell"]
 
         # Test valid range
-        valid_indices = ~np.isnan(mfe_buy)
-        assert np.any(valid_indices), "Should have some valid MFE values"
+        valid_indices = ~mfe_buy.is_nan()
+        assert valid_indices.any(), "Should have some valid MFE values"
 
         # For upward trend, buy MFE should be positive, sell MFE should be 0 or negative
-        valid_buy_mfe = mfe_buy[valid_indices]
-        valid_sell_mfe = mfe_sell[valid_indices]
+        valid_buy_mfe = mfe_buy.filter(valid_indices)
+        valid_sell_mfe = mfe_sell.filter(valid_indices)
 
-        assert np.all(valid_buy_mfe >= 0), "Buy MFE should be non-negative in uptrend"
-        assert np.all(valid_sell_mfe <= 0), "Sell MFE should be non-positive in uptrend"
+        assert (valid_buy_mfe >= 0).all(), "Buy MFE should be non-negative in uptrend"
+        assert (valid_sell_mfe <= 0).all(), "Sell MFE should be non-positive in uptrend"
 
     def test_mfe_with_controlled_scenario(self):
         """Test MFE with a controlled price scenario."""
@@ -80,7 +80,7 @@ class TestDirectionalMFEGenerator:
         # Note: With lookforward_horizon=80, from position 50 we look to position 130
         # The movement starts at position 100, so we only see 31 bps of the 50 bps move
         test_idx = 50
-        if not np.isnan(mfe_buy[test_idx]):
+        if not mfe_buy.is_nan()[test_idx]:
             # Buy MFE should be close to 31 bps (partial movement within horizon)
             assert abs(mfe_buy[test_idx] - 31.0) < 5.0, f"Expected ~31 bps, got {mfe_buy[test_idx]}"
             # Sell MFE should be 0 (price never goes down from entry)
@@ -115,10 +115,10 @@ class TestDirectionalMFEGenerator:
         mfe_buy_no_fees = targets_no_fees["mfe_buy"]
 
         # Find valid comparison point
-        valid_mask = ~np.isnan(mfe_buy_fees) & ~np.isnan(mfe_buy_no_fees)
-        if np.any(valid_mask):
+        valid_mask = ~mfe_buy_fees.is_nan() & ~mfe_buy_no_fees.is_nan()
+        if valid_mask.any():
             # With fees should be 10 bps lower than without fees
-            fee_difference = mfe_buy_no_fees[valid_mask] - mfe_buy_fees[valid_mask]
+            fee_difference = mfe_buy_no_fees.filter(valid_mask) - mfe_buy_fees.filter(valid_mask)
             assert np.allclose(fee_difference, 10.0, atol=0.1), (
                 "Fee adjustment not applied correctly"
             )
@@ -141,10 +141,10 @@ class TestDirectionalMFEGenerator:
         mfe_sell = targets["mfe_sell"]
 
         # With flat prices, MFE should be 0 (or close to 0)
-        valid_mask = ~np.isnan(mfe_buy)
-        if np.any(valid_mask):
-            assert np.allclose(mfe_buy[valid_mask], 0.0, atol=0.1), "Flat prices should give ~0 MFE"
-            assert np.allclose(mfe_sell[valid_mask], 0.0, atol=0.1), (
+        valid_mask = ~mfe_buy.is_nan()
+        if valid_mask.any():
+            assert np.allclose(mfe_buy.filter(valid_mask), 0.0, atol=0.1), "Flat prices should give ~0 MFE"
+            assert np.allclose(mfe_sell.filter(valid_mask), 0.0, atol=0.1), (
                 "Flat prices should give ~0 MFE"
             )
 
@@ -185,9 +185,10 @@ class TestLogReturnHorizonsGenerator:
         log_3000 = targets["test_log_return_3000t"]
 
         # Find a test index where all horizons have valid values
-        valid_mask = (~np.isnan(log_1000) & ~np.isnan(log_2000) & ~np.isnan(log_3000))
-        if np.any(valid_mask):
-            test_idx = np.where(valid_mask)[0][len(np.where(valid_mask)[0]) // 2]  # Middle valid index
+        valid_mask = (~log_1000.is_nan() & ~log_2000.is_nan() & ~log_3000.is_nan())
+        if valid_mask.any():
+            valid_indices = np.where(valid_mask.to_numpy())[0]
+            test_idx = int(valid_indices[len(valid_indices) // 2])  # Middle valid index
 
             # Due to exponential growth, longer horizons should have larger returns
             assert log_3000[test_idx] > log_2000[test_idx], "3000 tick horizon should have larger return than 2000"
@@ -210,7 +211,7 @@ class TestLogReturnHorizonsGenerator:
         # All log returns should be very close to zero
         for name in ["flat_test_500t", "flat_test_1000t", "flat_test_1500t"]:
             log_returns = targets[name]
-            valid_values = log_returns[~np.isnan(log_returns)]
+            valid_values = log_returns.filter(~log_returns.is_nan())
 
             if len(valid_values) > 0:
                 assert np.allclose(valid_values, 0.0, atol=0.1), f"Flat prices should give ~0 log returns for {name}"
@@ -241,7 +242,7 @@ class TestLogReturnHorizonsGenerator:
         # Position 500 (current) -> Position 1500 (future) spans the transition from 1.00 to 1.01
         test_idx = 500
 
-        if not np.isnan(log_returns[test_idx]):
+        if not log_returns.is_nan()[test_idx]:
             # Log return of 1% is approximately 99.5 bps (ln(1.01) * 10000)
             expected_return = np.log(1.01) * 10000
             actual_return = log_returns[test_idx]
@@ -271,7 +272,7 @@ class TestLogReturnHorizonsGenerator:
         # Should have some valid values
         for name in expected_defaults:
             log_returns = targets[name]
-            valid_count = np.sum(~np.isnan(log_returns))
+            valid_count = (~log_returns.is_nan()).sum()
             assert valid_count > 0, f"Should have some valid values for {name}"
 
     def test_log_return_custom_horizons(self):
@@ -381,21 +382,22 @@ class TestRemainingValueTunerGenerator:
         remaining_values = targets["remaining_value"]
 
         # Should have some valid values
-        valid_mask = ~np.isnan(remaining_values)
-        assert np.any(valid_mask), "Should have some valid remaining value calculations"
+        valid_mask = ~remaining_values.is_nan()
+        assert valid_mask.any(), "Should have some valid remaining value calculations"
 
         # Test monotonicity in trend region (positions 600-1200)
         trend_start = 600
         trend_end = 1200
         trend_values = remaining_values[trend_start:trend_end]
-        valid_trend_values = trend_values[~np.isnan(trend_values)]
+        valid_trend_values = trend_values.filter(~trend_values.is_nan())
 
         if len(valid_trend_values) > 50:
             # Check that values generally decrease (allowing some noise)
-            early_values = valid_trend_values[: len(valid_trend_values) // 3]
-            late_values = valid_trend_values[-len(valid_trend_values) // 3 :]
+            third = len(valid_trend_values) // 3
+            early_values = valid_trend_values.head(third)
+            late_values = valid_trend_values.tail(third)
 
-            assert np.mean(early_values) > np.mean(late_values), (
+            assert early_values.mean() > late_values.mean(), (
                 "Remaining values should decrease through the trend"
             )
 
@@ -426,12 +428,12 @@ class TestRemainingValueTunerGenerator:
         remaining_values = targets["remaining_value"]
 
         # Most values should be NaN or close to neutral in sideways market
-        valid_mask = ~np.isnan(remaining_values)
-        valid_values = remaining_values[valid_mask]
+        valid_mask = ~remaining_values.is_nan()
+        valid_values = remaining_values.filter(valid_mask)
 
         if len(valid_values) > 0:
             # Values should be relatively small (no strong trend)
-            assert np.all(np.abs(valid_values) < 100.0), (
+            assert (valid_values.abs() < 100.0).all(), (
                 "Sideways market should have small remaining values"
             )
 
@@ -485,8 +487,8 @@ class TestRemainingValueTunerGenerator:
         values_no_mono = targets_no_mono["remaining_value"]
 
         # Both should have valid values
-        assert np.any(~np.isnan(values_mono)), "Monotonic version should have valid values"
-        assert np.any(~np.isnan(values_no_mono)), "Non-monotonic version should have valid values"
+        assert (~values_mono.is_nan()).any(), "Monotonic version should have valid values"
+        assert (~values_no_mono.is_nan()).any(), "Non-monotonic version should have valid values"
 
         # Results can differ (we're not asserting they're the same, just that both work)
 
@@ -517,11 +519,11 @@ class TestRemainingValueTunerGenerator:
         targets_conservative = generator_conservative.generate_targets(df)
 
         # Both should generate some values (though potentially different amounts)
-        sensitive_valid = ~np.isnan(targets_sensitive["test_sensitive"])
-        conservative_valid = ~np.isnan(targets_conservative["test_conservative"])
+        sensitive_valid = ~targets_sensitive["test_sensitive"].is_nan()
+        conservative_valid = ~targets_conservative["test_conservative"].is_nan()
 
         # At least one should have valid values with clear uptrend data
-        assert np.any(sensitive_valid) or np.any(conservative_valid), (
+        assert sensitive_valid.any() or conservative_valid.any(), (
             "At least one configuration should detect the uptrend"
         )
 
@@ -642,9 +644,9 @@ class TestRegressionGeneratorIntegration:
         assert len(log_targets["realistic_log_800t"]) == n_samples
 
         # Should have some valid values
-        assert np.any(~np.isnan(mfe_targets["mfe_buy"]))
-        assert np.any(~np.isnan(mfe_targets["mfe_sell"]))
-        assert np.any(~np.isnan(log_targets["realistic_log_200t"]))
-        assert np.any(~np.isnan(log_targets["realistic_log_400t"]))
-        assert np.any(~np.isnan(log_targets["realistic_log_800t"]))
+        assert (~mfe_targets["mfe_buy"].is_nan()).any()
+        assert (~mfe_targets["mfe_sell"].is_nan()).any()
+        assert (~log_targets["realistic_log_200t"].is_nan()).any()
+        assert (~log_targets["realistic_log_400t"].is_nan()).any()
+        assert (~log_targets["realistic_log_800t"].is_nan()).any()
         # RemainingValue may have fewer valid values depending on trend detection
