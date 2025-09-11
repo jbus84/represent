@@ -178,6 +178,18 @@ class TernaryCTLGenerator(TargetGenerator):
         # Remap TStrends ternary labels {-1, 0, 1} to {0, 1, 2} for consistency
         # -1 (down) -> 0, 0 (neutral) -> 1, 1 (up) -> 2
         labels = labels + 1
+        
+        # Validate label diversity - warn if too homogeneous
+        unique_labels, counts = np.unique(labels, return_counts=True)
+        if len(unique_labels) == 1:
+            print(f"⚠️  WARNING: Ternary CTL generated only one class ({unique_labels[0]})")
+            print(f"    Consider lowering marginal_change_thres ({self.marginal_change_thres}) or window_size ({self.window_size})")
+        elif len(unique_labels) == 2:
+            # Check if neutral dominates (>90%)
+            neutral_pct = counts[unique_labels == 1][0] / len(labels) if 1 in unique_labels else 0
+            if neutral_pct > 0.9:
+                print(f"⚠️  WARNING: Ternary CTL is {neutral_pct:.1%} neutral labels")
+                print(f"    Consider lowering marginal_change_thres ({self.marginal_change_thres})")
 
         # Create base target DataFrame with keys
         target_df = self._create_base_target_df(df, symbol)

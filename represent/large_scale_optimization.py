@@ -74,7 +74,7 @@ class LargeScaleParameterOptimizer:
 
     def __init__(
         self,
-        window_size: int = 50000,  # STABILITY FIX: Increased from 15K to 50K for <30% CV
+        window_size: int = 25000,  # USER REQ: Reduced to 25K max sampling window
         n_windows: int = 3,        # STABILITY FIX: Increased from 2 to 3 windows for better averaging
         sampling_strategy: str = "stratified",
         fee_pips: float = 0.7,
@@ -86,8 +86,8 @@ class LargeScaleParameterOptimizer:
         use_optuna: bool = True,  # Prefer Optuna over scikit-optimize
         # Adaptive sampling parameters
         adaptive_sampling: bool = True,
-        min_window_size: int = 50000,  # STABILITY FIX: Start at stable 50K baseline
-        max_window_size: int = 100000, # STABILITY FIX: Allow growth to 100K for extra stability
+        min_window_size: int = 15000,  # USER REQ: Reduced to 15K min sampling window  
+        max_window_size: int = 25000,  # USER REQ: Reduced to 25K max sampling window
         stabilization_threshold: float = 0.05,
         stabilization_patience: int = 3,
         growth_factor: float = 1.5,
@@ -274,25 +274,36 @@ class LargeScaleParameterOptimizer:
                         targets = generator.generate_targets(window_df)
                         if targets is None or len(targets) == 0:
                             continue
-                            
-                        # Get first target column
-                        label_columns = [col for col in targets.columns if "label" in col]
-                        if not label_columns:
-                            continue
-                            
-                        labels = targets[label_columns[0]].to_numpy()
-                        
-                        # Normalize labels to {-1, 0, 1} format for PnL calculation
-                        labels = self._normalize_labels_for_pnl(labels)
-                        
-                        if len(labels) > 1:
-                            # Fee is total round-trip cost, so divide by 2 for separate entry/exit charges
-                            half_fee = (self.fee_pips * 0.0001) / 2.0
+
+ 
+                        # Fee is total round-trip cost, so divide by 2 for separate entry/exit charges
+                        half_fee = (self.fee_pips * 0.0001) / 2.0
+
+                        if method_name in ['Triple Barrier (Large-Scale)']:
+
+                            labels = targets[f"{generator.target_name}"].to_numpy()
+
+                            window_pnl = ((labels != 0).astype(int) * params["barrier_width"] - half_fee).sum()
+                            total_pnl += window_pnl
+                            valid_evaluations += 1
+
+                        elif method_name in ['Triple Exceedance (Large-Scale)']:
+
+                            buy_labels = targets[f"{generator.target_name}_long"].to_numpy()
+                            sell_labels = targets[f"{generator.target_name}_short"].to_numpy()
+                            window_pnl = (buy_labels - half_fee).sum()
+                            window_pnl += (sell_labels - half_fee).sum()
+                            total_pnl += window_pnl
+                            valid_evaluations += 1
+
+                        else: # method_name in ["Oracle Binary (Large-Scale)", "Oracle Ternary (Large-Scale)", "CTL Binary (Large-Scale)", "CTL Ternary (Large-Scale)"]:
+                            labels = targets[f"{generator.target_name}"].to_numpy()
                             window_pnl = _estimate_directional_pnl(window_prices, labels, half_fee)
                             total_pnl += window_pnl
                             valid_evaluations += 1
-                            
-                    except Exception:
+                        
+                    except Exception as e:
+                        print(f"   ❌ Window evaluation failed: {e}")
                         continue
                 
                 if valid_evaluations == 0:
@@ -850,6 +861,8 @@ class LargeScaleParameterOptimizer:
                 windows = self.sample_windows(prices, n_windows=self.current_n_windows)
                 
                 total_returns = 0.0
+                total_signals = 0  # Track signal count for frequency penalty
+                total_samples = 0  # Track total samples for frequency calculation
                 valid_windows = 0
                 
                 # Evaluate on all sampled windows
@@ -923,6 +936,13 @@ class LargeScaleParameterOptimizer:
                             labels_tstrends.tolist()
                         )
 
+                        # Track signal frequency for triple methods
+                        if method_name in ['Triple Barrier (Large-Scale)', 'Triple Exceedance (Large-Scale)']:
+                            # Count non-zero signals (actual trades)
+                            signal_count = np.count_nonzero(labels_int)
+                            total_signals += signal_count
+                            total_samples += len(labels_int)
+
                         total_returns += returns
                         valid_windows += 1
 
@@ -935,6 +955,20 @@ class LargeScaleParameterOptimizer:
                     return 1000.0  # High penalty for complete failure
 
                 avg_returns = total_returns / valid_windows
+                
+                # Apply signal frequency penalty for triple methods
+                final_score = avg_returns
+                if method_name in ['Triple Barrier (Large-Scale)', 'Triple Exceedance (Large-Scale)'] and total_samples > 0:
+                    signal_frequency = total_signals / total_samples
+                    min_frequency = 0.05  # Require at least 5% signal frequency
+                    
+                    if signal_frequency < min_frequency:
+                        # Heavy penalty for sparse signals: penalize by missing frequency
+                        frequency_penalty = (min_frequency - signal_frequency) * 10.0  # 10x penalty
+                        final_score = avg_returns - frequency_penalty
+                        
+                        if self.verbose and evaluation_count[0] % 10 == 0:  # Log occasionally
+                            print(f"   Signal frequency penalty: {signal_frequency:.3f} < {min_frequency:.3f}, penalty: {frequency_penalty:.4f}")
                 
                 # Track parameter history for stability analysis (if adaptive sampling is enabled)
                 if self.adaptive_sampling:
@@ -956,21 +990,27 @@ class LargeScaleParameterOptimizer:
                             # Use a custom exception to signal early termination
                             raise EarlyStoppingException("Parameter optimization converged")
                 
-                # Update best return tracking
-                if avg_returns > best_return_so_far[0]:
-                    best_return_so_far[0] = avg_returns
+                # Update best return tracking with final score
+                if final_score > best_return_so_far[0]:
+                    best_return_so_far[0] = final_score
                 
                 # Update progress bar with current status
+                freq_info = ""
+                if method_name in ['Triple Barrier (Large-Scale)', 'Triple Exceedance (Large-Scale)'] and total_samples > 0:
+                    signal_freq = total_signals / total_samples
+                    freq_info = f", freq={signal_freq:.1%}"
+                
                 if progress_bar:
                     progress_bar.set_postfix({
-                        'best_return': f"{best_return_so_far[0]:.4f}",
-                        'current': f"{avg_returns:.4f}",
+                        'best_score': f"{best_return_so_far[0]:.4f}",
+                        'current': f"{final_score:.4f}",
+                        'returns': f"{avg_returns:.4f}{freq_info}",
                         'windows': f"{valid_windows}/{len(windows)}",
-                        'params': f"pop={params.get('population_size', '?')}, window={params.get('lookforward_window', '?')}"
+                        'params': f"window={params.get('lookforward_window', '?')}"
                     })
                 
-                # Return negative returns (minimization problem)
-                return -avg_returns
+                # Return negative score (minimization problem)
+                return -final_score
 
             except EarlyStoppingException as e:
                 # Early stopping triggered - this is expected behavior
@@ -1213,11 +1253,12 @@ class LargeScaleParameterOptimizer:
         except ImportError:
             raise ImportError("CTL labeling requires tstrends integration")
 
-        # SENSITIVITY-OPTIMIZED PARAMETERS: validated ranges for balanced label generation
-        # Analysis shows all micro-scale thresholds work well, window size affects class count
+        # MICRO-SCALE OPTIMIZED PARAMETERS: fine-tuned for FX-like data
+        # Testing revealed sweet spot between 1e-06 and 5e-06 for balanced labels
+        # Range (1e-06, 1e-05) captures 1-30% neutral range for proper ternary classification
         default_bounds = {
-            'marginal_change_thres': (0.000005, 0.00005),  # Validated micro-scale range (57-90% balance)
-            'window_size': (100, 1000),  # 100 gives 3-class, 500+ gives binary, both balanced
+            'marginal_change_thres': (0.000001, 0.00001),  # 1e-06 to 1e-05: micro-scale balance
+            'window_size': (5, 100),  # Small to medium windows for responsive signals
         }
         if custom_bounds:
             default_bounds.update(custom_bounds)
@@ -1296,18 +1337,12 @@ class LargeScaleParameterOptimizer:
         """Optimize Triple Barrier with window sampling."""
         from .target_generators.triple_barrier import TripleBarrierGenerator
 
-        # ECONOMICALLY VIABLE bounds for Triple Barrier parameters
-        # CORRECTED ANALYSIS: Transaction cost = 0.7 pips total round-trip (not 1.4!)
-        # ECONOMIC REALITY: Need barriers >1.5x transaction costs for profitability
-        # - Round-trip cost: 0.7 pips (0.00007 decimal)
-        # - Breakeven barrier: 1+ pips
-        # - Min viable barrier: 1.5+ pips (0.00015+ decimal)
+        # PROVEN bounds based on successful diagnostic parameters (2K window, 1 pip barriers)
+        # Lookforward limited to 5K samples max, sampling windows to 25K max
+        # Bounds centered around proven diagnostic values that generated good signals
         default_bounds = {
-            'lookforward_window': (5000, 15000),  # MUCH LONGER: 5-15K ticks (5-15 minutes) for moves to develop
-            'barrier_width': (0.00015, 0.0005),   # Profitable barriers: 1.5-5 pips (>1.5x transaction cost)
-            'min_return_threshold': (1e-8, 1e-5), # Lower thresholds with longer windows
-            'volatility_window': (200, 1000),     # Longer volatility windows to match
-            'normalize_by_volatility': (0, 1),    # Boolean: 0=False, 1=True
+            'lookforward_window': (1000, 3000),    # 1K-3K ticks: proven range around 2K
+            'barrier_width': (0.0003, 0.001), # 3-10 pips
         }
 
         if custom_bounds:
@@ -1330,20 +1365,12 @@ class LargeScaleParameterOptimizer:
         """Optimize Triple Exceedance with window sampling and multi-objective optimization."""
         from .target_generators.triple_exceedance import TripleExceedanceGenerator
 
-        # ECONOMICALLY VIABLE bounds for Triple Exceedance parameters  
-        # CORRECTED ANALYSIS: Transaction cost = 0.7 pips total round-trip
-        # ECONOMIC REALITY: Need scaling factors that create barriers >1+ pips
-        # - 0.7 pip fee + barrier must be profitable
-        # - Need 1.5x+ scaling minimum for 1+ pip barriers
+        # PROVEN bounds based on successful diagnostic parameters (2K window, 3.0 scaling)
+        # Lookforward limited to 5K samples max, sampling windows to 25K max
+        # Bounds centered around proven diagnostic values that generated good signals
         default_bounds = {
-            'lookforward_window': (5000, 15000),  # MUCH LONGER: 5-15K ticks (5-15 minutes) for moves to develop
-            'scaling_factor': (1.5, 8.0),         # SMALLER scaling with longer windows: 1.5x-8x (1-6 pip barriers)
-            'min_exceedance_threshold': (0.1, 0.6),  # Lower thresholds with longer windows
-            'volatility_window': (200, 1000),     # Longer volatility windows to match lookforward
-            'window_penalty_weight': (0.01, 0.2), # Lower penalty - longer windows are OK now
-            'balance_weight': (0.5, 1.0),         # High balance weight for multi-class solutions
-            'target_balance_ratio': (0.25, 0.40), # Flexible but realistic balance targets
-            'adaptive_scaling': (0, 1),           # Boolean: adaptive volatility scaling
+            'lookforward_window': (1000, 5000),    # 1K-3K ticks: proven range around 2K
+            'scaling_factor': (2.0, 7.0),       # 2x-4x transaction cost: centered around proven 3x
         }
 
         if custom_bounds:
@@ -1361,7 +1388,7 @@ class LargeScaleParameterOptimizer:
 def optimize_on_symbol_dataset(
     dataset_path: str | Path,
     methods: list[str] | None = None,
-    window_size: int = 50000,   # STABILITY FIX: Use stable 50K window size
+    window_size: int = 25000,   # USER REQ: Reduced to 25K max sampling window
     n_windows: int = 3,         # Good: 3 windows for averaging
     sampling_strategy: str = "stratified",
     data_loader: Callable | None = None,

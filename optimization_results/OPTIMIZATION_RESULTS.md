@@ -1,6 +1,6 @@
 # Symbol-Specific Parameter Optimization Results
 
-Generated on: 2025-09-11 11:07:52
+Generated on: 2025-09-11 19:21:29
 
 ## Summary
 - **Total symbols optimized**: 6
@@ -8,135 +8,135 @@ Generated on: 2025-09-11 11:07:52
 - **Total optimization runs**: 36
 
 ## Returns Performance
-- **Best performing method**: ternary_ctl (1.0160)
-- **Average returns**: 0.1586
-- **Returns range**: -0.2196 to 1.0160
+- **Best performing method**: ternary_ctl (0.8557)
+- **Average returns**: 0.1055
+- **Returns range**: -0.2089 to 0.8557
 
 ## Parameter Comparison Table
 
 | symbol                                    | method            | timestamp                  |   lookforward_window |   scaling_factor |   min_exceedance_threshold |   volatility_window |   window_penalty_weight |   balance_weight |   target_balance_ratio |   adaptive_scaling |   returns |   dataset_size |   sample_efficiency |   barrier_width |   min_return_threshold |   normalize_by_volatility |   transaction_cost |   neutral_reward_factor |     omega |   marginal_change_thres |   window_size |
 |:------------------------------------------|:------------------|:---------------------------|---------------------:|-----------------:|---------------------------:|--------------------:|------------------------:|-----------------:|-----------------------:|-------------------:|----------:|---------------:|--------------------:|----------------:|-----------------------:|--------------------------:|-------------------:|------------------------:|----------:|------------------------:|--------------:|
-| M6AZ4_inputs_only_dataset_20250909_141012 | triple_exceedance | 2025-09-11T11:07:46.223430 |                11126 |          7.9343  |                   0.374569 |             680.079 |                0.117822 |         0.570395 |               0.281196 |           0.267884 | -0.039197 |       26441376 |             94.5488 |      nan        |                nan     |                nan        |          nan       |              nan        | nan       |               nan       |           nan |
-| M6AZ4_inputs_only_dataset_20250909_141012 | triple_barrier    | 2025-09-11T11:07:46.223268 |                 7939 |        nan       |                 nan        |             555.053 |              nan        |       nan        |             nan        |         nan        | -0.050826 |       26441376 |             94.5488 |        0.000457 |                  7e-06 |                  0.170144 |          nan       |              nan        | nan       |               nan       |           nan |
-| M6AZ4_inputs_only_dataset_20250909_141012 | oracle_ternary    | 2025-09-11T11:07:46.223085 |                  nan |        nan       |                 nan        |             nan     |              nan        |       nan        |             nan        |         nan        |  0.124396 |       26441376 |             94.5488 |      nan        |                nan     |                nan        |            5.8e-05 |                0.342665 | nan       |               nan       |           nan |
-| M6AZ4_inputs_only_dataset_20250909_141012 | oracle_binary     | 2025-09-11T11:07:46.222718 |                  nan |        nan       |                 nan        |             nan     |              nan        |       nan        |             nan        |         nan        |  0.176758 |       26441376 |             94.5488 |      nan        |                nan     |                nan        |            8.5e-05 |              nan        | nan       |               nan       |           nan |
-| M6AZ4_inputs_only_dataset_20250909_141012 | binary_ctl        | 2025-09-11T11:07:46.220270 |                  nan |        nan       |                 nan        |             nan     |              nan        |       nan        |             nan        |         nan        |  0.29173  |       26441376 |             94.5488 |      nan        |                nan     |                nan        |          nan       |              nan        |   6e-05   |               nan       |           nan |
-| M6AZ4_inputs_only_dataset_20250909_141012 | ternary_ctl       | 2025-09-11T11:07:46.222485 |                  nan |        nan       |                 nan        |             nan     |              nan        |       nan        |             nan        |         nan        |  0.33576  |       26441376 |             94.5488 |      nan        |                nan     |                nan        |          nan       |              nan        | nan       |                 1.2e-05 |           240 |
-| M6AM5_inputs_only_dataset_20250909_140854 | triple_exceedance | 2025-09-11T10:02:45.934089 |                 6388 |          7.14348 |                   0.355001 |             539.871 |                0.179302 |         0.501843 |               0.281139 |           0.078181 | -0.219637 |        3530614 |            708.092  |      nan        |                nan     |                nan        |          nan       |              nan        | nan       |               nan       |           nan |
-| M6AM5_inputs_only_dataset_20250909_140854 | triple_barrier    | 2025-09-11T10:02:45.933749 |                 8107 |        nan       |                 nan        |             278.292 |              nan        |       nan        |             nan        |         nan        | -0.206407 |        3530614 |            708.092  |        0.000498 |                  7e-06 |                  0.345952 |          nan       |              nan        | nan       |               nan       |           nan |
-| M6AM5_inputs_only_dataset_20250909_140854 | oracle_ternary    | 2025-09-11T10:02:45.933426 |                  nan |        nan       |                 nan        |             nan     |              nan        |       nan        |             nan        |         nan        |  0.389117 |        3530614 |            708.092  |      nan        |                nan     |                nan        |            2e-05   |                0.315118 | nan       |               nan       |           nan |
-| M6AM5_inputs_only_dataset_20250909_140854 | oracle_binary     | 2025-09-11T10:02:45.933066 |                  nan |        nan       |                 nan        |             nan     |              nan        |       nan        |             nan        |         nan        |  0.374354 |        3530614 |            708.092  |      nan        |                nan     |                nan        |            6e-05   |              nan        | nan       |               nan       |           nan |
-| M6AM5_inputs_only_dataset_20250909_140854 | binary_ctl        | 2025-09-11T10:02:45.931198 |                  nan |        nan       |                 nan        |             nan     |              nan        |       nan        |             nan        |         nan        |  0.492554 |        3530614 |            708.092  |      nan        |                nan     |                nan        |          nan       |              nan        |   3.6e-05 |               nan       |           nan |
-| M6AM5_inputs_only_dataset_20250909_140854 | ternary_ctl       | 2025-09-11T10:02:45.932863 |                  nan |        nan       |                 nan        |             nan     |              nan        |       nan        |             nan        |         nan        |  1.01595  |        3530614 |            708.092  |      nan        |                nan     |                nan        |          nan       |              nan        | nan       |                 3.2e-05 |           141 |
-| M6AH5_inputs_only_dataset_20250909_140842 | triple_exceedance | 2025-09-11T10:48:36.075502 |                12944 |          7.3642  |                   0.268275 |             724.528 |                0.199283 |         0.75054  |               0.310625 |           0.288547 | -0.054623 |       18979389 |            131.722  |      nan        |                nan     |                nan        |          nan       |              nan        | nan       |               nan       |           nan |
-| M6AH5_inputs_only_dataset_20250909_140842 | triple_barrier    | 2025-09-11T10:48:36.075246 |                 8745 |        nan       |                 nan        |             678.927 |              nan        |       nan        |             nan        |         nan        | -0.082084 |       18979389 |            131.722  |        0.00048  |                  7e-06 |                  0.156019 |          nan       |              nan        | nan       |               nan       |           nan |
-| M6AH5_inputs_only_dataset_20250909_140842 | oracle_ternary    | 2025-09-11T10:48:36.075076 |                  nan |        nan       |                 nan        |             nan     |              nan        |       nan        |             nan        |         nan        |  0.160285 |       18979389 |            131.722  |      nan        |                nan     |                nan        |            4.4e-05 |                0.301045 | nan       |               nan       |           nan |
-| M6AH5_inputs_only_dataset_20250909_140842 | oracle_binary     | 2025-09-11T10:48:36.074868 |                  nan |        nan       |                 nan        |             nan     |              nan        |       nan        |             nan        |         nan        |  0.216018 |       18979389 |            131.722  |      nan        |                nan     |                nan        |            2.9e-05 |              nan        | nan       |               nan       |           nan |
-| M6AH5_inputs_only_dataset_20250909_140842 | binary_ctl        | 2025-09-11T10:48:36.073030 |                  nan |        nan       |                 nan        |             nan     |              nan        |       nan        |             nan        |         nan        |  0.313138 |       18979389 |            131.722  |      nan        |                nan     |                nan        |          nan       |              nan        |   5.4e-05 |               nan       |           nan |
-| M6AH5_inputs_only_dataset_20250909_140842 | ternary_ctl       | 2025-09-11T10:48:36.074589 |                  nan |        nan       |                 nan        |             nan     |              nan        |       nan        |             nan        |         nan        |  0.404805 |       18979389 |            131.722  |      nan        |                nan     |                nan        |          nan       |              nan        | nan       |                 4.8e-05 |           103 |
-| M6AU5_inputs_only_dataset_20250909_140950 | triple_exceedance | 2025-09-11T10:27:47.536722 |                14936 |          7.93793 |                   0.341213 |             604.936 |                0.19893  |         0.712558 |               0.317136 |           0.015018 | -0.04486  |         102043 |          24499.5    |      nan        |                nan     |                nan        |          nan       |              nan        | nan       |               nan       |           nan |
-| M6AU5_inputs_only_dataset_20250909_140950 | triple_barrier    | 2025-09-11T10:27:47.536558 |                14999 |        nan       |                 nan        |             811.774 |              nan        |       nan        |             nan        |         nan        | -0.057932 |         102043 |          24499.5    |        0.000474 |                  3e-06 |                  0.161445 |          nan       |              nan        | nan       |               nan       |           nan |
-| M6AU5_inputs_only_dataset_20250909_140950 | oracle_ternary    | 2025-09-11T10:27:47.536411 |                  nan |        nan       |                 nan        |             nan     |              nan        |       nan        |             nan        |         nan        |  0.240254 |         102043 |          24499.5    |      nan        |                nan     |                nan        |            6.3e-05 |                0.300807 | nan       |               nan       |           nan |
-| M6AU5_inputs_only_dataset_20250909_140950 | oracle_binary     | 2025-09-11T10:27:47.536241 |                  nan |        nan       |                 nan        |             nan     |              nan        |       nan        |             nan        |         nan        |  0.17171  |         102043 |          24499.5    |      nan        |                nan     |                nan        |            4.4e-05 |              nan        | nan       |               nan       |           nan |
-| M6AU5_inputs_only_dataset_20250909_140950 | binary_ctl        | 2025-09-11T10:27:47.535031 |                  nan |        nan       |                 nan        |             nan     |              nan        |       nan        |             nan        |         nan        |  0.332965 |         102043 |          24499.5    |      nan        |                nan     |                nan        |          nan       |              nan        |   3.7e-05 |               nan       |           nan |
-| M6AU5_inputs_only_dataset_20250909_140950 | ternary_ctl       | 2025-09-11T10:27:47.536034 |                  nan |        nan       |                 nan        |             nan     |              nan        |       nan        |             nan        |         nan        |  0.404123 |         102043 |          24499.5    |      nan        |                nan     |                nan        |          nan       |              nan        | nan       |                 3.2e-05 |           141 |
-| M6AU4_inputs_only_dataset_20250909_140914 | triple_exceedance | 2025-09-11T09:44:27.973721 |                14975 |          7.02899 |                   0.508873 |             228.746 |                0.109243 |         0.644415 |               0.340133 |           0.859068 | -0.052041 |       21854618 |            114.392  |      nan        |                nan     |                nan        |          nan       |              nan        | nan       |               nan       |           nan |
-| M6AU4_inputs_only_dataset_20250909_140914 | triple_barrier    | 2025-09-11T09:44:27.973314 |                 6372 |        nan       |                 nan        |             624.386 |              nan        |       nan        |             nan        |         nan        | -0.06336  |       21854618 |            114.392  |        0.000496 |                  5e-06 |                  0.461695 |          nan       |              nan        | nan       |               nan       |           nan |
-| M6AU4_inputs_only_dataset_20250909_140914 | oracle_ternary    | 2025-09-11T09:44:27.972797 |                  nan |        nan       |                 nan        |             nan     |              nan        |       nan        |             nan        |         nan        |  0.089412 |       21854618 |            114.392  |      nan        |                nan     |                nan        |            6.5e-05 |                0.355798 | nan       |               nan       |           nan |
-| M6AU4_inputs_only_dataset_20250909_140914 | oracle_binary     | 2025-09-11T09:44:27.972435 |                  nan |        nan       |                 nan        |             nan     |              nan        |       nan        |             nan        |         nan        |  0.150933 |       21854618 |            114.392  |      nan        |                nan     |                nan        |            8.7e-05 |              nan        | nan       |               nan       |           nan |
-| M6AU4_inputs_only_dataset_20250909_140914 | binary_ctl        | 2025-09-11T09:44:27.969512 |                  nan |        nan       |                 nan        |             nan     |              nan        |       nan        |             nan        |         nan        |  0.192426 |       21854618 |            114.392  |      nan        |                nan     |                nan        |          nan       |              nan        |   6.3e-05 |               nan       |           nan |
-| M6AU4_inputs_only_dataset_20250909_140914 | ternary_ctl       | 2025-09-11T09:44:27.971597 |                  nan |        nan       |                 nan        |             nan     |              nan        |       nan        |             nan        |         nan        |  0.315732 |       21854618 |            114.392  |      nan        |                nan     |                nan        |          nan       |              nan        | nan       |                 3.2e-05 |           418 |
-| M6AM4_inputs_only_dataset_20250909_140944 | triple_exceedance | 2025-09-11T10:24:25.348184 |                11996 |          7.72131 |                   0.412341 |             882.231 |                0.148919 |         0.616184 |               0.380075 |           0.585804 | -0.048821 |       15089079 |            165.683  |      nan        |                nan     |                nan        |          nan       |              nan        | nan       |               nan       |           nan |
-| M6AM4_inputs_only_dataset_20250909_140944 | triple_barrier    | 2025-09-11T10:24:25.347587 |                 7877 |        nan       |                 nan        |             235.301 |              nan        |       nan        |             nan        |         nan        | -0.044407 |       15089079 |            165.683  |        0.000478 |                  8e-06 |                  0.143999 |          nan       |              nan        | nan       |               nan       |           nan |
-| M6AM4_inputs_only_dataset_20250909_140944 | oracle_ternary    | 2025-09-11T10:24:25.347436 |                  nan |        nan       |                 nan        |             nan     |              nan        |       nan        |             nan        |         nan        |  0.052502 |       15089079 |            165.683  |      nan        |                nan     |                nan        |            6.5e-05 |                0.355798 | nan       |               nan       |           nan |
-| M6AM4_inputs_only_dataset_20250909_140944 | oracle_binary     | 2025-09-11T10:24:25.347256 |                  nan |        nan       |                 nan        |             nan     |              nan        |       nan        |             nan        |         nan        |  0.08505  |       15089079 |            165.683  |      nan        |                nan     |                nan        |            4.4e-05 |              nan        | nan       |               nan       |           nan |
-| M6AM4_inputs_only_dataset_20250909_140944 | binary_ctl        | 2025-09-11T10:24:25.344505 |                  nan |        nan       |                 nan        |             nan     |              nan        |       nan        |             nan        |         nan        |  0.111736 |       15089079 |            165.683  |      nan        |                nan     |                nan        |          nan       |              nan        |   1e-06   |               nan       |           nan |
-| M6AM4_inputs_only_dataset_20250909_140944 | ternary_ctl       | 2025-09-11T10:24:25.347061 |                  nan |        nan       |                 nan        |             nan     |              nan        |       nan        |             nan        |         nan        |  0.231309 |       15089079 |            165.683  |      nan        |                nan     |                nan        |          nan       |              nan        | nan       |                 4.6e-05 |           304 |
+| M6AZ4_inputs_only_dataset_20250909_141012 | triple_exceedance | 2025-09-11T19:20:52.375996 |                 2395 |          3.48428 |                   0.378142 |             26.4526 |                0.276929 |         0.489633 |               0.318612 |           0.286231 | -0.006354 |       26441376 |             23.6372 |      nan        |              nan       |                nan        |          nan       |              nan        | nan       |                 nan     |           nan |
+| M6AZ4_inputs_only_dataset_20250909_141012 | triple_barrier    | 2025-09-11T19:20:52.375823 |                 1419 |        nan       |                 nan        |             43.036  |              nan        |       nan        |             nan        |         nan        | -0.022087 |       26441376 |             23.6372 |        0.00016  |                2e-05   |                  0.482849 |          nan       |              nan        | nan       |                 nan     |           nan |
+| M6AZ4_inputs_only_dataset_20250909_141012 | oracle_ternary    | 2025-09-11T19:20:52.375666 |                  nan |        nan       |                 nan        |            nan      |              nan        |       nan        |             nan        |         nan        |  0.049341 |       26441376 |             23.6372 |      nan        |              nan       |                nan        |            8.5e-05 |                0.384936 | nan       |                 nan     |           nan |
+| M6AZ4_inputs_only_dataset_20250909_141012 | oracle_binary     | 2025-09-11T19:20:52.375462 |                  nan |        nan       |                 nan        |            nan      |              nan        |       nan        |             nan        |         nan        |  0.042856 |       26441376 |             23.6372 |      nan        |              nan       |                nan        |            9.8e-05 |              nan        | nan       |                 nan     |           nan |
+| M6AZ4_inputs_only_dataset_20250909_141012 | binary_ctl        | 2025-09-11T19:20:52.374846 |                  nan |        nan       |                 nan        |            nan      |              nan        |       nan        |             nan        |         nan        |  0.143043 |       26441376 |             23.6372 |      nan        |              nan       |                nan        |          nan       |              nan        |   2.6e-05 |                 nan     |           nan |
+| M6AZ4_inputs_only_dataset_20250909_141012 | ternary_ctl       | 2025-09-11T19:20:52.375267 |                  nan |        nan       |                 nan        |            nan      |              nan        |       nan        |             nan        |         nan        |  0.328803 |       26441376 |             23.6372 |      nan        |              nan       |                nan        |          nan       |              nan        | nan       |                   9e-06 |            62 |
+| M6AM5_inputs_only_dataset_20250909_140854 | triple_exceedance | 2025-09-11T19:09:21.557769 |                 2854 |          2.29295 |                   0.201919 |             40.5529 |                0.228271 |         0.244208 |               0.372628 |           0.406153 | -0.006625 |        3530614 |            177.023  |      nan        |              nan       |                nan        |          nan       |              nan        | nan       |                 nan     |           nan |
+| M6AM5_inputs_only_dataset_20250909_140854 | triple_barrier    | 2025-09-11T19:09:21.557591 |                 1388 |        nan       |                 nan        |             27.3844 |              nan        |       nan        |             nan        |         nan        | -0.05881  |        3530614 |            177.023  |        0.000169 |                2.7e-05 |                  0.187061 |          nan       |              nan        | nan       |                 nan     |           nan |
+| M6AM5_inputs_only_dataset_20250909_140854 | oracle_ternary    | 2025-09-11T19:09:21.557442 |                  nan |        nan       |                 nan        |            nan      |              nan        |       nan        |             nan        |         nan        |  0.120893 |        3530614 |            177.023  |      nan        |              nan       |                nan        |            8e-05   |                0.355104 | nan       |                 nan     |           nan |
+| M6AM5_inputs_only_dataset_20250909_140854 | oracle_binary     | 2025-09-11T19:09:21.557273 |                  nan |        nan       |                 nan        |            nan      |              nan        |       nan        |             nan        |         nan        |  0.113201 |        3530614 |            177.023  |      nan        |              nan       |                nan        |            7.3e-05 |              nan        | nan       |                 nan     |           nan |
+| M6AM5_inputs_only_dataset_20250909_140854 | binary_ctl        | 2025-09-11T19:09:21.555884 |                  nan |        nan       |                 nan        |            nan      |              nan        |       nan        |             nan        |         nan        |  0.17082  |        3530614 |            177.023  |      nan        |              nan       |                nan        |          nan       |              nan        |   1.8e-05 |                 nan     |           nan |
+| M6AM5_inputs_only_dataset_20250909_140854 | ternary_ctl       | 2025-09-11T19:09:21.557061 |                  nan |        nan       |                 nan        |            nan      |              nan        |       nan        |             nan        |         nan        |  0.308769 |        3530614 |            177.023  |      nan        |              nan       |                nan        |          nan       |              nan        | nan       |                   8e-06 |             6 |
+| M6AH5_inputs_only_dataset_20250909_140842 | triple_exceedance | 2025-09-11T19:18:05.432559 |                 2726 |          3.4436  |                   0.448674 |             26.1868 |                0.265838 |         0.368562 |               0.262432 |           0.326416 | -0.007136 |       18979389 |             32.9305 |      nan        |              nan       |                nan        |          nan       |              nan        | nan       |                 nan     |           nan |
+| M6AH5_inputs_only_dataset_20250909_140842 | triple_barrier    | 2025-09-11T19:18:05.432388 |                 2076 |        nan       |                 nan        |             39.205  |              nan        |       nan        |             nan        |         nan        | -0.02805  |       18979389 |             32.9305 |        0.000199 |                2.1e-05 |                  0.449262 |          nan       |              nan        | nan       |                 nan     |           nan |
+| M6AH5_inputs_only_dataset_20250909_140842 | oracle_ternary    | 2025-09-11T19:18:05.432215 |                  nan |        nan       |                 nan        |            nan      |              nan        |       nan        |             nan        |         nan        |  0.127339 |       18979389 |             32.9305 |      nan        |              nan       |                nan        |            2.3e-05 |                0.366549 | nan       |                 nan     |           nan |
+| M6AH5_inputs_only_dataset_20250909_140842 | oracle_binary     | 2025-09-11T19:18:05.431799 |                  nan |        nan       |                 nan        |            nan      |              nan        |       nan        |             nan        |         nan        |  0.057879 |       18979389 |             32.9305 |      nan        |              nan       |                nan        |            6.3e-05 |              nan        | nan       |                 nan     |           nan |
+| M6AH5_inputs_only_dataset_20250909_140842 | binary_ctl        | 2025-09-11T19:18:05.430650 |                  nan |        nan       |                 nan        |            nan      |              nan        |       nan        |             nan        |         nan        |  0.10559  |       18979389 |             32.9305 |      nan        |              nan       |                nan        |          nan       |              nan        |   5.4e-05 |                 nan     |           nan |
+| M6AH5_inputs_only_dataset_20250909_140842 | ternary_ctl       | 2025-09-11T19:18:05.431549 |                  nan |        nan       |                 nan        |            nan      |              nan        |       nan        |             nan        |         nan        |  0.855718 |       18979389 |             32.9305 |      nan        |              nan       |                nan        |          nan       |              nan        | nan       |                   4e-06 |            55 |
+| M6AU5_inputs_only_dataset_20250909_140950 | triple_exceedance | 2025-09-11T19:15:05.778135 |                 2987 |          2.26213 |                   0.324825 |             34.0109 |                0.224994 |         0.446245 |               0.38237  |           0.732322 | -0.008649 |         102043 |           6124.87   |      nan        |              nan       |                nan        |          nan       |              nan        | nan       |                 nan     |           nan |
+| M6AU5_inputs_only_dataset_20250909_140950 | triple_barrier    | 2025-09-11T19:15:05.777964 |                 2994 |        nan       |                 nan        |             48.0706 |              nan        |       nan        |             nan        |         nan        | -0.208946 |         102043 |           6124.87   |        0.000102 |                1e-05   |                  0.332493 |          nan       |              nan        | nan       |                 nan     |           nan |
+| M6AU5_inputs_only_dataset_20250909_140950 | oracle_ternary    | 2025-09-11T19:15:05.777675 |                  nan |        nan       |                 nan        |            nan      |              nan        |       nan        |             nan        |         nan        |  0.240254 |         102043 |           6124.87   |      nan        |              nan       |                nan        |            6.3e-05 |                0.300807 | nan       |                 nan     |           nan |
+| M6AU5_inputs_only_dataset_20250909_140950 | oracle_binary     | 2025-09-11T19:15:05.777508 |                  nan |        nan       |                 nan        |            nan      |              nan        |       nan        |             nan        |         nan        |  0.17171  |         102043 |           6124.87   |      nan        |              nan       |                nan        |            4.4e-05 |              nan        | nan       |                 nan     |           nan |
+| M6AU5_inputs_only_dataset_20250909_140950 | binary_ctl        | 2025-09-11T19:15:05.776061 |                  nan |        nan       |                 nan        |            nan      |              nan        |       nan        |             nan        |         nan        |  0.332965 |         102043 |           6124.87   |      nan        |              nan       |                nan        |          nan       |              nan        |   3.7e-05 |                 nan     |           nan |
+| M6AU5_inputs_only_dataset_20250909_140950 | ternary_ctl       | 2025-09-11T19:15:05.777309 |                  nan |        nan       |                 nan        |            nan      |              nan        |       nan        |             nan        |         nan        |  0.667979 |         102043 |           6124.87   |      nan        |              nan       |                nan        |          nan       |              nan        | nan       |                   6e-06 |            21 |
+| M6AU4_inputs_only_dataset_20250909_140914 | triple_exceedance | 2025-09-11T19:06:39.300383 |                 2710 |          3.52158 |                   0.324283 |             19.6709 |                0.164634 |         0.739057 |               0.353855 |           0.394424 | -0.004707 |       21854618 |             28.5981 |      nan        |              nan       |                nan        |          nan       |              nan        | nan       |                 nan     |           nan |
+| M6AU4_inputs_only_dataset_20250909_140914 | triple_barrier    | 2025-09-11T19:06:39.299924 |                 1040 |        nan       |                 nan        |             18.2709 |              nan        |       nan        |             nan        |         nan        | -0.027569 |       21854618 |             28.5981 |        0.000173 |                3e-05   |                  0.144091 |          nan       |              nan        | nan       |                 nan     |           nan |
+| M6AU4_inputs_only_dataset_20250909_140914 | oracle_ternary    | 2025-09-11T19:06:39.299743 |                  nan |        nan       |                 nan        |            nan      |              nan        |       nan        |             nan        |         nan        |  0.025847 |       21854618 |             28.5981 |      nan        |              nan       |                nan        |            7.9e-05 |                0.339519 | nan       |                 nan     |           nan |
+| M6AU4_inputs_only_dataset_20250909_140914 | oracle_binary     | 2025-09-11T19:06:39.299404 |                  nan |        nan       |                 nan        |            nan      |              nan        |       nan        |             nan        |         nan        |  0.041397 |       21854618 |             28.5981 |      nan        |              nan       |                nan        |            9.7e-05 |              nan        | nan       |                 nan     |           nan |
+| M6AU4_inputs_only_dataset_20250909_140914 | binary_ctl        | 2025-09-11T19:06:39.297483 |                  nan |        nan       |                 nan        |            nan      |              nan        |       nan        |             nan        |         nan        |  0.055598 |       21854618 |             28.5981 |      nan        |              nan       |                nan        |          nan       |              nan        |   3.6e-05 |                 nan     |           nan |
+| M6AU4_inputs_only_dataset_20250909_140914 | ternary_ctl       | 2025-09-11T19:06:39.299202 |                  nan |        nan       |                 nan        |            nan      |              nan        |       nan        |             nan        |         nan        |  0.105801 |       21854618 |             28.5981 |      nan        |              nan       |                nan        |          nan       |              nan        | nan       |                   7e-06 |            18 |
+| M6AM4_inputs_only_dataset_20250909_140944 | triple_exceedance | 2025-09-11T19:12:22.569700 |                 2202 |          3.41615 |                   0.108234 |             48.7964 |                0.266489 |         0.327403 |               0.277274 |           0.183405 | -0.007562 |       15089079 |             41.4207 |      nan        |              nan       |                nan        |          nan       |              nan        | nan       |                 nan     |           nan |
+| M6AM4_inputs_only_dataset_20250909_140944 | triple_barrier    | 2025-09-11T19:12:22.569533 |                 1221 |        nan       |                 nan        |             16.78   |              nan        |       nan        |             nan        |         nan        | -0.024622 |       15089079 |             41.4207 |        0.00015  |                2.2e-05 |                  0.107161 |          nan       |              nan        | nan       |                 nan     |           nan |
+| M6AM4_inputs_only_dataset_20250909_140944 | oracle_ternary    | 2025-09-11T19:12:22.569379 |                  nan |        nan       |                 nan        |            nan      |              nan        |       nan        |             nan        |         nan        |  0.01929  |       15089079 |             41.4207 |      nan        |              nan       |                nan        |            7.1e-05 |                0.30222  | nan       |                 nan     |           nan |
+| M6AM4_inputs_only_dataset_20250909_140944 | oracle_binary     | 2025-09-11T19:12:22.569210 |                  nan |        nan       |                 nan        |            nan      |              nan        |       nan        |             nan        |         nan        |  0.030916 |       15089079 |             41.4207 |      nan        |              nan       |                nan        |            8.5e-05 |              nan        | nan       |                 nan     |           nan |
+| M6AM4_inputs_only_dataset_20250909_140944 | binary_ctl        | 2025-09-11T19:12:22.567716 |                  nan |        nan       |                 nan        |            nan      |              nan        |       nan        |             nan        |         nan        |  0.030586 |       15089079 |             41.4207 |      nan        |              nan       |                nan        |          nan       |              nan        |   4.9e-05 |                 nan     |           nan |
+| M6AM4_inputs_only_dataset_20250909_140944 | ternary_ctl       | 2025-09-11T19:12:22.569011 |                  nan |        nan       |                 nan        |            nan      |              nan        |       nan        |             nan        |         nan        |  0.061638 |       15089079 |             41.4207 |      nan        |              nan       |                nan        |          nan       |              nan        | nan       |                   5e-06 |            35 |
 
 ## Triple Exceedance Results
 
 Optimized for **6** symbols.
 
 ### Performance Metrics
-- **Best returns**: -0.0392 (M6AZ4_inputs_only_dataset_20250909_141012)
-- **Average returns**: -0.0765
-- **Worst returns**: -0.2196 (M6AM5_inputs_only_dataset_20250909_140854)
+- **Best returns**: -0.0047 (M6AU4_inputs_only_dataset_20250909_140914)
+- **Average returns**: -0.0068
+- **Worst returns**: -0.0086 (M6AU5_inputs_only_dataset_20250909_140950)
 
 ### Parameter Ranges
-- **lookforward_window**: 6388 to 14975 (avg: 12060.8)
-- **scaling_factor**: 7.02899 to 7.93793 (avg: 7.5217)
-- **min_exceedance_threshold**: 0.268275 to 0.508873 (avg: 0.376712)
-- **volatility_window**: 228.746 to 882.231 (avg: 610.065)
-- **window_penalty_weight**: 0.109243 to 0.199283 (avg: 0.158917)
-- **balance_weight**: 0.501843 to 0.75054 (avg: 0.632656)
-- **target_balance_ratio**: 0.281139 to 0.380075 (avg: 0.318384)
-- **adaptive_scaling**: 0.0150178 to 0.859068 (avg: 0.349084)
+- **lookforward_window**: 2202 to 2987 (avg: 2645.67)
+- **scaling_factor**: 2.26213 to 3.52158 (avg: 3.07011)
+- **min_exceedance_threshold**: 0.108234 to 0.448674 (avg: 0.297679)
+- **volatility_window**: 19.6709 to 48.7964 (avg: 32.6117)
+- **window_penalty_weight**: 0.164634 to 0.276929 (avg: 0.237859)
+- **balance_weight**: 0.244208 to 0.739057 (avg: 0.435851)
+- **target_balance_ratio**: 0.262432 to 0.38237 (avg: 0.327862)
+- **adaptive_scaling**: 0.183405 to 0.732322 (avg: 0.388158)
 
 ## Triple Barrier Results
 
 Optimized for **6** symbols.
 
 ### Performance Metrics
-- **Best returns**: -0.0444 (M6AM4_inputs_only_dataset_20250909_140944)
-- **Average returns**: -0.0842
-- **Worst returns**: -0.2064 (M6AM5_inputs_only_dataset_20250909_140854)
+- **Best returns**: -0.0221 (M6AZ4_inputs_only_dataset_20250909_141012)
+- **Average returns**: -0.0617
+- **Worst returns**: -0.2089 (M6AU5_inputs_only_dataset_20250909_140950)
 
 ### Parameter Ranges
-- **lookforward_window**: 6372 to 14999 (avg: 9006.5)
-- **volatility_window**: 235.301 to 811.774 (avg: 530.622)
-- **barrier_width**: 0.000457262 to 0.000497567 (avg: 0.000480349)
-- **min_return_threshold**: 3.21682e-06 to 8.48999e-06 (avg: 6.29887e-06)
-- **normalize_by_volatility**: 0.143999 to 0.461695 (avg: 0.239876)
+- **lookforward_window**: 1040 to 2994 (avg: 1689.67)
+- **volatility_window**: 16.78 to 48.0706 (avg: 32.1245)
+- **barrier_width**: 0.000101774 to 0.000199227 (avg: 0.000158916)
+- **min_return_threshold**: 1.01197e-05 to 2.98732e-05 (avg: 2.15486e-05)
+- **normalize_by_volatility**: 0.107161 to 0.482849 (avg: 0.283819)
 
 ## Oracle Ternary Results
 
 Optimized for **6** symbols.
 
 ### Performance Metrics
-- **Best returns**: 0.3891 (M6AM5_inputs_only_dataset_20250909_140854)
-- **Average returns**: 0.1760
-- **Worst returns**: 0.0525 (M6AM4_inputs_only_dataset_20250909_140944)
+- **Best returns**: 0.2403 (M6AU5_inputs_only_dataset_20250909_140950)
+- **Average returns**: 0.0972
+- **Worst returns**: 0.0193 (M6AM4_inputs_only_dataset_20250909_140944)
 
 ### Parameter Ranges
-- **transaction_cost**: 2.01189e-05 to 6.50668e-05 (avg: 5.26379e-05)
-- **neutral_reward_factor**: 0.300807 to 0.355798 (avg: 0.328538)
+- **transaction_cost**: 2.29487e-05 to 8.49198e-05 (avg: 6.67843e-05)
+- **neutral_reward_factor**: 0.300807 to 0.384936 (avg: 0.341522)
 
 ## Oracle Binary Results
 
 Optimized for **6** symbols.
 
 ### Performance Metrics
-- **Best returns**: 0.3744 (M6AM5_inputs_only_dataset_20250909_140854)
-- **Average returns**: 0.1958
-- **Worst returns**: 0.0850 (M6AM4_inputs_only_dataset_20250909_140944)
+- **Best returns**: 0.1717 (M6AU5_inputs_only_dataset_20250909_140950)
+- **Average returns**: 0.0763
+- **Worst returns**: 0.0309 (M6AM4_inputs_only_dataset_20250909_140944)
 
 ### Parameter Ranges
-- **transaction_cost**: 2.90447e-05 to 8.71858e-05 (avg: 5.81205e-05)
+- **transaction_cost**: 4.37086e-05 to 9.75777e-05 (avg: 7.65302e-05)
 
 ## Binary Ctl Results
 
 Optimized for **6** symbols.
 
 ### Performance Metrics
-- **Best returns**: 0.4926 (M6AM5_inputs_only_dataset_20250909_140854)
-- **Average returns**: 0.2891
-- **Worst returns**: 0.1117 (M6AM4_inputs_only_dataset_20250909_140944)
+- **Best returns**: 0.3330 (M6AU5_inputs_only_dataset_20250909_140950)
+- **Average returns**: 0.1398
+- **Worst returns**: 0.0306 (M6AM4_inputs_only_dataset_20250909_140944)
 
 ### Parameter Ranges
-- **omega**: 6.90101e-07 to 6.33929e-05 (avg: 4.18424e-05)
+- **omega**: 1.80217e-05 to 5.38133e-05 (avg: 3.67913e-05)
 
 ## Ternary Ctl Results
 
 Optimized for **6** symbols.
 
 ### Performance Metrics
-- **Best returns**: 1.0160 (M6AM5_inputs_only_dataset_20250909_140854)
-- **Average returns**: 0.4513
-- **Worst returns**: 0.2313 (M6AM4_inputs_only_dataset_20250909_140944)
+- **Best returns**: 0.8557 (M6AH5_inputs_only_dataset_20250909_140842)
+- **Average returns**: 0.3881
+- **Worst returns**: 0.0616 (M6AM4_inputs_only_dataset_20250909_140944)
 
 ### Parameter Ranges
-- **marginal_change_thres**: 1.20208e-05 to 4.75311e-05 (avg: 3.3422e-05)
-- **window_size**: 103 to 418 (avg: 224.5)
+- **marginal_change_thres**: 3.73818e-06 to 9.2268e-06 (avg: 6.38014e-06)
+- **window_size**: 6 to 62 (avg: 32.8333)
 
 ---
 *Generated by Represent Parameter Optimization System*

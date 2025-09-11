@@ -256,10 +256,12 @@ class ParameterOptimizer:
         except ImportError:
             raise ImportError("CTL labeling requires tstrends integration")
 
-        # Default bounds for Ternary CTL (from tstrends documentation)
+        # Default bounds for Ternary CTL (optimized for FX-scale data)
+        # Testing revealed sweet spot 1e-06 to 1e-05 for balanced ternary classification
+        # This range produces 1-30% neutral labels for proper class balance
         default_bounds = {
-            'marginal_change_thres': (0.000001, 0.1),
-            'window_size': (1, 5000),
+            'marginal_change_thres': (0.000001, 0.00001),  # 1e-06 to 1e-05: micro-scale balance
+            'window_size': (5, 100),  # Small to medium windows for responsive signals
         }
 
         if custom_bounds:
@@ -339,16 +341,22 @@ class ParameterOptimizer:
                 progress_bar.update(1)
             
             try:
-                # Create generator with current parameters + fixed transaction cost (1 pip)
+                # Create generator with current parameters
                 generator_params = params.copy()
-                generator_params['transaction_cost'] = 0.0001  # Fixed at 1 pip
+                
+                # Only add transaction_cost for Oracle generators that need it
+                if "Oracle" in generator_class.__name__:
+                    generator_params['transaction_cost'] = 0.0001  # Fixed at 1 pip
+                
                 generator = generator_class(**generator_params)
 
                 total_returns = 0.0
+                total_signals = 0  # Track signal count for frequency penalty
+                total_samples = 0  # Track total samples for frequency calculation
                 valid_series = 0
+                series_progress = None
 
                 # Evaluate on all price series with inner progress
-                series_progress = None
                 if TQDM_AVAILABLE and len(price_series_list) > 1:
                     series_progress = tqdm(
                         price_series_list, 
@@ -392,6 +400,13 @@ class ParameterOptimizer:
                             labels.astype(int).tolist()
                         )
 
+                        # Track signal frequency for triple methods
+                        if "Triple" in generator_class.__name__:
+                            # Count non-zero signals (actual trades)
+                            signal_count = np.count_nonzero(labels)
+                            total_signals += signal_count
+                            total_samples += len(labels)
+
                         total_returns += returns
                         valid_series += 1
 
@@ -413,20 +428,40 @@ class ParameterOptimizer:
 
                 avg_returns = total_returns / valid_series
                 
-                # Update best return tracking
-                if avg_returns > best_return_so_far[0]:
-                    best_return_so_far[0] = avg_returns
+                # Apply signal frequency penalty for triple methods
+                final_score = avg_returns
+                if "Triple" in generator_class.__name__ and total_samples > 0:
+                    signal_frequency = total_signals / total_samples
+                    min_frequency = 0.05  # Require at least 5% signal frequency
+                    
+                    if signal_frequency < min_frequency:
+                        # Heavy penalty for sparse signals: penalize by missing frequency
+                        frequency_penalty = (min_frequency - signal_frequency) * 10.0  # 10x penalty
+                        final_score = avg_returns - frequency_penalty
+                        
+                        if self.verbose and evaluation_count[0] % 10 == 0:  # Log occasionally
+                            print(f"   Signal frequency penalty: {signal_frequency:.3f} < {min_frequency:.3f}, penalty: {frequency_penalty:.4f}")
+                
+                # Update best return tracking with final score
+                if final_score > best_return_so_far[0]:
+                    best_return_so_far[0] = final_score
                 
                 # Update progress bar with current status
+                freq_info = ""
+                if "Triple" in generator_class.__name__ and total_samples > 0:
+                    signal_freq = total_signals / total_samples
+                    freq_info = f", freq={signal_freq:.1%}"
+                
                 if progress_bar:
                     progress_bar.set_postfix({
-                        'best_return': f"{best_return_so_far[0]:.4f}",
-                        'current': f"{avg_returns:.4f}",
-                        'params': f"pop={params.get('population_size', '?')}, window={params.get('lookforward_window', '?')}"
+                        'best_score': f"{best_return_so_far[0]:.4f}",
+                        'current': f"{final_score:.4f}",
+                        'returns': f"{avg_returns:.4f}{freq_info}",
+                        'params': f"window={params.get('lookforward_window', '?')}"
                     })
 
-                # Return negative returns (we minimize, but want to maximize returns)
-                return -avg_returns
+                # Return negative score (we minimize, but want to maximize score)
+                return -final_score
 
             except Exception as e:
                 if series_progress:
@@ -503,12 +538,14 @@ class ParameterOptimizer:
         """
         from .target_generators.triple_barrier import TripleBarrierGenerator
 
-        # Default bounds for Triple Barrier parameters (transaction_cost is fixed at 1 pip)
+        # PROVEN bounds based on successful diagnostic parameters (2K window, 1 pip barriers)
+        # Lookforward limited to 5K samples max, sampling windows to 25K max
+        # Bounds centered around proven diagnostic values that generated good signals
         default_bounds = {
-            'lookforward_window': (100, 2000),  # 100-2000 ticks lookforward window
-            'barrier_width': (0.0001, 0.005),   # 0.01%-0.5% barrier width (1-50 pips)
-            'min_return_threshold': (0.00001, 0.0001),  # Minimum return threshold to avoid noise
-            'volatility_window': (20, 100),      # Window for volatility normalization
+            'lookforward_window': (1000, 3000),    # 1K-3K ticks: proven range around 2K
+            'barrier_width': (0.00005, 0.0002), # 0.5-2 pips: centered around proven 1 pip
+            'min_return_threshold': (0.000005, 0.00003),  # Low threshold: don't filter signals
+            'volatility_window': (10, 50),       # Faster volatility adaptation
             'normalize_by_volatility': (0, 1),   # Boolean: 0=False, 1=True
         }
 
@@ -542,17 +579,18 @@ class ParameterOptimizer:
         """
         from .target_generators.triple_exceedance import TripleExceedanceGenerator
 
-        # Default bounds for Triple Exceedance parameters (transaction_cost is fixed at 1 pip)
-        # Multi-objective optimization: returns + window efficiency + class balance
+        # PROVEN bounds based on successful diagnostic parameters (2K window, 3.0 scaling)
+        # Lookforward limited to 5K samples max, sampling windows to 25K max
+        # Bounds centered around proven diagnostic values that generated good signals
         default_bounds = {
-            'lookforward_window': (50, 500),  # Minimize window length (50-500 ticks)
-            'scaling_factor': (2.0, 20.0),   # 2x-20x transaction cost scaling
-            'min_exceedance_threshold': (0.3, 0.9),  # Minimum exceedance to trigger trade
-            'volatility_window': (20, 100),   # Volatility normalization window
-            'window_penalty_weight': (0.05, 0.5),  # Weight for window length penalty
-            'balance_weight': (0.1, 1.0),     # Weight for class balance objective
+            'lookforward_window': (1000, 3000),  # 1K-3K ticks: proven range around 2K
+            'scaling_factor': (2.0, 4.0),     # 2x-4x transaction cost: centered around proven 3x
+            'min_exceedance_threshold': (0.1, 0.5),  # Low threshold: allow more signals
+            'volatility_window': (10, 50),     # Faster volatility adaptation  
+            'window_penalty_weight': (0.1, 0.3),  # Moderate window length penalty
+            'balance_weight': (0.2, 0.8),      # Balance constraint for class distribution
             'target_balance_ratio': (0.25, 0.40),  # Target ratio per class (0.33 = perfect balance)
-            'adaptive_scaling': (0, 1),       # Boolean: adaptive volatility scaling
+            'adaptive_scaling': (0, 1),        # Boolean: adaptive volatility scaling
         }
 
         if custom_bounds:

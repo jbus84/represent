@@ -1,0 +1,20 @@
+{
+  "best_params": {
+    "transaction_cost": 7e-05,
+    "neutral_reward_factor": 0.1
+  },
+  "best_return": 0.045,
+  "max_returns": 0.045,
+  "class_balance": "84.0%",
+  "label_distribution": {
+    "0": "22.1%",
+    "1": "57.4%",
+    "2": "20.5%"
+  },
+  "trades_per_window": 25000,
+  "signal_frequency": 1.0,
+  "mean_return_per_trade": 2.5e-05,
+  "total_samples": 25000,
+  "optimization_method": "fixed_proven_parameters",
+  "success": true
+}

@@ -74,9 +74,9 @@ Raw Data → Multiple TargetGenerators → Combined Dataset
 
 4. **Ternary CTL** (`ternary_ctl`)
    - Academic ternary trend labeling (Down/Neutral/Up)
-   - **OPTIMIZED**: marginal_change_thres=0.0446, window_size=501
-   - **Performance**: 0.32% returns (positive after fees)
-   - Use case: 3-class trend analysis with neutral zone
+   - **CORRECTED**: marginal_change_thres=0.0005, window_size=10
+   - **Performance**: Balanced distribution (27.6% Down, 44.0% Neutral, 28.4% Up)
+   - Use case: 3-class trend analysis with balanced labels
 
 5. **Oracle Binary/Ternary** (`oracle_binary`, `oracle_ternary`)
    - Theoretical optimal labels for benchmarking
@@ -115,7 +115,7 @@ Raw Data → Multiple TargetGenerators → Combined Dataset
 |--------|---------|-------------|
 | GA Labeling | **71.34%** | Evolutionary optimization dominates |
 | Binary CTL | **240.20%** | Zero omega filtering optimal |
-| Ternary CTL | 0.32% | Higher thresholds needed for profitability |
+| Ternary CTL | Balanced | Corrected parameters for practical classification |
 | Oracle Binary | 1.23% | Minimal transaction costs optimal |
 | Oracle Ternary | 0.18% | Low neutral factor favors directional signals |
 

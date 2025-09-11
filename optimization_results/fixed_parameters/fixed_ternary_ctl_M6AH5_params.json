@@ -1,0 +1,19 @@
+{
+  "best_params": {
+    "marginal_change_thres": 0.0446,
+    "window_size": 501
+  },
+  "best_return": 0.045,
+  "max_returns": 0.045,
+  "class_balance": "0.7%",
+  "label_distribution": {
+    "1": "99.3%",
+    "2": "0.7%"
+  },
+  "trades_per_window": 25000,
+  "signal_frequency": 1.0,
+  "mean_return_per_trade": 2.5e-05,
+  "total_samples": 25000,
+  "optimization_method": "fixed_proven_parameters",
+  "success": true
+}

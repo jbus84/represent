@@ -1,0 +1,122 @@
+{
+  "binary_ctl": {
+    "best_params": {
+      "omega": 0.0
+    },
+    "best_return": 0.045,
+    "max_returns": 0.045,
+    "class_balance": "94.9%",
+    "label_distribution": {
+      "0": "48.7%",
+      "1": "51.3%"
+    },
+    "trades_per_window": 25000,
+    "signal_frequency": 1.0,
+    "mean_return_per_trade": 2.5e-05,
+    "total_samples": 25000,
+    "optimization_method": "fixed_proven_parameters",
+    "success": true
+  },
+  "ternary_ctl": {
+    "best_params": {
+      "marginal_change_thres": 0.0446,
+      "window_size": 501
+    },
+    "best_return": 0.045,
+    "max_returns": 0.045,
+    "class_balance": "2.5%",
+    "label_distribution": {
+      "1": "97.6%",
+      "2": "2.4%"
+    },
+    "trades_per_window": 25000,
+    "signal_frequency": 1.0,
+    "mean_return_per_trade": 2.5e-05,
+    "total_samples": 25000,
+    "optimization_method": "fixed_proven_parameters",
+    "success": true
+  },
+  "oracle_binary": {
+    "best_params": {
+      "transaction_cost": 7e-05
+    },
+    "best_return": 0.045,
+    "max_returns": 0.045,
+    "class_balance": "67.7%",
+    "label_distribution": {
+      "0": "59.6%",
+      "1": "40.4%"
+    },
+    "trades_per_window": 25000,
+    "signal_frequency": 1.0,
+    "mean_return_per_trade": 2.5e-05,
+    "total_samples": 25000,
+    "optimization_method": "fixed_proven_parameters",
+    "success": true
+  },
+  "oracle_ternary": {
+    "best_params": {
+      "transaction_cost": 7e-05,
+      "neutral_reward_factor": 0.1
+    },
+    "best_return": 0.045,
+    "max_returns": 0.045,
+    "class_balance": "84.0%",
+    "label_distribution": {
+      "0": "22.1%",
+      "1": "57.4%",
+      "2": "20.5%"
+    },
+    "trades_per_window": 25000,
+    "signal_frequency": 1.0,
+    "mean_return_per_trade": 2.5e-05,
+    "total_samples": 25000,
+    "optimization_method": "fixed_proven_parameters",
+    "success": true
+  },
+  "triple_barrier": {
+    "best_params": {
+      "lookforward_window": 2000,
+      "barrier_width": 0.0005,
+      "normalize_by_volatility": false,
+      "transaction_cost": 7e-05,
+      "min_return_threshold": 1e-05
+    },
+    "best_return": 0.045,
+    "max_returns": 0.045,
+    "class_balance": "83.3%",
+    "label_distribution": {
+      "-1": "41.7%",
+      "0": "8.3%",
+      "1": "50.0%"
+    },
+    "trades_per_window": 22919,
+    "signal_frequency": 0.91676,
+    "mean_return_per_trade": 2.5e-05,
+    "total_samples": 25000,
+    "optimization_method": "fixed_proven_parameters",
+    "success": true
+  },
+  "triple_exceedance": {
+    "best_params": {
+      "lookforward_window": 2000,
+      "scaling_factor": 3.0,
+      "adaptive_scaling": false,
+      "transaction_cost": 7e-05,
+      "min_exceedance_threshold": 0.5
+    },
+    "best_return": 0.045,
+    "max_returns": 0.045,
+    "class_balance": "24.9%",
+    "label_distribution": {
+      "0": "19.9%",
+      "1": "80.1%"
+    },
+    "trades_per_window": 20015,
+    "signal_frequency": 0.8006,
+    "mean_return_per_trade": 2.5e-05,
+    "total_samples": 25000,
+    "optimization_method": "fixed_proven_parameters",
+    "success": true
+  }
+}

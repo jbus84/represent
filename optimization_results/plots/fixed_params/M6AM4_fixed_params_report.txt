@@ -1,0 +1,37 @@
+FIXED PARAMETERS ANALYSIS REPORT
+==================================================
+
+Symbol: M6AM4
+Samples: 15,089,080
+Size: 330.3MB
+
+BINARY_CTL:
+  Signal Frequency: 100.0%
+  Label Distribution: {'0': '51.5%', '1': '48.5%'}
+  Parameters: {'omega': 0.0}
+
+TERNARY_CTL:
+  Signal Frequency: 100.0%
+  Label Distribution: {'1': '98.1%', '2': '1.9%'}
+  Parameters: {'marginal_change_thres': 0.0446, 'window_size': 501}
+
+ORACLE_BINARY:
+  Signal Frequency: 100.0%
+  Label Distribution: {'0': '74.7%', '1': '25.3%'}
+  Parameters: {'transaction_cost': 7e-05}
+
+ORACLE_TERNARY:
+  Signal Frequency: 100.0%
+  Label Distribution: {'0': '27.3%', '1': '50.8%', '2': '21.9%'}
+  Parameters: {'transaction_cost': 7e-05, 'neutral_reward_factor': 0.1}
+
+TRIPLE_BARRIER:
+  Signal Frequency: 15.0%
+  Label Distribution: {'-1': '7.4%', '0': '85.0%', '1': '7.6%'}
+  Parameters: {'lookforward_window': 2000, 'barrier_width': 0.0005, 'normalize_by_volatility': False, 'transaction_cost': 7e-05, 'min_return_threshold': 1e-05}
+
+TRIPLE_EXCEEDANCE:
+  Signal Frequency: 25.8%
+  Label Distribution: {'0': '74.2%', '1': '25.8%'}
+  Parameters: {'lookforward_window': 2000, 'scaling_factor': 3.0, 'adaptive_scaling': False, 'transaction_cost': 7e-05, 'min_exceedance_threshold': 0.5}
+

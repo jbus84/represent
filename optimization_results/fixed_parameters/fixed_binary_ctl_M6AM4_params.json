@@ -1,0 +1,18 @@
+{
+  "best_params": {
+    "omega": 0.0
+  },
+  "best_return": 0.045,
+  "max_returns": 0.045,
+  "class_balance": "94.1%",
+  "label_distribution": {
+    "0": "51.5%",
+    "1": "48.5%"
+  },
+  "trades_per_window": 25000,
+  "signal_frequency": 1.0,
+  "mean_return_per_trade": 2.5e-05,
+  "total_samples": 25000,
+  "optimization_method": "fixed_proven_parameters",
+  "success": true
+}

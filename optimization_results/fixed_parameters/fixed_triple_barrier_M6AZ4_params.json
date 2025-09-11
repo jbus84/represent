@@ -1,0 +1,23 @@
+{
+  "best_params": {
+    "lookforward_window": 2000,
+    "barrier_width": 0.0005,
+    "normalize_by_volatility": false,
+    "transaction_cost": 7e-05,
+    "min_return_threshold": 1e-05
+  },
+  "best_return": 0.045,
+  "max_returns": 0.045,
+  "class_balance": "83.3%",
+  "label_distribution": {
+    "-1": "41.7%",
+    "0": "8.3%",
+    "1": "50.0%"
+  },
+  "trades_per_window": 22919,
+  "signal_frequency": 0.91676,
+  "mean_return_per_trade": 2.5e-05,
+  "total_samples": 25000,
+  "optimization_method": "fixed_proven_parameters",
+  "success": true
+}

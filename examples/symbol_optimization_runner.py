@@ -19,6 +19,295 @@ from represent.large_scale_optimization import LargeScaleParameterOptimizer
 from represent.parameter_storage import ParameterStorage, save_optimization_results
 
 
+def generate_diagnostics_comprehensive_plots_for_symbol(
+    symbol_info: Dict[str, Any],
+    symbol_results: Dict[str, Dict[str, Any]],
+    windows: int = 3,
+    window_size: int = 25_000  # USER REQ: Max 25K sampling window
+) -> None:
+    """Use diagnostics.create_all_methods_plot to render comprehensive plots per window.
+    For each subset of methods, copy the plots into per-symbol directories.
+
+    Output structure:
+    - plots/optimisation/[SYMBOL]/all/comprehensive_all_methods_window_{n}.png
+    - plots/optimisation/[SYMBOL]/classification/comprehensive_all_methods_window_{n}.png
+    - plots/optimisation/[SYMBOL]/oracle/comprehensive_all_methods_window_{n}.png
+    - plots/optimisation/[SYMBOL]/triple/comprehensive_all_methods_window_{n}.png
+    """
+    import polars as pl
+    import numpy as np
+    import shutil
+    from pathlib import Path as _P
+    from diagnostics.comprehensive_method_debugging import (
+        create_all_methods_plot,
+        get_all_optimization_methods,
+        simulate_optimization_sampling,
+    )
+
+    symbol_name = symbol_info['symbol']
+
+    # Load full dataset for the symbol
+    df = pl.read_parquet(symbol_info['file_path'])
+    df = df.filter(pl.col('mid_price').is_not_null())
+
+    # Build fixed 100k windows using diagnostic sampler
+    win_list = simulate_optimization_sampling(df, window_size, n_windows=windows)
+
+    # Get full method configs from diagnostics (include all available methods)
+    full_methods = list(get_all_optimization_methods())
+
+    # Helper to inject optimized parameters
+    def with_optimized_params(methods_in: list[dict]) -> list[dict]:
+        out = []
+        for m in methods_in:
+            m2 = dict(m)
+            method_key = m2.get('method')
+            optimal = symbol_results.get(method_key, {}).get('optimal_params', {})
+            params = dict(m2.get('params', {}))
+            params.update(optimal)
+            if method_key in ('binary_ctl', 'ternary_ctl'):
+                params.pop('transaction_cost', None)
+            for k in list(params.keys()):
+                if k.endswith('_window') or k in ('window_size',):
+                    try:
+                        params[k] = int(params[k])
+                    except Exception:
+                        pass
+            m2['params'] = params
+            out.append(m2)
+        return out
+
+    # Define subsets
+    def is_classification(m):
+        return m.get('method') in {'binary_ctl', 'ternary_ctl'}
+
+    def is_oracle(m):
+        return m.get('method') in {'oracle_binary', 'oracle_ternary'}
+
+    def is_triple(m):
+        return 'triple' in (m.get('method') or '')
+
+    subsets = {
+        'all': full_methods,
+        'classification': [m for m in full_methods if is_classification(m)],
+        'oracle': [m for m in full_methods if is_oracle(m)],
+        'triple': [m for m in full_methods if is_triple(m)],
+    }
+
+    # Ensure base output dirs exist
+    base_dir = _P('plots/optimisation')
+    base_dir.mkdir(parents=True, exist_ok=True)
+
+    # For each subset, render global plots then copy into per-symbol/subset dirs
+    for subset_name, subset_methods in subsets.items():
+        if not subset_methods:
+            continue
+        methods = with_optimized_params(subset_methods)
+        # Render for each window (diagnostics saves to plots/optimisation/... globally)
+        for idx, window_df in enumerate(win_list, 1):
+            create_all_methods_plot(window_df, methods, idx)
+            # Copy to per-symbol/subset path
+            src = base_dir / f"comprehensive_all_methods_window_{idx}.png"
+            dst_dir = base_dir / symbol_name / subset_name
+            dst_dir.mkdir(parents=True, exist_ok=True)
+            dst = dst_dir / f"comprehensive_all_methods_window_{idx}.png"
+            try:
+                shutil.copy2(src, dst)
+            except Exception as e:
+                print(f"⚠️  Failed to copy plot for {symbol_name}/{subset_name}/window_{idx}: {e}")
+
+
+def generate_comprehensive_all_methods_windows(
+    symbol_info: Dict[str, Any],
+    symbol_results: Dict[str, Dict[str, Any]],
+    windows: int = 3,
+    window_size: int = 25_000,  # USER REQ: Max 25K sampling window
+    save_dir: Path = Path("examples")
+) -> list[Path]:
+    """Apply optimized parameters to fixed 100k windows and generate comprehensive plots.
+    Saves files as examples/comprehensive_all_methods_window_1.png, etc.
+    Returns list of saved file Paths.
+    """
+    import matplotlib.pyplot as plt
+    from represent.target_generators import TargetGeneratorFactory
+
+    # Load prices
+    prices = load_symbol_data_from_parquet(symbol_info['file_path'])
+    n = len(prices)
+    w = min(window_size, n)
+    if w < 1000:
+        raise ValueError("Not enough samples to create a 100k window plot")
+
+    # Determine window start indices (evenly spaced)
+    if windows == 1:
+        starts = [max(0, n - w)]
+    else:
+        step = max(1, (n - w) // max(1, windows - 1))
+        starts = [min(i * step, n - w) for i in range(windows)]
+
+    method_order = ['binary_ctl', 'ternary_ctl', 'oracle_binary', 'oracle_ternary']
+
+    saved = []
+    for idx, start in enumerate(starts, 1):
+        end = start + w
+        window_prices = prices[start:end]
+        market_data = pl.DataFrame({
+            'mid_price': window_prices,
+            'ts_event': np.arange(w, dtype=np.int64)
+        })
+
+        # Collect labels per method using optimized params
+        labels_per_method: Dict[str, np.ndarray] = {}
+        for method in method_order:
+            if method not in symbol_results:
+                continue
+            optimal = symbol_results[method].get('optimal_params', {})
+            # Filter incompatible params for CTL
+            filtered = dict(optimal)
+            if method in ('binary_ctl', 'ternary_ctl'):
+                filtered.pop('transaction_cost', None)
+            try:
+                gen = TargetGeneratorFactory.create(method, **filtered)
+            except Exception:
+                # Fallback: try without any params
+                try:
+                    gen = TargetGeneratorFactory.create(method)
+                except Exception:
+                    continue
+            try:
+                df = gen.generate_targets(market_data)
+                # Pick last column by default
+                labels = df[df.columns[-1]].to_numpy()
+                labels_per_method[method] = labels
+            except Exception as e:
+                print(f"   ⚠️  Visualization generation failed for {method}: {e}")
+                continue
+
+        # Create figure: top price, then one subplot per method
+        rows = 1 + len(labels_per_method)
+        if rows == 1:
+            continue
+        fig, axes = plt.subplots(rows, 1, figsize=(16, 3 * rows), sharex=True)
+        if not isinstance(axes, np.ndarray):
+            axes = np.array([axes])
+
+        # Plot price
+        axes[0].plot(np.arange(w), window_prices, 'k-', linewidth=1)
+        axes[0].set_title(f"{symbol_info['symbol']} – Price (Window {idx}, {w:,} samples)")
+        axes[0].grid(True, alpha=0.3)
+
+        # Plot methods
+        r = 1
+        for method in method_order:
+            if method not in labels_per_method:
+                continue
+            lbls = labels_per_method[method]
+            ax = axes[r]
+            # Handle ternary {-1,0,1} vs binary {0,1}
+            uniq = np.unique(lbls[~np.isnan(lbls)]) if hasattr(lbls, '__len__') else np.array([])
+            cmap = plt.cm.get_cmap('Set2', max(3, len(uniq)))
+            if len(uniq) == 0:
+                ax.text(0.5, 0.5, 'No labels', transform=ax.transAxes, ha='center')
+            else:
+                for j, u in enumerate(sorted(uniq)):
+                    mask = (lbls == u)
+                    ax.scatter(np.where(mask)[0], lbls[mask], s=1, c=[cmap(j)], label=str(int(u)))
+            ax.set_title(method.replace('_', ' ').title())
+            ax.grid(True, alpha=0.3)
+            r += 1
+        axes[-1].set_xlabel('Time (ticks)')
+        plt.tight_layout()
+
+        out_path = save_dir / f"comprehensive_all_methods_window_{idx}.png"
+        plt.savefig(out_path, dpi=200, bbox_inches='tight')
+        plt.close(fig)
+        print(f"   📈 Saved {out_path}")
+        saved.append(out_path)
+
+    return saved
+
+def generate_symbol_visualizations(
+    symbol_info: Dict[str, Any],
+    symbol_results: Dict[str, Dict[str, Any]], 
+    output_dir: Path
+) -> None:
+    """
+    Generate comprehensive visualizations for a symbol's optimization results.
+    
+    Args:
+        symbol_info: Symbol dataset information  
+        symbol_results: Optimization results for all methods
+        output_dir: Directory to save visualization plots
+    """
+    try:
+        from examples.labeling_approaches_visualization import create_comprehensive_visualization
+        from represent.target_generators import TargetGeneratorFactory
+        
+        # Load the symbol's price data
+        prices = load_symbol_data_from_parquet(symbol_info['file_path'])
+        
+        # Use a reasonable sample size for visualization (5K samples)
+        sample_size = min(5000, len(prices))
+        market_data = pl.DataFrame({
+            'mid_price': prices[:sample_size],
+            'ts_event': np.arange(sample_size, dtype=np.int64),
+            'symbol': [symbol_info['symbol']] * sample_size
+        })
+        
+        # Create output directory
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate targets using optimized parameters
+        targets = {}
+        
+        for method, method_results in symbol_results.items():
+            try:
+                # Get optimized parameters
+                best_params = method_results.get('best_params', {})
+                if not best_params:
+                    continue
+                    
+                # Convert method name and create generator with optimized parameters
+                converted_params = convert_params_for_generator(method, best_params)
+                generator = TargetGeneratorFactory.create(method, **converted_params)
+                
+                # Generate targets
+                result_df = generator.generate_targets(market_data, symbol_info['symbol'])
+                
+                # Extract target column(s)
+                target_info = generator.get_target_info()
+                target_names = target_info['target_names']
+                
+                for target_name in target_names:
+                    if target_name in result_df.columns:
+                        targets[target_name] = result_df[target_name].to_numpy()
+                        
+            except Exception as e:
+                print(f"   ⚠️  Failed to generate {method} targets for visualization: {e}")
+                continue
+        
+        if targets:
+            # Create symbol-specific output directory
+            symbol_name = symbol_info['symbol']
+            symbol_output_dir = output_dir / symbol_name
+            symbol_output_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Create comprehensive visualization
+            output_files = create_comprehensive_visualization(
+                market_data, 
+                targets, 
+                output_dir=str(symbol_output_dir)
+            )
+            
+            print(f"   📈 Generated {len(output_files)} visualization files for {symbol_name}")
+        else:
+            print(f"   ⚠️  No targets generated for {symbol_info['symbol']} visualization")
+            
+    except Exception as e:
+        print(f"   ❌ Visualization generation failed: {e}")
+        # Don't re-raise - visualization failure shouldn't stop optimization
+
+
 def load_symbol_data_from_parquet(file_path: str | Path) -> np.ndarray:
     """Load price data from symbol parquet file."""
     df = pl.read_parquet(file_path)
@@ -161,7 +450,7 @@ def calculate_additional_metrics(prices: np.ndarray, method: str, optimal_params
         import polars as pl
         
         # Use same windowing parameters as optimization (from large_scale_optimization.py)
-        window_size = 100000  # Same as optimization
+        window_size = 25000  # USER REQ: Max 25K sampling window
         n_windows = 5         # Same as optimization
         
         if len(prices) <= window_size:
@@ -468,14 +757,15 @@ def run_all_symbol_optimizations(
     
     # Optimization configuration with adaptive sampling and early stopping
     optimization_config = {
-        'window_size': 100000,     # Much larger windows (no GA memory constraints)
+        'window_size': 25000,      # USER REQ: Max 25K sampling window
         'n_windows': 5,            # More windows for better sampling
         'sampling_strategy': 'stratified',  # Ensure good coverage
         'adaptive_sampling': True,  # Enable adaptive sampling
         'stabilization_threshold': 0.05,  # 5% parameter change threshold
         'stabilization_patience': 3,  # Require 3 stable evaluations
         'growth_factor': 1.5,      # 50% growth per increase
-        'max_window_size': 500000, # Much larger max (500K samples per window)
+        'min_window_size': 15000,  # USER REQ: Min 15K sampling window
+        'max_window_size': 25000,  # USER REQ: Max 25K sampling window
         'early_stopping': True,    # Stop early when parameters stabilize
         'early_stopping_patience': 7,  # Extra evaluations after stabilization
         'fee_pips': 0.7,           # Correct 0.7 pip transaction costs
@@ -517,6 +807,19 @@ def run_all_symbol_optimizations(
                     symbol_results, 
                     str(Path(output_dir) / "optimized_parameters")
                 )
+                
+                # Generate comprehensive 100k-window visualizations per symbol via diagnostics
+                try:
+                    print(f"📊 Generating comprehensive 100k-window visualizations for {symbol} via diagnostics...")
+                    generate_diagnostics_comprehensive_plots_for_symbol(
+                        symbol_info,
+                        symbol_results,
+                        windows=3,
+                        window_size=25_000,  # USER REQ: Max 25K sampling window
+                    )
+                    print(f"✅ Comprehensive windows generated for {symbol}")
+                except Exception as viz_error:
+                    print(f"⚠️  Visualization failed for {symbol}: {viz_error}")
                 
                 print(f"✅ {symbol} optimization complete ({len(symbol_results)} methods)")
                 successful_optimizations += 1
@@ -642,6 +945,18 @@ def run_debug_m6am4():
             str(output_dir / 'optimized_parameters')
         )
         print(f"✅ Debug results saved. Files: {saved_files}")
+        
+        # Generate debug visualizations
+        try:
+            print("📊 Generating debug visualizations...")
+            generate_symbol_visualizations(
+                m6am4,
+                results,
+                output_dir=output_dir / "plots" / "optimisation"
+            )
+            print("✅ Debug visualizations generated")
+        except Exception as viz_error:
+            print(f"⚠️  Debug visualization failed: {viz_error}")
     else:
         print("❌ No results produced in debug run")
 
@@ -661,7 +976,7 @@ def main():
     try:
         from represent.target_generators.tstrends_labeling import TSTRENDS_AVAILABLE
         if TSTRENDS_AVAILABLE:
-            methods = ['binary_ctl', 'ternary_ctl', 'oracle_binary', 'oracle_ternary', 'triple_barrier', 'triple_exceedance']
+            methods = ['binary_ctl', 'ternary_ctl', 'oracle_binary', 'oracle_ternary', 'triple_exceedance', 'triple_barrier', ]
             print("✅ TStrends available - including CTL, Oracle, and Triple methods")
         else:
             methods = ['triple_barrier', 'triple_exceedance']
@@ -692,7 +1007,8 @@ def main():
         print("Check the following files:")
         print(f"  • {output_dir}/OPTIMIZATION_RESULTS.md - Main report")
         print(f"  • {output_dir}/parameter_comparison.csv - Raw data")
-        print(f"  • {output_dir}/*.png - Visualizations")
+        print(f"  • {output_dir}/*.png - Parameter distribution plots")
+        print(f"  • {output_dir}/plots/optimisation/[SYMBOL]/comprehensive_all_methods_window_*.png - 100k-window comprehensive plots")
         print(f"  • {output_dir}/optimized_parameters/ - Individual parameter files")
         
     except KeyboardInterrupt:

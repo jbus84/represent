@@ -62,16 +62,12 @@ class TripleBarrierGenerator(TargetGenerator):
     
     def __init__(
         self,
-        lookforward_window: int = 500,  # Hundreds of ticks for meaningful predictions
-        barrier_width: float = 0.0005,  # 5 pips symmetric barriers (0.05%)
+        lookforward_window: int = 2000,  # FIXED: 2K ticks lookforward window
+        barrier_width: float = 0.0005,  # FIXED: 5 pip barriers for better signal quality
         upper_barrier: float | None = None,  # Optional asymmetric upper barrier
         lower_barrier: float | None = None,  # Optional asymmetric lower barrier
         transaction_cost: float = 0.0001,  # 1 pip transaction cost
-        min_return_threshold: float = 0.0001,  # Minimum return to consider significant
         target_name: str = "triple_barrier_label",
-        normalize_by_volatility: bool = False,  # Scale barriers by recent volatility
-        volatility_window: int = 50,  # Window for volatility calculation
-        return_probabilities: bool = False,  # Return label probabilities instead of hard labels
     ):
         """
         Initialize Triple Barrier generator.
@@ -93,11 +89,8 @@ class TripleBarrierGenerator(TargetGenerator):
         self.upper_barrier = upper_barrier if upper_barrier is not None else barrier_width
         self.lower_barrier = lower_barrier if lower_barrier is not None else barrier_width
         self.transaction_cost = transaction_cost
-        self.min_return_threshold = min_return_threshold
         self.target_name = target_name
-        self.normalize_by_volatility = normalize_by_volatility
-        self.volatility_window = volatility_window
-        self.return_probabilities = return_probabilities
+
         
         # Validation
         if self.lookforward_window < 10:
@@ -113,10 +106,10 @@ class TripleBarrierGenerator(TargetGenerator):
         
         prices = df["mid_price"].to_numpy()
         
-        if len(prices) < self.lookforward_window + self.volatility_window:
+        if len(prices) < self.lookforward_window:
             warnings.warn(
                 f"Insufficient data for triple barrier labeling: {len(prices)} samples. "
-                f"Need at least {self.lookforward_window + self.volatility_window}. "
+                f"Need at least {self.lookforward_window}. "
                 f"Returning neutral labels.",
                 stacklevel=2
             )
@@ -129,12 +122,7 @@ class TripleBarrierGenerator(TargetGenerator):
         result_df = self._create_base_target_df(df, symbol)
         
         # Add target column
-        if self.return_probabilities:
-            # Return probability of upper barrier (profit target)
-            result_df = result_df.with_columns(pl.Series(f"{self.target_name}_prob", label_metadata))
-        else:
-            # Return hard classification labels
-            result_df = result_df.with_columns(pl.Series(self.target_name, labels))
+        result_df = result_df.with_columns(pl.Series(self.target_name, labels))
             
         # Add metadata columns for analysis
         result_df = result_df.with_columns([
@@ -157,21 +145,15 @@ class TripleBarrierGenerator(TargetGenerator):
         labels = np.zeros(n_samples, dtype=np.int32)
         metadata = np.zeros(n_samples, dtype=np.float32)
         
-        # Calculate volatility scaling if enabled
-        if self.normalize_by_volatility:
-            volatilities = self._calculate_rolling_volatility(prices)
-        else:
-            volatilities = np.ones(n_samples)
-        
         # Process each position
         for i in range(n_samples - self.lookforward_window):
             entry_price = prices[i]
-            vol_scalar = volatilities[i] if self.normalize_by_volatility else 1.0
+
             
             # Adjust barriers for current volatility
             # FIXED: Use absolute barriers, not percentage-based
-            upper_threshold = entry_price + (self.upper_barrier * vol_scalar)
-            lower_threshold = entry_price - (self.lower_barrier * vol_scalar)
+            upper_threshold = entry_price + self.upper_barrier
+            lower_threshold = entry_price - self.lower_barrier
             
             # Look ahead for barrier hits
             future_prices = prices[i+1:i+1+self.lookforward_window]
@@ -225,45 +207,15 @@ class TripleBarrierGenerator(TargetGenerator):
                 # Timeout: calculate return based on final price change (no directional bias)
                 realized_return = (exit_price - entry_price) / entry_price - self.transaction_cost
             
-            # Store metadata (realized return or probability)
-            if self.return_probabilities:
-                # Convert return to probability using sigmoid
-                metadata[i] = self._return_to_probability(realized_return)
-            else:
-                metadata[i] = realized_return
+            metadata[i] = realized_return
                 
-            # Apply minimum return threshold to avoid noise trading
-            # FIXED: Only apply threshold to timeout cases, not valid barrier hits
-            if labels[i] == 0 and abs(realized_return) < self.min_return_threshold:
-                labels[i] = 0  # Keep as timeout for truly small moves
-        
         return labels, metadata
     
-    def _calculate_rolling_volatility(self, prices: np.ndarray) -> np.ndarray:
-        """Calculate rolling volatility for barrier normalization."""
-        volatilities = np.ones(len(prices))
-        
-        for i in range(self.volatility_window, len(prices)):
-            price_window = prices[i-self.volatility_window:i]
-            returns = np.diff(price_window) / price_window[:-1]
-            volatilities[i] = np.std(returns) if len(returns) > 1 else 1.0
-            
-        # Fill initial values with first computed volatility
-        if len(prices) > self.volatility_window:
-            volatilities[:self.volatility_window] = volatilities[self.volatility_window]
-            
-        return volatilities
-    
-    def _return_to_probability(self, realized_return: float) -> float:
-        """Convert realized return to probability using sigmoid transformation."""
-        # Scale return for sigmoid (adjust scaling factor as needed)
-        scaled_return = realized_return * 1000  # Scale up for better sigmoid behavior
-        return float(1.0 / (1.0 + np.exp(-scaled_return)))
     
     def get_target_info(self) -> dict[str, Any]:
         """Return metadata about this generator."""
         return {
-            "target_names": [self.target_name] + ([f"{self.target_name}_prob"] if self.return_probabilities else []),
+            "target_names": [self.target_name],
             "target_type": "classification", 
             "description": f"Triple barrier method with {self.lookforward_window} tick window, "
                           f"±{self.barrier_width:.1%} barriers, {self.transaction_cost*10000:.1f}bp costs",
@@ -273,10 +225,6 @@ class TripleBarrierGenerator(TargetGenerator):
                 "upper_barrier": self.upper_barrier,
                 "lower_barrier": self.lower_barrier,
                 "transaction_cost": self.transaction_cost,
-                "min_return_threshold": self.min_return_threshold,
-                "normalize_by_volatility": self.normalize_by_volatility,
-                "volatility_window": self.volatility_window,
-                "return_probabilities": self.return_probabilities
             }
         }
     
