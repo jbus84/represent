@@ -66,11 +66,10 @@ def get_all_optimization_methods():
         {
             "name": "Triple Barrier",
             "method": "triple_barrier",
-            "params": {"lookforward_window": 2000, "barrier_width": 0.0001,},
+            "params": {"lookforward_window": 2000, "barrier_width": 0.0001},
             "color_map": {-1: "red", 0: "gray", 1: "green"},
             "label_names": {-1: "Short", 0: "Timeout", 1: "Long"},
-            "has_barriers": True,
-            "barrier_width": 0.0001
+            "has_barriers": True
         },
         {
             "name": "Triple Exceedance (Long)",
@@ -175,7 +174,7 @@ def debug_triple_barrier_logic(window_df: pl.DataFrame, method_config: dict):
         labels = targets_df[target_col].to_numpy()
 
         prices = window_df["mid_price"].to_numpy()
-        barrier_width = method_config.get("barrier_width", 0.0001)
+        barrier_width = method_config["params"].get("barrier_width", 0.0001)
         lookforward = method_config["params"].get("lookforward_window", 1000)
 
         # Manually check first 1000 samples for debugging
@@ -383,9 +382,9 @@ def create_all_methods_plot(window_df: pl.DataFrame, methods: list, window_num: 
             threshold_pips = None
 
             # Calculate threshold based on method type
-            if method_config.get("has_barriers", False) and method_config.get("barrier_width"):
-                # Triple Barrier method
-                barrier_width = method_config["barrier_width"]
+            if method_config.get("has_barriers", False):
+                # Triple Barrier method - use optimized barrier_width from params
+                barrier_width = method_config["params"].get("barrier_width", 0.0001)
                 threshold_pips = barrier_width * 10000
                 upper_threshold = prices_plot + barrier_width
                 lower_threshold = prices_plot - barrier_width
@@ -395,9 +394,10 @@ def create_all_methods_plot(window_df: pl.DataFrame, methods: list, window_num: 
                 ax.plot(time_axis, lower_threshold, '--', color='black', alpha=0.8, linewidth=1.0, zorder=2)
 
             elif method_config["method"] == "triple_exceedance":
-                # Triple Exceedance method - calculate threshold from scaling factor
+                # Triple Exceedance method - use optimized parameters
                 scaling_factor = method_config["params"].get("scaling_factor", 3.0)
-                transaction_cost = 0.00007  # Standard 0.7 pip transaction cost
+                # Get transaction_cost from params, fallback to standard 0.7 pip
+                transaction_cost = method_config["params"].get("transaction_cost", 0.00007)
                 threshold = transaction_cost * scaling_factor
                 threshold_pips = threshold * 10000
 
@@ -430,13 +430,26 @@ def create_all_methods_plot(window_df: pl.DataFrame, methods: list, window_num: 
             unique_labels, counts = np.unique(labels_display, return_counts=True)
             percentages = counts / len(labels_display) * 100
             num_changes = np.sum(labels_display[1:] != labels_display[:-1])
-            avg_hold = len(labels_display) // max(num_changes, 1)
+
+            # Calculate average hold - for triple methods, it should be the lookforward_window
+            if method_config["method"] in ["triple_exceedance", "triple_barrier"]:
+                # For triple methods, hold is constant = optimized lookforward_window
+                avg_hold = method_config["params"]["lookforward_window"]
+            else:
+                # For other methods, calculate from label changes
+                avg_hold = len(labels_display) // max(num_changes, 1)
 
             # Title and formatting
             title_suffix = " (Direction Correctness)" if method_config["method"] == "triple_exceedance" and "direction_type" in method_config else ""
             ax.set_title(f"{method_config['name']} - Full 100K Analysis{title_suffix}", fontweight='bold', fontsize=14)
             ax.set_ylabel('Price')
             ax.grid(True, alpha=0.3)
+
+            # Add vertical reference lines every 1000 ticks
+            max_time = len(time_axis)
+            for tick_mark in range(1000, max_time, 1000):
+                if tick_mark < len(time_axis):
+                    ax.axvline(x=time_axis[tick_mark], color='gray', linestyle=':', alpha=0.5, linewidth=0.8, zorder=1)
 
             # Legend
             legend_elements: list = [Line2D([0], [0], color='black', linewidth=0.8, label='Price')]

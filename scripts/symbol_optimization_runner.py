@@ -479,7 +479,46 @@ def calculate_additional_metrics(prices: np.ndarray, method: str, optimal_params
         # Calculate class balance from all collected labels
         if all_labels:
             all_labels_array = np.array(all_labels)
+
+            # Check if method produces continuous (regression) outputs that need discretization
+            regression_methods = {
+                'directional_mfe', 'log_return_horizons', 'volatility',
+                'volatility_scaled_returns', 'remaining_value_tuner'
+            }
+
             unique_labels, counts = np.unique(all_labels_array, return_counts=True)
+
+            # If this is a regression method, discretize the continuous outputs
+            if method in regression_methods:
+                # Discretize continuous values into meaningful bins
+                if np.ptp(all_labels_array) > 0:  # If there's variation in the data
+                    # Use quantile-based binning for balance
+                    try:
+                        # Create 3 bins: Low, Medium, High (similar to ternary classification)
+                        bins = np.quantile(all_labels_array, [0, 0.33, 0.67, 1.0])
+                        # Ensure unique bin edges
+                        if len(np.unique(bins)) < len(bins):
+                            # Fall back to uniform spacing if quantiles are identical
+                            bins = np.linspace(all_labels_array.min(), all_labels_array.max(), 4)
+
+                        # Discretize into bins
+                        discretized = np.digitize(all_labels_array, bins[1:-1])  # Creates 0, 1, 2
+                        unique_labels, counts = np.unique(discretized, return_counts=True)
+
+                        # Map to meaningful labels
+                        label_mapping = {0: "Low", 1: "Medium", 2: "High"}
+                        unique_labels = [label_mapping.get(x, f"Bin_{x}") for x in unique_labels]
+
+                    except Exception:
+                        # Fallback: just show range info
+                        label_range = f"{all_labels_array.min():.4f} to {all_labels_array.max():.4f}"
+                        unique_labels = [f"Range: {label_range}"]
+                        counts = [len(all_labels_array)]
+                else:
+                    # All values are the same
+                    unique_labels = [f"Constant: {all_labels_array[0]:.4f}"]
+                    counts = [len(all_labels_array)]
+
             percentages = counts / len(all_labels_array) * 100
             balance_score = min(percentages) / max(percentages) * 100 if len(percentages) > 1 else 100
 
