@@ -78,7 +78,7 @@ pythonVersion = "3.12"
 include = ["represent"]
 exclude = [
     "tests/**",
-    "examples/**", 
+    "scripts/**", 
     "build/**",
     "dist/**",
     ".venv/**",

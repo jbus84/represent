@@ -64,9 +64,9 @@ clean:
 	rm -rf .pytest_cache/
 	find . -type d -name __pycache__ -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
-	find examples/ -name "*_output" -type d -exec rm -rf {} + 2>/dev/null || true
-	find examples/ -name "*.png" -type f -delete 2>/dev/null || true
-	find examples/ -name "*.parquet" -type f -delete 2>/dev/null || true
+	find scripts/ -name "*_output" -type d -exec rm -rf {} + 2>/dev/null || true
+	find scripts/ -name "*.png" -type f -delete 2>/dev/null || true
+	find scripts/ -name "*.parquet" -type f -delete 2>/dev/null || true
 	@echo "🧹 Cleanup complete!"
 
 build:
@@ -112,8 +112,8 @@ check-commit:
 visualize-approaches:
 	@echo "📊 Creating comprehensive labeling approaches visualization..."
 	@echo "🎯 Generating all available target types with real market data"
-	PYTHONPATH=. python examples/labeling_approaches_visualization.py
-	@echo "✅ Visualizations created in examples/:"
+	PYTHONPATH=. python scripts/labeling_approaches_visualization.py
+	@echo "✅ Visualizations created in scripts/:"
 	@echo "   • classification_approaches_comparison.png"
 	@echo "   • regression_approaches_comparison.png" 
 	@echo "   • academic_vs_traditional_comparison.png"
@@ -206,7 +206,7 @@ optimize-parameters-only:
 	@echo "💾 Memory usage: ~2GB peak"
 	@echo ""
 	@echo "🚀 Starting optimization with adaptive sampling..."
-	PYTHONPATH=. python examples/symbol_optimization_runner.py
+	PYTHONPATH=. python scripts/symbol_optimization_runner.py
 	@cp -r optimization_results /Users/danielfisher/data/databento/symbol_datasets/
 	@echo "✅ Parameter optimization complete!"
 	@echo ""
@@ -237,7 +237,7 @@ optimize-parameters:
 	@echo "💾 Memory usage: ~2GB peak"
 	@echo ""
 	@echo "🚀 Starting optimization..."
-	PYTHONPATH=. python examples/symbol_optimization_runner.py
+	PYTHONPATH=. python scripts/symbol_optimization_runner.py
 	@cp -r optimization_results /Users/danielfisher/data/databento/symbol_datasets/
 	@echo "✅ Parameter optimization complete!"
 	@echo ""

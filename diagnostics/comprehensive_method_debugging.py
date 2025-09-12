@@ -481,7 +481,7 @@ def create_all_methods_plot(window_df: pl.DataFrame, methods: list, window_num: 
     plt.tight_layout()
 
     # Save plot
-    output_path = f"plots/optimisation/comprehensive_all_methods_window_{window_num}.png"
+    output_path = f"outputs/plots/optimization/comprehensive_all_methods_window_{window_num}.png"
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     print(f"✅ Saved comprehensive plot: {output_path}")
     plt.close()
@@ -501,7 +501,7 @@ def main():
         print("✅ Triple Exceedance")
         print("✅ Full 100K sample analysis")
         print("✅ Triple Barrier logic verification")
-        print("\nPlots saved to plots/optimisation/comprehensive_all_methods_window_[1-3].png")
+        print("\nPlots saved to outputs/plots/optimization/comprehensive_all_methods_window_[1-3].png")
         print("Use these to debug any method issues and verify optimization behavior!")
 
     except Exception as e:

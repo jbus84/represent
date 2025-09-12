@@ -30,10 +30,10 @@ def generate_diagnostics_comprehensive_plots_for_symbol(
     For each subset of methods, copy the plots into per-symbol directories.
 
     Output structure:
-    - plots/optimisation/[SYMBOL]/all/comprehensive_all_methods_window_{n}.png
-    - plots/optimisation/[SYMBOL]/classification/comprehensive_all_methods_window_{n}.png
-    - plots/optimisation/[SYMBOL]/oracle/comprehensive_all_methods_window_{n}.png
-    - plots/optimisation/[SYMBOL]/triple/comprehensive_all_methods_window_{n}.png
+    - outputs/plots/optimization/[SYMBOL]/all/comprehensive_all_methods_window_{n}.png
+    - outputs/plots/optimization/[SYMBOL]/classification/comprehensive_all_methods_window_{n}.png
+    - outputs/plots/optimization/[SYMBOL]/oracle/comprehensive_all_methods_window_{n}.png
+    - outputs/plots/optimization/[SYMBOL]/triple/comprehensive_all_methods_window_{n}.png
     """
     import shutil
     from pathlib import Path as _P
@@ -97,7 +97,7 @@ def generate_diagnostics_comprehensive_plots_for_symbol(
     }
 
     # Ensure base output dirs exist
-    base_dir = _P('plots/optimisation')
+    base_dir = _P('outputs/plots/optimization')
     base_dir.mkdir(parents=True, exist_ok=True)
 
     # For each subset, render global plots then copy into per-symbol/subset dirs
@@ -105,7 +105,7 @@ def generate_diagnostics_comprehensive_plots_for_symbol(
         if not subset_methods:
             continue
         methods = with_optimized_params(subset_methods)
-        # Render for each window (diagnostics saves to plots/optimisation/... globally)
+        # Render for each window (diagnostics saves to outputs/plots/optimization/... globally)
         for idx, window_df in enumerate(win_list, 1):
             create_all_methods_plot(window_df, methods, idx)
             # Copy to per-symbol/subset path
@@ -124,10 +124,10 @@ def generate_comprehensive_all_methods_windows(
     symbol_results: dict[str, dict[str, Any]],
     windows: int = 3,
     window_size: int = 25_000,  # USER REQ: Max 25K sampling window
-    save_dir: Path = Path("examples")
+    save_dir: Path = Path("scripts")
 ) -> list[Path]:
     """Apply optimized parameters to fixed 100k windows and generate comprehensive plots.
-    Saves files as examples/comprehensive_all_methods_window_1.png, etc.
+    Saves files as scripts/comprehensive_all_methods_window_1.png, etc.
     Returns list of saved file Paths.
     """
     import matplotlib.pyplot as plt
@@ -228,87 +228,6 @@ def generate_comprehensive_all_methods_windows(
         saved.append(out_path)
 
     return saved
-
-def generate_symbol_visualizations(
-    symbol_info: dict[str, Any],
-    symbol_results: dict[str, dict[str, Any]],
-    output_dir: Path
-) -> None:
-    """
-    Generate comprehensive visualizations for a symbol's optimization results.
-
-    Args:
-        symbol_info: Symbol dataset information
-        symbol_results: Optimization results for all methods
-        output_dir: Directory to save visualization plots
-    """
-    try:
-        from examples.labeling_approaches_visualization import create_comprehensive_visualization
-        from represent.target_generators import TargetGeneratorFactory
-
-        # Load the symbol's price data
-        prices = load_symbol_data_from_parquet(symbol_info['file_path'])
-
-        # Use a reasonable sample size for visualization (5K samples)
-        sample_size = min(5000, len(prices))
-        market_data = pl.DataFrame({
-            'mid_price': prices[:sample_size],
-            'ts_event': np.arange(sample_size, dtype=np.int64),
-            'symbol': [symbol_info['symbol']] * sample_size
-        })
-
-        # Create output directory
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        # Generate targets using optimized parameters
-        targets = {}
-
-        for method, method_results in symbol_results.items():
-            try:
-                # Get optimized parameters
-                best_params = method_results.get('best_params', {})
-                if not best_params:
-                    continue
-
-                # Convert method name and create generator with optimized parameters
-                converted_params = convert_params_for_generator(method, best_params)
-                generator = TargetGeneratorFactory.create(method, **converted_params)
-
-                # Generate targets
-                result_df = generator.generate_targets(market_data, symbol_info['symbol'])
-
-                # Extract target column(s)
-                target_info = generator.get_target_info()
-                target_names = target_info['target_names']
-
-                for target_name in target_names:
-                    if target_name in result_df.columns:
-                        targets[target_name] = result_df[target_name].to_numpy()
-
-            except Exception as e:
-                print(f"   ⚠️  Failed to generate {method} targets for visualization: {e}")
-                continue
-
-        if targets:
-            # Create symbol-specific output directory
-            symbol_name = symbol_info['symbol']
-            symbol_output_dir = output_dir / symbol_name
-            symbol_output_dir.mkdir(parents=True, exist_ok=True)
-
-            # Create comprehensive visualization
-            output_files = create_comprehensive_visualization(
-                market_data,
-                targets,
-                output_dir=str(symbol_output_dir)
-            )
-
-            print(f"   📈 Generated {len(output_files)} visualization files for {symbol_name}")
-        else:
-            print(f"   ⚠️  No targets generated for {symbol_info['symbol']} visualization")
-
-    except Exception as e:
-        print(f"   ❌ Visualization generation failed: {e}")
-        # Don't re-raise - visualization failure shouldn't stop optimization
 
 
 def load_symbol_data_from_parquet(file_path: str | Path) -> np.ndarray:
@@ -803,7 +722,7 @@ def run_all_symbol_optimizations(
 
                 # Generate comprehensive 100k-window visualizations per symbol via diagnostics
                 try:
-                    print(f"📊 Generating comprehensive 100k-window visualizations for {symbol} via diagnostics...")
+                    print(f"📊 Generating comprehensive Nk-window visualizations for {symbol} via diagnostics...")
                     generate_diagnostics_comprehensive_plots_for_symbol(
                         symbol_info,
                         symbol_results,
@@ -939,17 +858,6 @@ def run_debug_m6am4():
         )
         print(f"✅ Debug results saved. Files: {saved_files}")
 
-        # Generate debug visualizations
-        try:
-            print("📊 Generating debug visualizations...")
-            generate_symbol_visualizations(
-                m6am4,
-                results,
-                output_dir=output_dir / "plots" / "optimisation"
-            )
-            print("✅ Debug visualizations generated")
-        except Exception as viz_error:
-            print(f"⚠️  Debug visualization failed: {viz_error}")
     else:
         print("❌ No results produced in debug run")
 
@@ -1001,7 +909,7 @@ def main():
         print(f"  • {output_dir}/OPTIMIZATION_RESULTS.md - Main report")
         print(f"  • {output_dir}/parameter_comparison.csv - Raw data")
         print(f"  • {output_dir}/*.png - Parameter distribution plots")
-        print(f"  • {output_dir}/plots/optimisation/[SYMBOL]/comprehensive_all_methods_window_*.png - 100k-window comprehensive plots")
+        print(f"  • {output_dir}/outputs/plots/optimization/[SYMBOL]/comprehensive_all_methods_window_*.png - 100k-window comprehensive plots")
         print(f"  • {output_dir}/optimized_parameters/ - Individual parameter files")
 
     except KeyboardInterrupt:
