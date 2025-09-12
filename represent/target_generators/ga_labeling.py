@@ -36,10 +36,10 @@ class GALabelingGenerator(TargetGenerator):
     This generator creates TWO separate GA-optimized models:
     1. Long Model: Optimized for long positions (BUY/HOLD signals)
     2. Short Model: Optimized for short positions (SELL/HOLD signals)
-    
+
     Each model is independently evolved to maximize performance for its specific
     trading direction, resulting in specialized long and short trading strategies.
-    
+
     Outputs:
     - long_labels: Binary labels (1: BUY long, 0: HOLD)
     - short_labels: Binary labels (1: SELL short, 0: HOLD)
@@ -158,31 +158,31 @@ class GALabelingGenerator(TargetGenerator):
     def _optimize_long_model(self, prices: np.ndarray) -> np.ndarray:
         """
         Optimize GA model specifically for long positions.
-        
+
         Args:
             prices: Array of prices to optimize labels for
-            
+
         Returns:
             Binary labels optimized for long trading (1: BUY, 0: HOLD)
         """
         if self.verbose:
-            print(f"🟢 Optimizing LONG model...")
-        
+            print("🟢 Optimizing LONG model...")
+
         return self._run_ga_optimization(prices, model_type="long")
-    
+
     def _optimize_short_model(self, prices: np.ndarray) -> np.ndarray:
         """
         Optimize GA model specifically for short positions.
-        
+
         Args:
             prices: Array of prices to optimize labels for
-            
+
         Returns:
             Binary labels optimized for short trading (1: SELL, 0: HOLD)
         """
         if self.verbose:
-            print(f"🔴 Optimizing SHORT model...")
-            
+            print("🔴 Optimizing SHORT model...")
+
         return self._run_ga_optimization(prices, model_type="short")
 
     def _optimize_labels(self, prices: np.ndarray) -> np.ndarray:
@@ -196,7 +196,7 @@ class GALabelingGenerator(TargetGenerator):
             Optimized binary labels (0: hold, 1: buy)
         """
         return self._run_ga_optimization(prices, model_type="long")
-        
+
     def _run_ga_optimization(self, prices: np.ndarray, model_type: str = "long") -> np.ndarray:
         """
         Run genetic algorithm to optimize trading labels for specific model type.
@@ -232,7 +232,7 @@ class GALabelingGenerator(TargetGenerator):
                     for chromosome in chunk
                 ]
                 fitness_scores.extend(chunk_fitness)
-            
+
             fitness_scores = np.array(fitness_scores)
 
             # Track best solution
@@ -289,10 +289,10 @@ class GALabelingGenerator(TargetGenerator):
             # Create sparse chromosomes that start within trade frequency limits
             # Use probability based on max_trade_frequency to avoid starting with overtrading chromosomes
             trade_probability = min(self.max_trade_frequency * 0.8, 0.1)  # Start conservatively
-            
-            # Add some variation across population  
+
+            # Add some variation across population
             if i < self.population_size // 4:
-                # 25% very conservative 
+                # 25% very conservative
                 trade_prob = trade_probability * 0.5
             elif i < self.population_size // 2:
                 # 25% at target
@@ -300,8 +300,8 @@ class GALabelingGenerator(TargetGenerator):
             else:
                 # 50% slightly above target (but still reasonable)
                 trade_prob = min(trade_probability * 1.5, 0.15)
-                
-            chromosome = np.random.choice([0, 1], size=n_samples, 
+
+            chromosome = np.random.choice([0, 1], size=n_samples,
                                         p=[1-trade_prob, trade_prob]).astype(np.int8)
             population.append(chromosome)
         return population
@@ -351,87 +351,44 @@ class GALabelingGenerator(TargetGenerator):
 
         # Calculate fitness score prioritizing net return per trade while heavily penalizing overtrading
         total_return = np.sum(trades)
-        
+
         # STRONG penalty for excessive trading - transaction costs kill profits
         # Use configurable max trade frequency (default 5% of samples)
         max_reasonable_trades = max(len(prices) * self.max_trade_frequency, self.min_trades)  # At least min_trades allowed
-        
+
         if n_trades > max_reasonable_trades:
             # EXTREME penalty for overtrading - must dominate fitness to force compliance
             excess_trades = n_trades - max_reasonable_trades
-            
+
             # Base penalty: 1000x transaction cost per excess trade (much more severe)
             overtrading_penalty = excess_trades * self.transaction_cost * 1000
-            
+
             # Exponential penalty for severe overtrading (more than 2x reasonable)
             if excess_trades > max_reasonable_trades:
                 overtrading_penalty += (excess_trades ** 2) * self.transaction_cost * 10
-            
+
             # Catastrophic penalty for extreme overtrading (>50% trade frequency)
             if n_trades > len(prices) * 0.5:
                 overtrading_penalty += abs(total_return) * 10  # Wipe out all gains + penalty
-            
+
             total_return -= overtrading_penalty
-            
+
             # If still trading excessively after penalty, return extreme negative fitness
             # Any trading above max_trade_frequency * 2 is completely unacceptable
             if n_trades > len(prices) * self.max_trade_frequency * 2:
                 return -10000.0  # Extreme penalty to eliminate these chromosomes
-        
+
         # Calculate return per trade (reward quality over quantity)
         return_per_trade = total_return / n_trades if n_trades > 0 else 0
-        
+
         # Bonus for good profit factor, scaled by return quality
         profit_bonus = min((profit_factor - 1.0) * return_per_trade * 0.1, abs(total_return) * 0.2)
-        
+
         # Fitness combines total return with return quality and trade efficiency
         fitness = total_return * 0.7 + return_per_trade * n_trades * 0.3 + profit_bonus
 
         return float(fitness)
 
-    def _simulate_trading(self, signals: np.ndarray, prices: np.ndarray) -> list[float]:
-        """
-        Simulate trading based on signals and calculate trade returns.
-
-        Args:
-            signals: Trading signals (1: buy/long, 0: hold, -1: sell/short)
-            prices: Price data for simulation
-
-        Returns:
-            List of trade returns (positive for profit, negative for loss)
-        """
-        trades = []
-        position = 0  # 0: no position, 1: long position, -1: short position
-        entry_price = 0
-
-        for i in range(len(signals) - self.lookforward_window):
-            current_price = prices[i]
-            signal = signals[i]
-
-            if signal == 1 and position == 0:
-                # Buy signal - enter long position
-                position = 1
-                entry_price = current_price
-            elif signal == -1 and position == 0 and self.enable_short_selling:
-                # Sell signal - enter short position
-                position = -1
-                entry_price = current_price
-            elif signal == 0 or i == len(signals) - self.lookforward_window - 1:
-                # Hold signal or end of data - close any open position
-                if position == 1:
-                    # Close long position
-                    price_return = (current_price - entry_price) / entry_price
-                    trade_return = price_return - 2 * self.transaction_cost  # Buy and sell costs
-                    trades.append(trade_return)
-                    position = 0
-                elif position == -1:
-                    # Close short position
-                    price_return = (entry_price - current_price) / entry_price  # Inverted for short
-                    trade_return = price_return - 2 * self.transaction_cost  # Short and cover costs
-                    trades.append(trade_return)
-                    position = 0
-
-        return trades
 
     def _simulate_specialized_trading(self, signals: np.ndarray, prices: np.ndarray, model_type: str = "long") -> list[float]:
         """
@@ -460,14 +417,14 @@ class GALabelingGenerator(TargetGenerator):
             elif (signal == 0 or i == len(signals) - self.lookforward_window - 1) and position == 1:
                 # Hold signal or end of data - close position
                 position = 0
-                
+
                 if model_type == "long":
                     # Long position: profit when price goes up
                     price_return = (current_price - entry_price) / entry_price
                 else:  # short
                     # Short position: profit when price goes down
                     price_return = (entry_price - current_price) / entry_price
-                
+
                 trade_return = price_return - 2 * self.transaction_cost  # Entry and exit costs
                 trades.append(trade_return)
 
@@ -563,7 +520,7 @@ class GALabelingGenerator(TargetGenerator):
         else:
             target_names = [f"{self.target_name_prefix}_long_labels"]
             description = f"Single GA model with {self.population_size} population, {self.max_generations} generations"
-            
+
         return {
             "target_names": target_names,
             "target_type": "classification",

@@ -5,21 +5,24 @@ This module provides efficient parameter optimization for datasets with millions
 using intelligent sampling strategies and parallel evaluation.
 """
 
-import warnings
-from typing import Any, Callable
-import numpy as np
 import time
-import polars as pl
+import warnings
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
+
+import numpy as np
+import polars as pl
 
 # Try to import optimization dependencies
 try:
     # Apply NumPy 2.x compatibility patch for scikit-optimize
     import numpy as np
+    # For compatibility with newer numpy versions that deprecated numpy.int/float
     if not hasattr(np, 'int'):
-        np.int = int
-        np.float = float
-    
+        np.int = int  # type: ignore[attr-defined]
+        np.float = float  # type: ignore[attr-defined]
+
     from skopt import gp_minimize
     from skopt.space import Integer, Real
     from skopt.utils import use_named_args
@@ -39,7 +42,7 @@ OPTIMIZATION_AVAILABLE = SCIKIT_OPTIMIZE_AVAILABLE or OPTUNA_AVAILABLE
 
 # Try to import tqdm for progress bars
 try:
-    from tqdm import tqdm
+    from tqdm import tqdm  # noqa: F401
     TQDM_AVAILABLE = True
 except ImportError:
     TQDM_AVAILABLE = False
@@ -52,7 +55,7 @@ try:
 except ImportError:
     TSTRENDS_AVAILABLE = False
 
-from .target_generators.base import TargetGenerator
+from .target_generators.base import TargetGenerator  # noqa: E402
 
 
 class EarlyStoppingException(Exception):
@@ -63,7 +66,7 @@ class EarlyStoppingException(Exception):
 class LargeScaleParameterOptimizer:
     """
     Parameter optimizer for large-scale symbol datasets using intelligent sampling.
-    
+
     Key features:
     - Random window sampling from large datasets (24M+ samples)
     - Multiple sampling strategies (uniform, stratified, temporal)
@@ -86,7 +89,7 @@ class LargeScaleParameterOptimizer:
         use_optuna: bool = True,  # Prefer Optuna over scikit-optimize
         # Adaptive sampling parameters
         adaptive_sampling: bool = True,
-        min_window_size: int = 15000,  # USER REQ: Reduced to 15K min sampling window  
+        min_window_size: int = 15000,  # USER REQ: Reduced to 15K min sampling window
         max_window_size: int = 25000,  # USER REQ: Reduced to 25K max sampling window
         stabilization_threshold: float = 0.05,
         stabilization_patience: int = 3,
@@ -135,13 +138,13 @@ class LargeScaleParameterOptimizer:
         self.n_calls = n_calls
         self.random_state = random_state
         self.verbose = verbose
-        
+
         # Optimization backend preference
         self.use_optuna = use_optuna and OPTUNA_AVAILABLE
         if use_optuna and not OPTUNA_AVAILABLE:
-            warnings.warn("Optuna not available, falling back to scikit-optimize")
+            warnings.warn("Optuna not available, falling back to scikit-optimize", stacklevel=2)
             self.use_optuna = False
-        
+
         # Adaptive sampling parameters
         self.adaptive_sampling = adaptive_sampling
         self.min_window_size = min_window_size
@@ -153,25 +156,25 @@ class LargeScaleParameterOptimizer:
         self.early_stopping_patience = early_stopping_patience
         # Debug logging path
         self.debug_log_path = Path(debug_log_path) if debug_log_path else None
-        
+
         # Adaptive sampling state
         self.current_window_size = window_size
         self.current_n_windows = n_windows
-        self.parameter_history = []
+        self.parameter_history: list[dict[str, int | float]] = []
         self.stable_count = 0
-        
+
         # Setup random state
         self.rng = np.random.RandomState(random_state)
-        
+
         # Progress reporting counters
         self._sampling_call_count = 0
 
-    def _run_optuna_optimization(self, original_objective, bounds: dict, method_name: str, 
+    def _run_optuna_optimization(self, original_objective, bounds: dict, method_name: str,
                                 generator_class, prices):
         """Run optimization using Optuna with TPE sampler."""
         if self.verbose:
-            print(f"   🎯 Using Optuna TPE optimizer")
-            
+            print("   🎯 Using Optuna TPE optimizer")
+
         # Create study with TPE sampler
         study = optuna.create_study(
             direction='minimize',
@@ -182,7 +185,7 @@ class LargeScaleParameterOptimizer:
             ),
             study_name=f"{method_name}_optimization"
         )
-        
+
         # Helper: directional PnL for {-1,0,1} label streams (long/short/flat)
         def _estimate_directional_pnl(prices_arr: np.ndarray, labels_arr: np.ndarray, fee: float) -> float:
             pnl = 0.0
@@ -199,20 +202,19 @@ class LargeScaleParameterOptimizer:
                 # Accrue returns
                 pnl += ret * position
             return pnl
-        
+
         # Progress tracking with TQDM for inline updates
         evaluation_count = [0]
         best_return = [float('-inf')]
-        
+
         # Create simple progress tracker for inline updates
-        progress_bar = None
         start_time = time.time()
         if self.verbose:
             self._tqdm_active = True  # Flag to suppress sampling messages
             print(f"🎯 Starting {method_name} optimization...")
         else:
             self._tqdm_active = False  # Ensure sampling messages work when not verbose
-        
+
         # Create Optuna-compatible objective function (replicating original logic)
         def optuna_objective(trial):
             params = {}
@@ -222,44 +224,43 @@ class LargeScaleParameterOptimizer:
                     params[param_name] = trial.suggest_int(param_name, int(low), int(high))
                 else:
                     params[param_name] = trial.suggest_float(param_name, low, high)
-            
+
             evaluation_count[0] += 1
-            
+
             try:
                 # Create generator with current parameters + fixed transaction cost (0.7 pips)
                 generator_params = params.copy()
                 generator_params['transaction_cost'] = 0.00007  # Fixed at 0.7 pips
-                
+
                 # Create generator with parameters (filter out incompatible params)
                 filtered_params = generator_params.copy()
-                
+
                 # Remove transaction_cost for CTL generators that don't use it as a parameter
                 # (Transaction costs are still applied during returns evaluation)
                 if 'CTL' in generator_class.__name__ and 'transaction_cost' in filtered_params:
                     filtered_params.pop('transaction_cost')
-                
+
                 # Generic casting for known integer/boolean parameters
                 int_like_params = {
                     'population_size', 'max_generations', 'lookforward_window', 'min_trades',
                     'window_size', 'volatility_window'
                 }
-                
+
                 casted_params = {}
                 for k, v in filtered_params.items():
-                    if k in int_like_params and isinstance(v, (int, float)):
+                    if k in int_like_params and isinstance(v, int | float):
                         casted_params[k] = int(v)
                     else:
                         casted_params[k] = v
-                
+
                 # Sample multiple windows and evaluate
-                current_window_size = self.current_window_size if self.adaptive_sampling else self.window_size
                 current_n_windows = self.current_n_windows if self.adaptive_sampling else self.n_windows
-                
+
                 windows = self.sample_windows(prices, current_n_windows)
-                
+
                 total_pnl = 0.0
                 valid_evaluations = 0
-                
+
                 for window_prices in windows:
                     try:
                         generator = generator_class(**casted_params)
@@ -267,12 +268,12 @@ class LargeScaleParameterOptimizer:
                             "ts_event": range(len(window_prices)),
                             "mid_price": window_prices,
                         })
-                        
+
                         targets = generator.generate_targets(window_df)
                         if targets is None or len(targets) == 0:
                             continue
 
- 
+
                         # Fee is total round-trip cost, so divide by 2 for separate entry/exit charges
                         half_fee = (self.fee_pips * 0.0001) / 2.0
 
@@ -298,25 +299,25 @@ class LargeScaleParameterOptimizer:
                             window_pnl = _estimate_directional_pnl(window_prices, labels, half_fee)
                             total_pnl += window_pnl
                             valid_evaluations += 1
-                        
+
                     except Exception as e:
                         print(f"   ❌ Window evaluation failed: {e}")
                         continue
-                
+
                 if valid_evaluations == 0:
                     return 1000.0  # High penalty for failed evaluations
-                
+
                 avg_return = total_pnl / valid_evaluations
-                
+
                 # Parameter stability check for adaptive sampling
                 if self.adaptive_sampling and evaluation_count[0] > 1:
                     self._check_parameter_stability(params)
-                
+
                 # Update simple progress display
                 current_return = -avg_return  # Minimize negative return
                 if -current_return > best_return[0]:
                     best_return[0] = -current_return
-                
+
                 # Simple inline progress update
                 if self.verbose:
                     elapsed = time.time() - start_time
@@ -325,29 +326,29 @@ class LargeScaleParameterOptimizer:
                     progress_bar_length = 30
                     filled_length = int(progress_bar_length * evaluation_count[0] // self.n_calls)
                     bar = '█' * filled_length + '░' * (progress_bar_length - filled_length)
-                    
+
                     # Use scientific notation for very small values, regular for larger ones
                     if abs(best_return[0]) < 0.001:
                         best_str = f"{best_return[0]:8.2e}"
                     else:
                         best_str = f"{best_return[0]:7.4f}"
-                    
+
                     print(f"\r🎯 {method_name}: {progress_pct:5.1f}% |{bar}| {evaluation_count[0]:2d}/{self.n_calls} "
                           f"[{elapsed:5.1f}s<{eta:5.1f}s] Best: {best_str}", end='', flush=True)
-                
+
                 return current_return
-                
+
             except Exception as e:
                 if self.verbose and not getattr(self, '_tqdm_active', False):
                     print(f"   ❌ Parameter evaluation failed: {e}")
                 return 1000.0
-        
+
         # Custom callback for early stopping and progress
         early_stop_count = 0
-        
+
         def optuna_callback(study, trial):
             nonlocal early_stop_count
-            
+
             # Check for early stopping based on parameter stability
             if self.early_stopping and self.adaptive_sampling:
                 min_trials = max(self.initial_points + 5, 15)
@@ -359,7 +360,7 @@ class LargeScaleParameterOptimizer:
                             study.stop()
                             if self.verbose and not getattr(self, '_tqdm_active', False):
                                 print(f"   🛑 Early stopping triggered by Optuna after {len(study.trials)} trials")
-        
+
         # Run optimization with quieter output
         try:
             # Suppress Optuna's verbose trial output completely when using manual progress
@@ -367,9 +368,9 @@ class LargeScaleParameterOptimizer:
                 optuna.logging.set_verbosity(optuna.logging.ERROR)
             else:
                 optuna.logging.set_verbosity(optuna.logging.WARNING)
-            
+
             study.optimize(
-                optuna_objective, 
+                optuna_objective,
                 n_trials=self.n_calls,
                 callbacks=[optuna_callback] if self.early_stopping else None,
                 show_progress_bar=False  # Disable Optuna's progress bar to avoid conflicts
@@ -377,21 +378,24 @@ class LargeScaleParameterOptimizer:
         except KeyboardInterrupt:
             if self.verbose and not getattr(self, '_tqdm_active', False):
                 print(f"   ⏸️  Optimization interrupted after {len(study.trials)} trials")
-        
+
         # Convert Optuna result to scikit-optimize compatible format
         best_trial = study.best_trial
         result_x = [best_trial.params[name] for name in bounds.keys()]
         result_fun = best_trial.value
-        
+
         # Print clean summary
         if self.verbose:
-            print(f"\\n🎯 Optimization Summary:")
+            print("\\n🎯 Optimization Summary:")
             print(f"   Trials completed: {len(study.trials)}")
             # Display return in percentage format - our returns are already properly scaled
-            return_pct = -result_fun * 100
-            print(f"   Best return: {-result_fun:.4f} ({return_pct:.2f}%)")
+            if result_fun is not None:
+                return_pct = -result_fun * 100
+                print(f"   Best return: {-result_fun:.4f} ({return_pct:.2f}%)")
+            else:
+                print("   Best return: No valid result found")
             print(f"   Best params: {best_trial.params}")
-        
+
         # Create a simple result object that mimics scikit-optimize result
         class OptunaResult:
             def __init__(self, x, fun, trials):
@@ -399,39 +403,39 @@ class LargeScaleParameterOptimizer:
                 self.fun = fun
                 self.func_vals = [t.value for t in trials if t.value is not None]
                 self.x_iters = [[t.params[name] for name in bounds.keys()] for t in trials if t.value is not None]
-            
+
             def get(self, key, default=None):
                 return getattr(self, key, default)
-            
+
             def __getitem__(self, key):
                 return getattr(self, key)
-            
+
             def __contains__(self, key):
                 return hasattr(self, key)
-        
+
         return OptunaResult(result_x, result_fun, study.trials)
 
     def _normalize_labels_for_pnl(self, labels: np.ndarray) -> np.ndarray:
         """
         Normalize labels to {-1, 0, 1} format for PnL calculation.
-        
+
         Different generators use different label encodings:
         - Binary: {0, 1} -> {0, 1} (flat/long)
-        - Ternary: {0, 1, 2} -> {-1, 0, 1} (short/flat/long) 
+        - Ternary: {0, 1, 2} -> {-1, 0, 1} (short/flat/long)
         - Oracle: Various encodings
-        
+
         Args:
             labels: Raw labels from generator
-            
+
         Returns:
             Labels normalized to {-1, 0, 1} format
         """
         unique_labels = np.unique(labels)
-        
+
         if len(unique_labels) == 1:
             # Single label - treat as neutral/flat
             return np.zeros_like(labels, dtype=np.int32)
-            
+
         elif len(unique_labels) == 2:
             # Binary case: assume {0, 1} = {flat, long} or {short, long}
             min_label, max_label = unique_labels
@@ -443,66 +447,66 @@ class LargeScaleParameterOptimizer:
                 normalized = np.zeros_like(labels, dtype=np.int32)
                 normalized[labels == max_label] = 1
                 return normalized
-                
+
         elif len(unique_labels) == 3:
             # Ternary case: map to {-1, 0, 1}
             sorted_labels = np.sort(unique_labels)
             low, mid, high = sorted_labels
-            
+
             normalized = np.zeros_like(labels, dtype=np.int32)
             normalized[labels == low] = -1   # Short
-            normalized[labels == mid] = 0    # Flat  
+            normalized[labels == mid] = 0    # Flat
             normalized[labels == high] = 1   # Long
-            
+
             return normalized
-            
+
         else:
             # More than 3 labels - use quantile mapping
             normalized = np.zeros_like(labels, dtype=np.int32)
-            
+
             # Map lowest third to -1, middle third to 0, highest third to 1
             p33 = np.percentile(unique_labels, 33.33)
             p66 = np.percentile(unique_labels, 66.67)
-            
+
             normalized[labels <= p33] = -1
             normalized[labels >= p66] = 1
-            
+
             return normalized
 
     def _check_parameter_stability(self, current_params: dict) -> bool:
         """
         Check if parameter estimates have stabilized.
-        
+
         Args:
             current_params: Current best parameter estimates
-            
+
         Returns:
             True if parameters are stable, False otherwise
         """
         if not self.adaptive_sampling or len(self.parameter_history) < 2:
             return False
-            
+
         # Compare with recent parameter history
         recent_params = self.parameter_history[-1]
-        
+
         # Calculate relative changes for each parameter
         max_change = 0.0
         for param_name in current_params.keys():
             if param_name in recent_params:
                 old_val = recent_params[param_name]
                 new_val = current_params[param_name]
-                
+
                 # Calculate relative change (handle zero values)
                 if abs(old_val) > 1e-10:
                     rel_change = abs((new_val - old_val) / old_val)
                 else:
                     rel_change = abs(new_val - old_val)
-                
+
                 max_change = max(max_change, rel_change)
-        
+
         # Parameters are stable if max change is below threshold
         is_stable = max_change < self.stabilization_threshold
-        
+
         if self.verbose and len(self.parameter_history) > 1:
             window_info = f"window={self.current_window_size}x{self.current_n_windows}"
             if is_stable:
@@ -511,38 +515,38 @@ class LargeScaleParameterOptimizer:
             else:
                 self.stable_count = 0  # Reset stable count
                 print(f"   📈 Parameters changing ({max_change:.3f} >= {self.stabilization_threshold:.3f}) - {window_info}")
-                
+
             # Show parameter details for first few evaluations
             if len(self.parameter_history) <= 5:
                 recent_params = self.parameter_history[-1]
                 print(f"   🔍 Current params: pop={recent_params.get('population_size', '?')}, "
                       f"gen={recent_params.get('max_generations', '?')}, "
                       f"window={recent_params.get('lookforward_window', '?')}")
-        
+
         return is_stable
 
     def _should_increase_sampling(self) -> bool:
         """Check if we should increase sampling size due to parameter instability."""
         if not self.adaptive_sampling:
             return False
-            
+
         # Don't increase if we've hit max window size
         if self.current_window_size >= self.max_window_size:
             if self.verbose and self.stable_count >= self.stabilization_patience:
                 print(f"   🎯 Sampling stabilized at maximum size: {self.current_window_size:,} samples")
             return False
-            
+
         # Increase sampling if we haven't been stable for enough evaluations
         should_increase = self.stable_count < self.stabilization_patience
-        
+
         # Log when parameters have stabilized
         if not should_increase and self.verbose and self.stable_count == self.stabilization_patience:
             print(f"   🎯 Parameters stabilized! Stopping adaptive growth at {self.current_window_size:,}x{self.current_n_windows}")
-            
+
             # Show the stabilized parameter values
             if len(self.parameter_history) >= 3:
                 recent_params = self.parameter_history[-1]  # Most recent parameters
-                print(f"   📊 Stabilized parameters:")
+                print("   📊 Stabilized parameters:")
                 for param_name, value in recent_params.items():
                     if isinstance(value, float):
                         print(f"      • {param_name}: {value:.4f}")
@@ -550,14 +554,14 @@ class LargeScaleParameterOptimizer:
                         print(f"      • {param_name}: {value}")
             else:
                 print(f"   📊 Parameter history: {len(self.parameter_history)} evaluations tracked")
-            
+
         return should_increase
 
     def _increase_sampling(self):
         """Increase window size and/or number of windows for better parameter stability."""
         old_window_size = self.current_window_size
         old_n_windows = self.current_n_windows
-        
+
         # Increase window size first, then number of windows
         if self.current_window_size < self.max_window_size:
             self.current_window_size = min(
@@ -566,54 +570,54 @@ class LargeScaleParameterOptimizer:
             )
         elif self.current_n_windows < 8:  # Max reasonable number of windows
             self.current_n_windows = min(self.current_n_windows + 1, 8)
-            
+
         if self.verbose:
             print(f"   🔄 Increasing sampling: {old_window_size}x{old_n_windows} → {self.current_window_size}x{self.current_n_windows}")
 
     def sample_windows(
-        self, 
+        self,
         prices: np.ndarray,
         n_windows: int | None = None
     ) -> list[np.ndarray]:
         """
         Sample windows from large price series using specified strategy.
-        
+
         Args:
             prices: Full price series (potentially 24M+ samples)
             n_windows: Number of windows to sample (uses self.n_windows if None)
-            
+
         Returns:
             List of sampled price windows
         """
         if n_windows is None:
             n_windows = self.n_windows
-            
+
         total_samples = len(prices)
-        
+
         window_size = self.current_window_size if self.adaptive_sampling else self.window_size
-        
+
         if total_samples <= window_size:
             # If data is smaller than window size, return the full series
             return [prices]
-        
+
         windows = []
-        
+
         if self.sampling_strategy == "uniform":
             # Random uniform sampling across the entire series
             for _ in range(n_windows):
                 start_idx = self.rng.randint(0, total_samples - window_size + 1)
                 end_idx = start_idx + window_size
                 windows.append(prices[start_idx:end_idx])
-                
+
         elif self.sampling_strategy == "stratified":
             # Stratified sampling: divide series into segments and sample from each
             segment_size = total_samples // n_windows
-            
+
             for i in range(n_windows):
                 # Sample from each segment
                 segment_start = i * segment_size
                 segment_end = min((i + 1) * segment_size, total_samples)
-                
+
                 # Ensure we can fit a window in this segment
                 if segment_end - segment_start >= window_size:
                     max_start = segment_end - window_size
@@ -623,20 +627,24 @@ class LargeScaleParameterOptimizer:
                 else:
                     # Fallback to taking the available data
                     windows.append(prices[segment_start:segment_end])
-                    
+
         elif self.sampling_strategy == "temporal":
             # Temporal sampling: sample windows with increasing time gaps
             # This captures different market regimes and volatility periods
             step_size = (total_samples - window_size) // (n_windows - 1) if n_windows > 1 else 0
-            
+
             for i in range(n_windows):
                 start_idx = min(i * step_size, total_samples - window_size)
                 end_idx = start_idx + window_size
                 windows.append(prices[start_idx:end_idx])
-                
+
         else:
             raise ValueError(f"Unknown sampling strategy: {self.sampling_strategy}")
-        
+
+        # Calculate coverage for debug logging
+        total_samples_used = sum(len(w) for w in windows)
+        coverage = (total_samples_used / total_samples) * 100
+
         if self.verbose:
             self._sampling_call_count += 1
             # Don't print sampling info during optimization when TQDM progress bar is active
@@ -644,8 +652,6 @@ class LargeScaleParameterOptimizer:
             # Only print sampling info every 10th call when not using TQDM
             if not hasattr(self, '_tqdm_active') or not self._tqdm_active:
                 if self._sampling_call_count % 10 == 1:
-                    total_samples_used = sum(len(w) for w in windows)
-                    coverage = (total_samples_used / total_samples) * 100
                     print(f"   📊 Sampled {len(windows)} windows ({total_samples_used:,} samples, {coverage:.1f}% coverage)")
         else:
             self._sampling_call_count += 1
@@ -654,7 +660,7 @@ class LargeScaleParameterOptimizer:
                 self.debug_log_path.parent.mkdir(parents=True, exist_ok=True)
                 with open(self.debug_log_path, 'a') as f:
                     f.write(f"SAMPLED_WINDOWS total={len(windows)} coverage={coverage:.3f}% size={window_size}\n")
-            
+
         return windows
 
     def optimize_with_sampling(
@@ -667,25 +673,28 @@ class LargeScaleParameterOptimizer:
     ) -> dict[str, Any]:
         """
         Optimize generator parameters using window sampling.
-        
+
         Args:
             generator_class: Target generator class to optimize
             prices: Price array, or path to data file
-            bounds: Parameter bounds dictionary  
+            bounds: Parameter bounds dictionary
             method_name: Name for logging
             data_loader: Optional function to load data from file path
-            
+
         Returns:
             Optimization results including sampling statistics
         """
         # Load data if path is provided
-        if isinstance(prices, (str, Path)):
+        if isinstance(prices, str | Path):
             if data_loader is None:
                 raise ValueError("data_loader function required when prices is a file path")
             prices = data_loader(prices)
-        
+
+        # Type assertion to help type checker understand prices is now ndarray
+        assert isinstance(prices, np.ndarray), "prices must be ndarray after conversion"
+
         total_samples = len(prices)
-        
+
         if self.verbose:
             print(f"🔍 Large-scale optimization: {method_name}")
             print(f"   📈 Dataset: {total_samples:,} samples ({total_samples/1e6:.1f}M)")
@@ -694,57 +703,100 @@ class LargeScaleParameterOptimizer:
                 print(f"   🔍 Using Optuna TPE optimizer ({self.n_calls} trials)")
                 print(f"   🎯 Bounds: {bounds}")
             else:
-                print(f"   🎯 Fixed parameters method (single evaluation with 0.7 pip transaction cost)")
-        
+                print("   🎯 Fixed parameters method (single evaluation with 0.7 pip transaction cost)")
+
         # Handle methods with no parameters to optimize (e.g., Oracle with fixed transaction costs)
         if not bounds:
             if self.verbose:
                 print(f"🎯 Evaluating {method_name} with fixed parameters...")
-            
+
             # Single evaluation with fixed transaction cost
             try:
                 # Create generator with fixed 0.7 pip transaction cost
                 generator_params = {'transaction_cost': 0.00007}  # Fixed at 0.7 pips
-                
+
                 # Filter out incompatible params for generators that don't use transaction_cost
                 filtered_params = generator_params.copy()
                 if 'CTL' in generator_class.__name__ and 'transaction_cost' in filtered_params:
                     filtered_params.pop('transaction_cost')
-                
+
                 generator = generator_class(**filtered_params)
-                
-                # Sample windows for evaluation  
+
+                # Sample windows for evaluation
                 windows = self.sample_windows(prices, self.current_n_windows)
-                
+
                 # Evaluate across all windows
                 total_pnl = 0.0
                 valid_evaluations = 0
-                
+
                 for window in windows:
                     window_prices = window
                     if len(window_prices) < 100:  # Skip very small windows
                         continue
-                    
-                    labels = generator.generate(window_prices)
+
+                    # Create DataFrame for generator
+                    window_df = pl.DataFrame({"mid_price": window_prices})
+                    targets_df = generator.generate_targets(window_df)
+                    target_info = generator.get_target_info()
+                    labels = targets_df[target_info['target_names'][0]].to_numpy()
                     normalized_labels = self._normalize_labels_for_pnl(labels)
-                    
+
                     # Apply transaction costs (already halved for round-trip)
                     half_fee = (self.fee_pips * 0.0001) / 2.0
-                    window_pnl = self._estimate_directional_pnl(window_prices, normalized_labels, half_fee)
-                    
+                    # Define local helper function for PnL calculation
+                    def _estimate_directional_pnl_local(prices_arr: np.ndarray, labels_arr: np.ndarray, fee: float) -> float:
+                        pnl = 0.0
+                        position = 0  # 0: flat, 1: long, -1: short
+                        entry_price = 0.0
+
+                        for i in range(len(labels_arr)):
+                            label = labels_arr[i]
+                            price = prices_arr[i]
+
+                            if label == 1 and position != 1:  # Go long
+                                if position == -1:  # Close short first
+                                    pnl += (entry_price - price) - fee
+                                entry_price = price
+                                position = 1
+                                pnl -= fee  # Entry cost
+                            elif label == -1 and position != -1:  # Go short
+                                if position == 1:  # Close long first
+                                    pnl += (price - entry_price) - fee
+                                entry_price = price
+                                position = -1
+                                pnl -= fee  # Entry cost
+                            elif label == 0 and position != 0:  # Close position
+                                if position == 1:
+                                    pnl += (price - entry_price) - fee
+                                elif position == -1:
+                                    pnl += (entry_price - price) - fee
+                                position = 0
+
+                        # Close any remaining position
+                        if position != 0:
+                            final_price = prices_arr[-1]
+                            if position == 1:
+                                pnl += (final_price - entry_price) - fee
+                            elif position == -1:
+                                pnl += (entry_price - final_price) - fee
+
+                        return pnl
+
+                    window_pnl = _estimate_directional_pnl_local(window_prices, normalized_labels, half_fee)
+
                     total_pnl += window_pnl
                     valid_evaluations += 1
-                
+
                 if valid_evaluations == 0:
                     raise ValueError("No valid windows for evaluation")
-                
+
                 avg_return = total_pnl / valid_evaluations
-                
+
                 if self.verbose:
                     # Display return in percentage format - our returns are already properly scaled
                     return_pct = avg_return * 100
                     print(f"🎯 Fixed evaluation result: {avg_return:.6f} ({return_pct:.2f}%)")
-                
+
                 # Return result in standard format
                 return {
                     'optimal_params': generator_params,
@@ -764,7 +816,7 @@ class LargeScaleParameterOptimizer:
                     },
                     'optimization_calls': [avg_return]  # Single evaluation
                 }
-                
+
             except Exception as e:
                 if self.verbose:
                     print(f"   ❌ Fixed parameter evaluation failed: {e}")
@@ -814,28 +866,28 @@ class LargeScaleParameterOptimizer:
         def objective(**params):
             """Objective function using adaptive sampled windows."""
             evaluation_count[0] += 1
-            
+
             # Progress tracking handled by Optuna version with manual display
-            
+
             try:
                 # Create generator with current parameters + fixed transaction cost (1 pip)
                 generator_params = params.copy()
                 generator_params['transaction_cost'] = 0.0001  # Fixed at 1 pip
-                
+
                 # Create generator with parameters (filter out incompatible params)
                 filtered_params = generator_params.copy()
-                
+
                 # Remove transaction_cost for CTL generators that don't use it as a parameter
                 # (Transaction costs are still applied during returns evaluation)
                 if 'CTL' in generator_class.__name__ and 'transaction_cost' in filtered_params:
                     filtered_params.pop('transaction_cost')
-                
+
                 # Generic casting for known integer/boolean parameters
                 int_like_params = {
                     'population_size', 'max_generations', 'lookforward_window', 'min_trades',
                     'window_size', 'volatility_window'
                 }
-                
+
                 casted_params = {}
                 for k, v in filtered_params.items():
                     if k in int_like_params or k.endswith('_window'):
@@ -845,17 +897,17 @@ class LargeScaleParameterOptimizer:
                             casted_params[k] = v
                     else:
                         casted_params[k] = v
-                
+
                 generator = generator_class(**casted_params)
-                
+
                 # Sample windows for this evaluation using adaptive sizes
                 windows = self.sample_windows(prices, n_windows=self.current_n_windows)
-                
+
                 total_returns = 0.0
                 total_signals = 0  # Track signal count for frequency penalty
                 total_samples = 0  # Track total samples for frequency calculation
                 valid_windows = 0
-                
+
                 # Evaluate on all sampled windows
                 for window_prices in windows:
                     try:
@@ -869,20 +921,20 @@ class LargeScaleParameterOptimizer:
                         if method_name in ['Triple Barrier (Large-Scale)', 'Triple Exceedance (Large-Scale)']:
                             lookforward_window = params.get('lookforward_window', 5000)
                             min_required_samples = lookforward_window + 50  # Buffer for safety
-                            
+
                             if len(window_prices) < min_required_samples:
                                 # Skip this window - insufficient data
                                 continue
 
                         # Generate targets
                         result = generator.generate_targets(df)
-                        
+
                         # Debug: log label distribution
                         if self.debug_log_path:
                             unique, counts = np.unique(result[result.columns[-1]].to_numpy(), return_counts=True)
                             with open(self.debug_log_path, 'a') as f:
                                 f.write(f"LABELS method={method_name} uniq={list(map(int, unique))} cnt={list(map(int, counts))}\n")
-                        
+
                         # For GA labeling, use long labels (more stable for optimization)
                         # GA generates both long and short labels, but long labels are more straightforward
                         if any('long_labels' in col for col in result.columns):
@@ -900,28 +952,28 @@ class LargeScaleParameterOptimizer:
                             sp_transaction_fees=fee_decimal,
                         )
                         returns_estimator = ReturnsEstimatorWithFees(fees_config=fees_config)
-                        
+
                         # Convert labels to proper format for returns estimation
                         labels_int = labels.astype(int)
-                        
+
                         # Handle different label formats for ReturnsEstimatorWithFees
                         # ReturnsEstimatorWithFees expects {-1, 0, 1} format:
                         # -1 = short position, 0 = no position, 1 = long position
-                        
+
                         unique_labels = np.unique(labels_int[~np.isnan(labels_int)])
-                        
+
                         if set(unique_labels).issubset({0, 1, 2}):
                             # Ternary labels from CTL generators: {0, 1, 2} → convert to {-1, 0, 1}
                             # 0 (Down/Sell) → -1 (Short), 1 (Neutral) → 0 (Hold), 2 (Up/Buy) → 1 (Long)
                             labels_tstrends = labels_int - 1  # {0,1,2} → {-1,0,1}
                         elif len(unique_labels) == 2 and set(unique_labels).issubset({0, 1}):
-                            # Binary labels {0, 1} → convert to {0, 1} (0=no position, 1=long position)  
+                            # Binary labels {0, 1} → convert to {0, 1} (0=no position, 1=long position)
                             # Note: This assumes binary is long-only strategy
                             labels_tstrends = labels_int
                         else:
                             # Assume already in correct format or handle as-is
                             labels_tstrends = labels_int
-                        
+
                         returns = returns_estimator.estimate_return(
                             window_prices.tolist(),
                             labels_tstrends.tolist()
@@ -946,51 +998,51 @@ class LargeScaleParameterOptimizer:
                     return 1000.0  # High penalty for complete failure
 
                 avg_returns = total_returns / valid_windows
-                
+
                 # Apply signal frequency penalty for triple methods
                 final_score = avg_returns
                 if method_name in ['Triple Barrier (Large-Scale)', 'Triple Exceedance (Large-Scale)'] and total_samples > 0:
                     signal_frequency = total_signals / total_samples
                     min_frequency = 0.05  # Require at least 5% signal frequency
-                    
+
                     if signal_frequency < min_frequency:
                         # Heavy penalty for sparse signals: penalize by missing frequency
                         frequency_penalty = (min_frequency - signal_frequency) * 10.0  # 10x penalty
                         final_score = avg_returns - frequency_penalty
-                        
+
                         if self.verbose and evaluation_count[0] % 10 == 0:  # Log occasionally
                             print(f"   Signal frequency penalty: {signal_frequency:.3f} < {min_frequency:.3f}, penalty: {frequency_penalty:.4f}")
-                
+
                 # Track parameter history for stability analysis (if adaptive sampling is enabled)
                 if self.adaptive_sampling:
                     self.parameter_history.append(params.copy())
-                    
+
                     # Check parameter stability after initial phase
                     if evaluation_count[0] > self.initial_points:
                         self._check_parameter_stability(params)
-                        
+
                         # Now check if we should increase sampling based on updated stability
                         if self._should_increase_sampling():
                             self._increase_sampling()
-                        
+
                         # Check for early stopping
-                        if (self.early_stopping and 
+                        if (self.early_stopping and
                             self.stable_count >= self.stabilization_patience + self.early_stopping_patience):
                             if self.verbose:
                                 print(f"   🛑 Early stopping triggered ({self.stable_count} stable evaluations)")
                             # Use a custom exception to signal early termination
                             raise EarlyStoppingException("Parameter optimization converged")
-                
+
                 # Update best return tracking with final score
                 if final_score > best_return_so_far[0]:
-                    best_return_so_far[0] = final_score
-                
+                    best_return_so_far[0] = float(final_score)
+
                 # Update progress bar with current status
                 freq_info = ""
                 if method_name in ['Triple Barrier (Large-Scale)', 'Triple Exceedance (Large-Scale)'] and total_samples > 0:
                     signal_freq = total_signals / total_samples
                     freq_info = f", freq={signal_freq:.1%}"
-                
+
                 if progress_bar:
                     progress_bar.set_postfix({
                         'best_score': f"{best_return_so_far[0]:.4f}",
@@ -999,7 +1051,7 @@ class LargeScaleParameterOptimizer:
                         'windows': f"{valid_windows}/{len(windows)}",
                         'params': f"window={params.get('lookforward_window', '?')}"
                     })
-                
+
                 # Return negative score (minimization problem)
                 return -final_score
 
@@ -1012,7 +1064,7 @@ class LargeScaleParameterOptimizer:
                     })
                 # Return the current best return (we want to stop)
                 raise e
-                
+
             except Exception as e:
                 if progress_bar:
                     progress_bar.set_postfix({
@@ -1023,18 +1075,18 @@ class LargeScaleParameterOptimizer:
                     print(f"   ❌ Parameter evaluation failed: {e}")
                 return 1000.0
 
-        # Early stopping callback  
+        # Early stopping callback
         def early_stopping_callback(res):
             """Check if we should stop optimization early due to parameter stability."""
             if not self.early_stopping or not self.adaptive_sampling:
                 return False
-            
+
             # Require a warmup before considering stability
             min_evals_before_stability = max(self.initial_points + 5, 15)
             total_evals = len(res.x_iters) if hasattr(res, 'x_iters') else evaluation_count[0]
             if total_evals < min_evals_before_stability:
                 return False
-            
+
             # Stop if parameters have been stable for patience + extra evaluations
             stop_threshold = self.stabilization_patience + self.early_stopping_patience
             if self.stable_count >= stop_threshold:
@@ -1068,14 +1120,14 @@ class LargeScaleParameterOptimizer:
                 # Early stopping was triggered - create a partial result
                 if self.verbose:
                     print(f"   ✅ Early stopping completed after {evaluation_count[0]} evaluations")
-                
+
                 # Create a mock result object with the best parameters found so far
                 # We'll use the last parameters from history as the "best" result
                 if self.parameter_history:
                     best_params_dict = self.parameter_history[-1]
                     result_x = [best_params_dict[param_name] for param_name in param_names]
                     result_fun = best_return_so_far[0]  # This is the best return found
-                    
+
                     # Create a simple result object that mimics scikit-optimize result
                     class EarlyStopResult:
                         def __init__(self, x, fun):
@@ -1083,40 +1135,44 @@ class LargeScaleParameterOptimizer:
                             self.fun = -fun  # Convert back to minimization format
                             self.func_vals = []  # Empty list for compatibility
                             self.x_iters = []    # Empty list for compatibility
-                        
+
                         def get(self, key, default=None):
                             """Provide dict-like get method for compatibility."""
                             return getattr(self, key, default)
-                        
+
                         def __getitem__(self, key):
                             """Allow dict-like access."""
                             return getattr(self, key)
-                        
+
                         def __contains__(self, key):
                             """Allow 'in' operator."""
                             return hasattr(self, key)
-                    
+
                     result = EarlyStopResult(result_x, result_fun)
                 else:
                     # Fallback if no history exists
-                    raise RuntimeError("Early stopping triggered but no parameter history available")
-            
+                    raise RuntimeError("Early stopping triggered but no parameter history available") from None  # noqa: B904
+
             # Finish progress display and cleanup flag
             if self.verbose:
                 print()  # New line after progress display
                 self._tqdm_active = False  # Re-enable sampling messages
 
         # Extract optimal parameters
-        optimal_params = {}
-        for i, param_name in enumerate(param_names):
-            value = result.x[i]
-            if param_name in ['population_size', 'max_generations', 'lookforward_window',
-                             'min_trades', 'window_size']:
-                optimal_params[param_name] = int(value)
-            else:
-                optimal_params[param_name] = float(value)
+        optimal_params: dict[str, int | float] = {}
+        # Type assertion to help PyRight understand result is not None
+        assert result is not None, "Result should always be set by optimization"
+        if result.x is not None:
+            result_x = result.x  # Cache to help type checker
+            for i, param_name in enumerate(param_names):
+                value = result_x[i]
+                if param_name in ['population_size', 'max_generations', 'lookforward_window',
+                                 'min_trades', 'window_size']:
+                    optimal_params[param_name] = int(value)
+                else:
+                    optimal_params[param_name] = float(value)
 
-        optimal_returns = -result.fun
+        optimal_returns = -result.fun if result.fun is not None else 0.0
 
         # Calculate effective sample efficiency (use adaptive values if enabled)
         final_window_size = self.current_window_size if self.adaptive_sampling else self.window_size
@@ -1129,26 +1185,26 @@ class LargeScaleParameterOptimizer:
             print(f"\n✅ {method_name} large-scale optimization complete!")
             print(f"   🎯 Optimal parameters: {optimal_params}")
             print(f"   📈 Maximum returns: {optimal_returns:.4f}")
-            
+
             if self.adaptive_sampling:
                 print(f"   📊 Final sampling: {final_window_size:,} samples × {final_n_windows} windows")
                 print(f"   🔄 Parameter stability: {len(self.parameter_history)} evaluations tracked")
-                
+
                 # Show when parameters stabilized and if early stopping was used
                 if self.stable_count >= self.stabilization_patience:
                     stabilization_point = len(self.parameter_history) - self.stable_count + self.stabilization_patience
                     print(f"   🎯 Parameters stabilized at evaluation {stabilization_point}/{len(self.parameter_history)}")
-                    
-                    if (self.early_stopping and 
+
+                    if (self.early_stopping and
                         self.stable_count >= self.stabilization_patience + self.early_stopping_patience):
                         print(f"   🛑 Early stopping used (saved {self.n_calls - len(self.parameter_history)} evaluations)")
                 else:
                     print(f"   ⚠️  Parameters never fully stabilized ({self.stable_count}/{self.stabilization_patience} stable)")
-                    
+
                 print(f"   📈 Sample efficiency: {efficiency:.1f}% of dataset used (adaptive)")
             else:
                 print(f"   📊 Sample efficiency: {efficiency:.1f}% of dataset used")
-            
+
             print(f"   ⏱️  Effective speedup: ~{total_samples/samples_per_eval:.0f}x faster")
 
         return {
@@ -1180,7 +1236,7 @@ class LargeScaleParameterOptimizer:
         """Optimize GA labeling with window sampling."""
         from .target_generators.ga_labeling import GALabelingGenerator
 
-        # OPTIMIZED PARAMETERS: population_size=50, max_generations=75, 
+        # OPTIMIZED PARAMETERS: population_size=50, max_generations=75,
         # lookforward_window=250, transaction_cost=0.00007 (71.34% returns)
         # GA parameters with fixed transaction_cost at 1 pip (0.0001)
         default_bounds = {
@@ -1216,7 +1272,7 @@ class LargeScaleParameterOptimizer:
         try:
             from .target_generators.tstrends_labeling import BinaryCTLGenerator
         except ImportError:
-            raise ImportError("CTL labeling requires tstrends integration")
+            raise ImportError("CTL labeling requires tstrends integration") from None  # noqa: B904
 
         # SENSITIVITY-OPTIMIZED PARAMETERS: omega range validated for 90%+ balance
         # Analysis shows omega 0.0-0.0001 works, fails at >=0.0005 - tightened to sweet spot
@@ -1242,7 +1298,7 @@ class LargeScaleParameterOptimizer:
         try:
             from .target_generators.tstrends_labeling import TernaryCTLGenerator
         except ImportError:
-            raise ImportError("CTL labeling requires tstrends integration")
+            raise ImportError("CTL labeling requires tstrends integration") from None  # noqa: B904
 
         # MICRO-SCALE OPTIMIZED PARAMETERS: fine-tuned for FX-like data
         # Testing revealed sweet spot between 1e-06 and 5e-06 for balanced labels
@@ -1261,7 +1317,7 @@ class LargeScaleParameterOptimizer:
             "Ternary CTL (Large-Scale)",
             data_loader
         )
-    
+
     def optimize_oracle_binary(
         self,
         prices: np.ndarray | str | Path,
@@ -1272,7 +1328,7 @@ class LargeScaleParameterOptimizer:
         try:
             from .target_generators.tstrends_labeling import OracleBinaryTrendGenerator
         except ImportError:
-            raise ImportError("Oracle labeling requires tstrends integration")
+            raise ImportError("Oracle labeling requires tstrends integration") from None  # noqa: B904
 
         # SENSITIVITY-OPTIMIZED Oracle Binary: higher transaction costs improve balance
         # Analysis shows TC 0.0001 gives 60% balance vs 27% at lower costs
@@ -1289,7 +1345,7 @@ class LargeScaleParameterOptimizer:
             "Oracle Binary (Large-Scale)",
             data_loader
         )
-    
+
     def optimize_oracle_ternary(
         self,
         prices: np.ndarray | str | Path,
@@ -1300,7 +1356,7 @@ class LargeScaleParameterOptimizer:
         try:
             from .target_generators.tstrends_labeling import OracleTernaryTrendGenerator
         except ImportError:
-            raise ImportError("Oracle labeling requires tstrends integration")
+            raise ImportError("Oracle labeling requires tstrends integration") from None  # noqa: B904
 
         # SENSITIVITY-OPTIMIZED Oracle Ternary: focused on optimal neutral reward factor
         # Analysis shows NRF 0.5 gives best balance (21.5%), transaction cost less sensitive
@@ -1387,7 +1443,7 @@ def optimize_on_symbol_dataset(
 ) -> dict[str, dict[str, Any]]:
     """
     Optimize parameters on large symbol datasets using intelligent sampling.
-    
+
     Args:
         dataset_path: Path to symbol dataset file
         methods: Methods to optimize (None for all available)
@@ -1396,7 +1452,7 @@ def optimize_on_symbol_dataset(
         sampling_strategy: Sampling strategy ("uniform", "stratified", "temporal")
         data_loader: Function to load data from file path
         **optimizer_kwargs: Additional optimizer arguments
-        
+
     Returns:
         Dict mapping method names to optimization results
     """
@@ -1409,7 +1465,7 @@ def optimize_on_symbol_dataset(
         sampling_strategy=sampling_strategy,
         **optimizer_kwargs
     )
-    
+
     results = {}
     method_map = {
         'ga_labeling': optimizer.optimize_ga_labeling,
@@ -1426,7 +1482,7 @@ def optimize_on_symbol_dataset(
             try:
                 print(f"\n{'='*80}")
                 results[method] = method_map[method](
-                    dataset_path, 
+                    dataset_path,
                     data_loader=data_loader
                 )
             except ImportError as e:

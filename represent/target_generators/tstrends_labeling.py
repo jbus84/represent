@@ -178,7 +178,7 @@ class TernaryCTLGenerator(TargetGenerator):
         # Remap TStrends ternary labels {-1, 0, 1} to {0, 1, 2} for consistency
         # -1 (down) -> 0, 0 (neutral) -> 1, 1 (up) -> 2
         labels = labels + 1
-        
+
         # Validate label diversity - warn if too homogeneous
         unique_labels, counts = np.unique(labels, return_counts=True)
         if len(unique_labels) == 1:

@@ -7,13 +7,13 @@ and maximum returns using transaction cost-scaled thresholds.
 
 CORRECTED METHOD DESIGN:
 - Fixed Duration: Always holds positions for the full lookforward window (no early exit)
-- Dual-Sided Assessment: Evaluates both long and short exceedance potential separately  
+- Dual-Sided Assessment: Evaluates both long and short exceedance potential separately
 - Binary Classification: Each direction gets Exceed (1) or Fail (0) based on threshold
 - Transaction Cost Scaling: Thresholds are automatically scaled to transaction costs
 
 Key Innovation:
 - Evaluates MAXIMUM moves in both directions over ENTIRE window
-- Multi-objective optimization: minimize window + maximize balance + maximize returns  
+- Multi-objective optimization: minimize window + maximize balance + maximize returns
 - Focuses on moves that can realistically overcome transaction cost hurdles
 - Generates balanced long/short signals based on exceedance strength
 
@@ -35,10 +35,11 @@ References:
 - Transaction cost-aware thresholds for realistic trading applications
 """
 
+import warnings
 from typing import Any
+
 import numpy as np
 import polars as pl
-import warnings
 
 from .base import TargetGenerator
 
@@ -46,29 +47,29 @@ from .base import TargetGenerator
 class TripleExceedanceGenerator(TargetGenerator):
     """
     Triple Exceedance Method target generator with transaction cost-scaled barriers.
-    
+
     This method creates barriers that are directly proportional to transaction costs,
     ensuring that labels represent moves that can realistically overcome trading costs.
     The lookforward window is optimized to be as short as possible while maintaining
     profitable signal quality.
-    
+
     Key Features:
     - Transaction cost-proportional barriers (e.g., 5x transaction cost)
     - Multi-objective optimization: maximize returns, minimize window
     - Adaptive barrier scaling based on market volatility
     - Memory-efficient implementation for large datasets
     """
-    
+
     @property
     def required_columns(self) -> list[str]:
         """Return list of required DataFrame columns."""
         return ["mid_price"]
-    
+
     @property
     def target_type(self) -> str:
         """Return the type of targets generated."""
         return "classification"
-    
+
     def __init__(
         self,
         lookforward_window: int = 2000,  # PROVEN: 2K ticks from diagnostic analysis
@@ -78,7 +79,7 @@ class TripleExceedanceGenerator(TargetGenerator):
     ):
         """
         Initialize Triple Exceedance generator.
-        
+
         Args:
             lookforward_window: Maximum lookforward period (optimized for minimum)
             transaction_cost: Base transaction cost (e.g., 0.0001 = 1 pip)
@@ -88,7 +89,7 @@ class TripleExceedanceGenerator(TargetGenerator):
         self.transaction_cost = transaction_cost
         self.scaling_factor = scaling_factor
         self.target_name = target_name
-        
+
         # Validation
         if self.lookforward_window < 10:
             raise ValueError("lookforward_window must be at least 10 ticks")
@@ -100,9 +101,9 @@ class TripleExceedanceGenerator(TargetGenerator):
     def generate_targets(self, df: pl.DataFrame, symbol: str | None = None) -> pl.DataFrame:
         """Generate dual-sided binary exceedance labels for the input DataFrame."""
         self.validate_input(df)
-        
+
         prices = df["mid_price"].to_numpy()
-        
+
         if len(prices) < self.lookforward_window:
             warnings.warn(
                 f"Insufficient data for triple exceedance labeling: {len(prices)} samples. "
@@ -114,39 +115,39 @@ class TripleExceedanceGenerator(TargetGenerator):
             short_labels = np.zeros(len(prices), dtype=np.int32)  # All fail
         else:
             long_labels, short_labels = self._compute_exceedance_labels(prices)
-        
+
         # Create base DataFrame with metadata
         result_df = self._create_base_target_df(df, symbol)
-        
+
         # Add DUAL TARGET COLUMNS (separate binary classifications)
         long_target_name = f"{self.target_name}_long"
         short_target_name = f"{self.target_name}_short"
-        
+
         result_df = result_df.with_columns([
             pl.Series(long_target_name, long_labels),      # Long exceedance: 1=exceed, 0=fail
             pl.Series(short_target_name, short_labels),    # Short exceedance: 1=exceed, 0=fail
         ])
-                
+
         return result_df
-    
+
     def _compute_exceedance_labels(self, prices: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 
         n_samples = len(prices)
         long_labels = np.zeros(n_samples, dtype=np.float32)  # Long exceedance: 1=exceed, 0=fail
         short_labels = np.zeros(n_samples, dtype=np.float32)  # Short exceedance: 1=exceed, 0=fail
-        
+
         # Process each position with FIXED DURATION
         for i in range(n_samples - self.lookforward_window):
             entry_price = prices[i]
-            
+
             # Calculate transaction cost-scaled exceedance thresholds
-            threshold = self.transaction_cost * self.scaling_factor 
-            
+            threshold = self.transaction_cost * self.scaling_factor
+
             # FIXED DURATION: Look at ENTIRE window (no early exit)
             future_price = prices[self.lookforward_window]
- 
+
             # Calculate maximum moves in each direction over FULL window
-            move = future_price - entry_price  # Long profit potential  
+            move = future_price - entry_price  # Long profit potential
 
             # DUAL-SIDED BINARY CLASSIFICATION (INDEPENDENT):
             # Long exceedance: Does upward move exceed threshold?
@@ -159,14 +160,14 @@ class TripleExceedanceGenerator(TargetGenerator):
                 short_labels[i] = abs(move)
             else:
                 short_labels[i] = 0
-            
+
         return long_labels, short_labels
-    
+
     def get_target_info(self) -> dict[str, Any]:
         """Return metadata about this generator."""
         long_target = f"{self.target_name}_long"
         short_target = f"{self.target_name}_short"
-        
+
         return {
             "target_names": [long_target, short_target],  # Two separate binary classifications
             "target_type": "classification",
@@ -180,7 +181,7 @@ class TripleExceedanceGenerator(TargetGenerator):
                 "scaling_factor": self.scaling_factor,
             }
         }
-    
+
     def __repr__(self) -> str:
         """Return string representation of the generator."""
         return (f"TripleExceedanceGenerator(window={self.lookforward_window}, "

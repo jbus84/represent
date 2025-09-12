@@ -15,10 +15,11 @@ import polars as pl
 try:
     # Apply NumPy 2.x compatibility patch for scikit-optimize
     import numpy as np
+    # For compatibility with newer numpy versions that deprecated numpy.int/float
     if not hasattr(np, 'int'):
-        np.int = int
-        np.float = float
-    
+        np.int = int  # type: ignore[attr-defined]
+        np.float = float  # type: ignore[attr-defined]
+
     from skopt import gp_minimize
     from skopt.space import Integer, Real
     from skopt.utils import use_named_args
@@ -148,7 +149,7 @@ class ParameterOptimizer:
         try:
             from .target_generators.tstrends_labeling import OracleBinaryTrendGenerator
         except ImportError:
-            raise ImportError("Oracle labeling requires tstrends integration")
+            raise ImportError("Oracle labeling requires tstrends integration") from None  # noqa: B904
 
         # Default bounds for Oracle Binary
         default_bounds = {
@@ -183,7 +184,7 @@ class ParameterOptimizer:
         try:
             from .target_generators.tstrends_labeling import OracleTernaryTrendGenerator
         except ImportError:
-            raise ImportError("Oracle labeling requires tstrends integration")
+            raise ImportError("Oracle labeling requires tstrends integration") from None  # noqa: B904
 
         # Default bounds for Oracle Ternary
         default_bounds = {
@@ -219,7 +220,7 @@ class ParameterOptimizer:
         try:
             from .target_generators.tstrends_labeling import BinaryCTLGenerator
         except ImportError:
-            raise ImportError("CTL labeling requires tstrends integration")
+            raise ImportError("CTL labeling requires tstrends integration") from None  # noqa: B904
 
         # Default bounds for Binary CTL (from tstrends documentation)
         default_bounds = {
@@ -254,7 +255,7 @@ class ParameterOptimizer:
         try:
             from .target_generators.tstrends_labeling import TernaryCTLGenerator
         except ImportError:
-            raise ImportError("CTL labeling requires tstrends integration")
+            raise ImportError("CTL labeling requires tstrends integration") from None  # noqa: B904
 
         # Default bounds for Ternary CTL (optimized for FX-scale data)
         # Testing revealed sweet spot 1e-06 to 1e-05 for balanced ternary classification
@@ -325,7 +326,7 @@ class ParameterOptimizer:
         progress_bar = None
         if TQDM_AVAILABLE and self.verbose:
             progress_bar = tqdm(
-                total=self.n_calls, 
+                total=self.n_calls,
                 desc=f"🔍 Optimizing {method_name}",
                 unit="eval",
                 bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]"
@@ -335,19 +336,19 @@ class ParameterOptimizer:
         def objective(**params):
             """Objective function to minimize (negative returns)."""
             evaluation_count[0] += 1
-            
+
             # Update main progress bar
             if progress_bar:
                 progress_bar.update(1)
-            
+
             try:
                 # Create generator with current parameters
                 generator_params = params.copy()
-                
+
                 # Only add transaction_cost for Oracle generators that need it
                 if "Oracle" in generator_class.__name__:
                     generator_params['transaction_cost'] = 0.0001  # Fixed at 1 pip
-                
+
                 generator = generator_class(**generator_params)
 
                 total_returns = 0.0
@@ -359,7 +360,7 @@ class ParameterOptimizer:
                 # Evaluate on all price series with inner progress
                 if TQDM_AVAILABLE and len(price_series_list) > 1:
                     series_progress = tqdm(
-                        price_series_list, 
+                        price_series_list,
                         desc=f"  📊 Series eval {evaluation_count[0]}/{self.n_calls}",
                         leave=False,
                         unit="series"
@@ -378,7 +379,7 @@ class ParameterOptimizer:
 
                         # Generate targets
                         result = generator.generate_targets(df)
-                        
+
                         # For GA labeling, use long labels (more stable for optimization)
                         # GA generates both long and short labels, but long labels are more straightforward
                         if any('long_labels' in col for col in result.columns):
@@ -427,31 +428,31 @@ class ParameterOptimizer:
                     return 1000.0  # High penalty for complete failure
 
                 avg_returns = total_returns / valid_series
-                
+
                 # Apply signal frequency penalty for triple methods
                 final_score = avg_returns
                 if "Triple" in generator_class.__name__ and total_samples > 0:
                     signal_frequency = total_signals / total_samples
                     min_frequency = 0.05  # Require at least 5% signal frequency
-                    
+
                     if signal_frequency < min_frequency:
                         # Heavy penalty for sparse signals: penalize by missing frequency
                         frequency_penalty = (min_frequency - signal_frequency) * 10.0  # 10x penalty
                         final_score = avg_returns - frequency_penalty
-                        
+
                         if self.verbose and evaluation_count[0] % 10 == 0:  # Log occasionally
                             print(f"   Signal frequency penalty: {signal_frequency:.3f} < {min_frequency:.3f}, penalty: {frequency_penalty:.4f}")
-                
+
                 # Update best return tracking with final score
                 if final_score > best_return_so_far[0]:
-                    best_return_so_far[0] = final_score
-                
+                    best_return_so_far[0] = float(final_score)
+
                 # Update progress bar with current status
                 freq_info = ""
                 if "Triple" in generator_class.__name__ and total_samples > 0:
                     signal_freq = total_signals / total_samples
                     freq_info = f", freq={signal_freq:.1%}"
-                
+
                 if progress_bar:
                     progress_bar.set_postfix({
                         'best_score': f"{best_return_so_far[0]:.4f}",
@@ -487,23 +488,27 @@ class ParameterOptimizer:
                 random_state=self.random_state,
                 verbose=False  # Disable skopt verbose to avoid conflicts with tqdm
             )
-            
+
             # Close progress bar
             if progress_bar:
                 progress_bar.close()
 
         # Extract optimal parameters
-        optimal_params = {}
-        for i, param_name in enumerate(param_names):
-            value = result.x[i]
-            # Convert numpy types to native Python types for JSON serialization
-            if param_name in ['population_size', 'max_generations', 'lookforward_window',
-                             'min_trades', 'window_size']:
-                optimal_params[param_name] = int(value)
-            else:
-                optimal_params[param_name] = float(value)
+        optimal_params: dict[str, int | float] = {}
+        # Type assertion to help PyRight understand result is not None
+        assert result is not None, "Result should always be set by optimization"
+        if result.x is not None:
+            result_x = result.x  # Cache to help type checker
+            for i, param_name in enumerate(param_names):
+                value = result_x[i]
+                # Convert numpy types to native Python types for JSON serialization
+                if param_name in ['population_size', 'max_generations', 'lookforward_window',
+                                 'min_trades', 'window_size']:
+                    optimal_params[param_name] = int(value)
+                else:
+                    optimal_params[param_name] = float(value)
 
-        optimal_returns = -result.fun  # Convert back from minimization
+        optimal_returns = -result.fun if result.fun is not None else 0.0  # Convert back from minimization
 
         if self.verbose:
             print(f"✅ {method_name} optimization complete!")
@@ -563,7 +568,7 @@ class ParameterOptimizer:
     ) -> dict[str, Any]:
         """
         Optimize Triple Exceedance parameters with multi-objective optimization.
-        
+
         Optimizes for both maximum returns and minimum lookforward window length,
         using transaction cost-scaled barriers.
 

@@ -111,12 +111,11 @@ class TestGALabelingGenerator:
 
     def test_simple_updown_fallback(self):
         """Test that simple up/down labeling fallback raises error (deprecated)."""
-        n_samples = 20
         prices = [100, 101, 102, 101, 103, 102, 104, 105, 104, 106,
                  107, 106, 108, 109, 108, 110, 111, 110, 112, 111]
 
         generator = GALabelingGenerator(verbose=False)
-        
+
         # The fallback method should raise a RuntimeError since it's deprecated
         with pytest.raises(RuntimeError, match="GA fallback to simple labeling should never be called"):
             generator._simple_updown_labels(np.array(prices))

@@ -2,7 +2,7 @@
 """
 Proven Parameters from Diagnostic Analysis
 
-These parameters were validated through comprehensive diagnostic analysis 
+These parameters were validated through comprehensive diagnostic analysis
 and generate excellent signal frequencies (76-96%) with balanced distributions.
 They should be used as defaults or starting points for optimization.
 """
@@ -12,27 +12,27 @@ PROVEN_PARAMETERS = {
     "binary_ctl": {
         "omega": 0.0,  # Optimized parameter from successful runs
     },
-    
+
     "ternary_ctl": {
         "marginal_change_thres": 0.0446,  # Optimized parameters from successful runs
         "window_size": 501,
     },
-    
+
     "oracle_binary": {
         "transaction_cost": 0.00007,  # Corrected transaction cost (0.7 pips)
     },
-    
+
     "oracle_ternary": {
-        "transaction_cost": 0.00007,  # Corrected transaction cost (0.7 pips) 
+        "transaction_cost": 0.00007,  # Corrected transaction cost (0.7 pips)
         "neutral_reward_factor": 0.1,  # Optimized parameters
     },
-    
+
     "triple_barrier": {
         "lookforward_window": 2000,  # PROVEN: generates good signal frequency
         "barrier_width": 0.0005,     # FIXED: 5 pip barriers for better signal quality
         "transaction_cost": 0.00007,  # Correct 0.7 pip transaction cost
     },
-    
+
     "triple_exceedance": {
         "lookforward_window": 2000,  # PROVEN: generates 77% signal frequency
         "scaling_factor": 3.0,       # PROVEN: 3x transaction cost (~2.1 pips)
@@ -43,30 +43,30 @@ PROVEN_PARAMETERS = {
 def get_proven_parameters(method_name: str) -> dict:
     """
     Get proven parameters for a specific method.
-    
+
     Args:
         method_name: Name of the method (e.g., 'triple_barrier')
-        
+
     Returns:
         Dictionary of proven parameters for the method
-        
+
     Raises:
         KeyError: If method_name is not found
     """
     if method_name not in PROVEN_PARAMETERS:
         available = list(PROVEN_PARAMETERS.keys())
         raise KeyError(f"Method '{method_name}' not found. Available: {available}")
-    
+
     return PROVEN_PARAMETERS[method_name].copy()
 
 def apply_proven_parameters(generator_class, **kwargs):
     """
     Create a generator with proven parameters, allowing overrides.
-    
+
     Args:
         generator_class: The target generator class
         **kwargs: Parameter overrides
-        
+
     Returns:
         Instantiated generator with proven parameters
     """
@@ -79,12 +79,12 @@ def apply_proven_parameters(generator_class, **kwargs):
         'OracleBinaryGenerator': 'oracle_binary',
         'OracleTernaryGenerator': 'oracle_ternary',
     }
-    
+
     class_name = generator_class.__name__
     if class_name in class_to_method:
         method_name = class_to_method[class_name]
         proven_params = get_proven_parameters(method_name)
-        
+
         # Merge with overrides (kwargs take precedence)
         final_params = {**proven_params, **kwargs}
         return generator_class(**final_params)

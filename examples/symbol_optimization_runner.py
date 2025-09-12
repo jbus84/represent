@@ -8,9 +8,10 @@ comprehensive reports with visualizations.
 
 import sys
 from pathlib import Path
+from typing import Any
+
 import numpy as np
 import polars as pl
-from typing import Dict, Any, List
 
 # Add represent package to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -20,8 +21,8 @@ from represent.parameter_storage import ParameterStorage, save_optimization_resu
 
 
 def generate_diagnostics_comprehensive_plots_for_symbol(
-    symbol_info: Dict[str, Any],
-    symbol_results: Dict[str, Dict[str, Any]],
+    symbol_info: dict[str, Any],
+    symbol_results: dict[str, dict[str, Any]],
     windows: int = 3,
     window_size: int = 25_000  # USER REQ: Max 25K sampling window
 ) -> None:
@@ -34,10 +35,11 @@ def generate_diagnostics_comprehensive_plots_for_symbol(
     - plots/optimisation/[SYMBOL]/oracle/comprehensive_all_methods_window_{n}.png
     - plots/optimisation/[SYMBOL]/triple/comprehensive_all_methods_window_{n}.png
     """
-    import polars as pl
-    import numpy as np
     import shutil
     from pathlib import Path as _P
+
+    import polars as pl
+
     from diagnostics.comprehensive_method_debugging import (
         create_all_methods_plot,
         get_all_optimization_methods,
@@ -118,8 +120,8 @@ def generate_diagnostics_comprehensive_plots_for_symbol(
 
 
 def generate_comprehensive_all_methods_windows(
-    symbol_info: Dict[str, Any],
-    symbol_results: Dict[str, Dict[str, Any]],
+    symbol_info: dict[str, Any],
+    symbol_results: dict[str, dict[str, Any]],
     windows: int = 3,
     window_size: int = 25_000,  # USER REQ: Max 25K sampling window
     save_dir: Path = Path("examples")
@@ -129,6 +131,7 @@ def generate_comprehensive_all_methods_windows(
     Returns list of saved file Paths.
     """
     import matplotlib.pyplot as plt
+
     from represent.target_generators import TargetGeneratorFactory
 
     # Load prices
@@ -157,7 +160,7 @@ def generate_comprehensive_all_methods_windows(
         })
 
         # Collect labels per method using optimized params
-        labels_per_method: Dict[str, np.ndarray] = {}
+        labels_per_method: dict[str, np.ndarray] = {}
         for method in method_order:
             if method not in symbol_results:
                 continue
@@ -227,25 +230,25 @@ def generate_comprehensive_all_methods_windows(
     return saved
 
 def generate_symbol_visualizations(
-    symbol_info: Dict[str, Any],
-    symbol_results: Dict[str, Dict[str, Any]], 
+    symbol_info: dict[str, Any],
+    symbol_results: dict[str, dict[str, Any]],
     output_dir: Path
 ) -> None:
     """
     Generate comprehensive visualizations for a symbol's optimization results.
-    
+
     Args:
-        symbol_info: Symbol dataset information  
+        symbol_info: Symbol dataset information
         symbol_results: Optimization results for all methods
         output_dir: Directory to save visualization plots
     """
     try:
         from examples.labeling_approaches_visualization import create_comprehensive_visualization
         from represent.target_generators import TargetGeneratorFactory
-        
+
         # Load the symbol's price data
         prices = load_symbol_data_from_parquet(symbol_info['file_path'])
-        
+
         # Use a reasonable sample size for visualization (5K samples)
         sample_size = min(5000, len(prices))
         market_data = pl.DataFrame({
@@ -253,56 +256,56 @@ def generate_symbol_visualizations(
             'ts_event': np.arange(sample_size, dtype=np.int64),
             'symbol': [symbol_info['symbol']] * sample_size
         })
-        
+
         # Create output directory
         output_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Generate targets using optimized parameters
         targets = {}
-        
+
         for method, method_results in symbol_results.items():
             try:
                 # Get optimized parameters
                 best_params = method_results.get('best_params', {})
                 if not best_params:
                     continue
-                    
+
                 # Convert method name and create generator with optimized parameters
                 converted_params = convert_params_for_generator(method, best_params)
                 generator = TargetGeneratorFactory.create(method, **converted_params)
-                
+
                 # Generate targets
                 result_df = generator.generate_targets(market_data, symbol_info['symbol'])
-                
+
                 # Extract target column(s)
                 target_info = generator.get_target_info()
                 target_names = target_info['target_names']
-                
+
                 for target_name in target_names:
                     if target_name in result_df.columns:
                         targets[target_name] = result_df[target_name].to_numpy()
-                        
+
             except Exception as e:
                 print(f"   ⚠️  Failed to generate {method} targets for visualization: {e}")
                 continue
-        
+
         if targets:
             # Create symbol-specific output directory
             symbol_name = symbol_info['symbol']
             symbol_output_dir = output_dir / symbol_name
             symbol_output_dir.mkdir(parents=True, exist_ok=True)
-            
+
             # Create comprehensive visualization
             output_files = create_comprehensive_visualization(
-                market_data, 
-                targets, 
+                market_data,
+                targets,
                 output_dir=str(symbol_output_dir)
             )
-            
+
             print(f"   📈 Generated {len(output_files)} visualization files for {symbol_name}")
         else:
             print(f"   ⚠️  No targets generated for {symbol_info['symbol']} visualization")
-            
+
     except Exception as e:
         print(f"   ❌ Visualization generation failed: {e}")
         # Don't re-raise - visualization failure shouldn't stop optimization
@@ -311,52 +314,52 @@ def generate_symbol_visualizations(
 def load_symbol_data_from_parquet(file_path: str | Path) -> np.ndarray:
     """Load price data from symbol parquet file."""
     df = pl.read_parquet(file_path)
-    
+
     if 'mid_price' in df.columns:
         prices = df['mid_price'].to_numpy()
     elif 'price' in df.columns:
         prices = df['price'].to_numpy()
     else:
         raise ValueError(f"No price column found in {file_path}")
-    
+
     # Remove NaN and invalid values
     valid_mask = np.isfinite(prices) & (prices > 0)
     valid_prices = prices[valid_mask]
-    
+
     if len(valid_prices) == 0:
         raise ValueError(f"No valid price data found in {file_path}")
-    
+
     if len(valid_prices) < len(prices):
         invalid_count = len(prices) - len(valid_prices)
         print(f"⚠️  Removed {invalid_count:,} invalid price values from {file_path.name}")
-    
+
     return valid_prices
 
 
-def discover_symbol_datasets(data_dir: str | Path) -> List[Dict[str, Any]]:
+def discover_symbol_datasets(data_dir: str | Path) -> list[dict[str, Any]]:
     """
     Discover all symbol datasets in the data directory.
-    
+
     Args:
         data_dir: Directory containing symbol datasets
-        
+
     Returns:
         List of symbol dataset info dicts
     """
     data_path = Path(data_dir)
     symbols = []
-    
+
     # Look for parquet files that look like symbol datasets
     for file_path in data_path.rglob("*.parquet"):
         if file_path.stat().st_size > 1 * 1024 * 1024:  # At least 1MB
             try:
                 # Try to load a small sample to validate format
                 df_sample = pl.read_parquet(file_path, n_rows=1000)
-                
+
                 if 'mid_price' in df_sample.columns or 'price' in df_sample.columns:
                     # Get full dataset size
                     df_full = pl.read_parquet(file_path)
-                    
+
                     symbol_info = {
                         'symbol': file_path.stem,  # Use filename as symbol
                         'file_path': file_path,
@@ -364,51 +367,51 @@ def discover_symbol_datasets(data_dir: str | Path) -> List[Dict[str, Any]]:
                         'size_mb': file_path.stat().st_size / (1024 * 1024),
                         'date_range': None
                     }
-                    
+
                     # Try to get date range if timestamp column exists
                     if 'timestamp' in df_full.columns:
                         try:
                             timestamps = df_full['timestamp']
                             if len(timestamps) > 0:
                                 symbol_info['date_range'] = f"{timestamps.min()} to {timestamps.max()}"
-                        except:
+                        except Exception:
                             pass
-                    
+
                     symbols.append(symbol_info)
                     print(f"📊 Found symbol dataset: {symbol_info['symbol']} ({symbol_info['samples']:,} samples, {symbol_info['size_mb']:.1f}MB)")
-                    
+
             except Exception as e:
                 print(f"⚠️  Skipping {file_path}: {e}")
                 continue
-    
+
     return symbols
 
 
-def convert_params_for_generator(method: str, params: Dict[str, Any]) -> Dict[str, Any]:
+def convert_params_for_generator(method: str, params: dict[str, Any]) -> dict[str, Any]:
     """
     Convert optimization parameters to correct types for generators.
-    
+
     Optimization returns all parameters as floats, but some generators
     require integer parameters (e.g., window sizes).
-    
+
     Args:
         method: Target generation method name
         params: Raw parameters from optimization
-        
+
     Returns:
         Parameters with correct types for the generator
     """
     converted = params.copy()
-    
+
     # Parameters that should be integers for various methods
     int_params_by_method = {
         'triple_barrier': ['lookforward_window', 'volatility_window'],
-        'triple_exceedance': ['lookforward_window', 'volatility_window'], 
+        'triple_exceedance': ['lookforward_window', 'volatility_window'],
         'ternary_ctl': ['window_size'],
         'ga_labeling': ['population_size', 'max_generations', 'lookforward_window'],
     }
-    
-    
+
+
     # Convert specified parameters to integers
     int_params = int_params_by_method.get(method, [])
     for param in int_params:
@@ -418,30 +421,31 @@ def convert_params_for_generator(method: str, params: Dict[str, Any]) -> Dict[st
     return converted
 
 
-def calculate_additional_metrics(prices: np.ndarray, method: str, optimal_params: Dict[str, Any]) -> Dict[str, Any]:
+def calculate_additional_metrics(prices: np.ndarray, method: str, optimal_params: dict[str, Any]) -> dict[str, Any]:
     """
     Calculate additional metrics using EXACT same logic and windowing as optimization.
-    
+
     The optimization uses window sampling (e.g., 100K samples × 5 windows) while the original
     enhanced output calculated over entire dataset sequentially. This mismatch caused different results.
-    
+
     Args:
-        prices: Full price array 
+        prices: Full price array
         method: Target generation method name
         optimal_params: Optimal parameters for the method
-        
+
     Returns:
         Dictionary with additional metrics calculated using sampled windows
     """
     try:
         # Import here to avoid circular imports
-        from represent.target_generators.factory import TargetGeneratorFactory
         import polars as pl
-        
+
+        from represent.target_generators.factory import TargetGeneratorFactory
+
         # Use same windowing parameters as optimization (from large_scale_optimization.py)
         window_size = 25000  # USER REQ: Max 25K sampling window
         n_windows = 5         # Same as optimization
-        
+
         if len(prices) <= window_size:
             # Small dataset - use entire dataset
             sample_windows = [prices]
@@ -454,56 +458,56 @@ def calculate_additional_metrics(prices: np.ndarray, method: str, optimal_params
                 end_idx = start_idx + window_size
                 window_prices = prices[start_idx:end_idx]
                 sample_windows.append(window_prices)
-        
+
         # Aggregate results across windows (same as optimization)
         total_returns = 0.0
         total_trades = 0
         all_labels = []
         valid_windows = 0
-        
+
         for window_prices in sample_windows:
             try:
                 # Create DataFrame for this window
                 df = pl.DataFrame({"mid_price": window_prices})
-                
+
                 # Convert float parameters to int where needed for generators
                 converted_params = convert_params_for_generator(method, optimal_params)
-                
+
                 # Generate targets using optimal parameters
                 generator = TargetGeneratorFactory.create(method, **converted_params)
                 targets_df = generator.generate_targets(df)
                 target_info = generator.get_target_info()
                 target_col = target_info['target_names'][0]
                 window_labels = targets_df[target_col].to_numpy()
-                
+
                 # Collect labels for overall balance calculation
                 all_labels.extend(window_labels.tolist())
-                
+
                 # Calculate PnL for this window using EXACT optimization logic
                 transaction_cost = 0.00007  # 0.7 pip default
-                
+
                 try:
                     from tstrends.returns_estimation import ReturnsEstimatorWithFees
                     from tstrends.returns_estimation.fees_config import FeesConfig
-                    
+
                     # EXACT replication of optimization logic (lines 882-915)
                     fees_config = FeesConfig(
                         lp_transaction_fees=transaction_cost,
                         sp_transaction_fees=transaction_cost,
                     )
                     returns_estimator = ReturnsEstimatorWithFees(fees_config=fees_config)
-                    
+
                     # Convert labels to proper format for returns estimation
                     labels_int = window_labels.astype(int)
                     unique_labels_set = np.unique(labels_int[~np.isnan(labels_int)])
-                    
+
                     if (set(unique_labels_set).issubset({0, 1, 2}) and len(unique_labels_set) >= 2) or method.lower() in ['ternary_ctl', 'oracle_ternary']:
                         # Ternary labels: {0, 1, 2} → {-1, 0, 1} for TStrends
                         # Even if not all 3 classes present in this window, convert for TStrends compatibility
                         labels_tstrends = labels_int - 1
                     elif len(unique_labels_set) == 2 and set(unique_labels_set).issubset({0, 1}):
                         # Binary labels: {0, 1} → {-1, 1} for TStrends binary methods
-                        # Only convert if this is binary CTL, oracle binary, etc. 
+                        # Only convert if this is binary CTL, oracle binary, etc.
                         if method.lower() in ['binary_ctl', 'oracle_binary']:
                             labels_tstrends = np.where(labels_int == 0, -1, 1)
                         else:
@@ -511,13 +515,13 @@ def calculate_additional_metrics(prices: np.ndarray, method: str, optimal_params
                             labels_tstrends = labels_int
                     else:
                         labels_tstrends = labels_int
-                    
+
                     # Calculate returns using TStrends for this window
                     window_return = returns_estimator.estimate_return(
                         window_prices.tolist(),
                         labels_tstrends.tolist()
                     )
-                    
+
                     # Count trades in this window
                     window_trades = 0
                     current_position = 0
@@ -525,26 +529,26 @@ def calculate_additional_metrics(prices: np.ndarray, method: str, optimal_params
                         if target_position != current_position:
                             window_trades += 1
                             current_position = target_position
-                    
+
                     # Aggregate
                     total_returns += window_return
                     total_trades += window_trades
                     valid_windows += 1
-                    
+
                 except ImportError:
                     # Skip this window if TStrends not available
                     continue
-                    
+
             except Exception:
                 # Skip problematic windows
                 continue
-        
+
         # Calculate overall metrics from aggregated windows
         if valid_windows > 0:
             avg_return = total_returns / valid_windows  # Average return across windows
             avg_trades = total_trades / valid_windows   # Average trades per window
             mean_return_per_trade = avg_return / avg_trades if avg_trades > 0 else 0.0
-            
+
             # Calculate trading frequency as percentage of window size
             trading_frequency = avg_trades / window_size * 100 if window_size > 0 else 0.0
         else:
@@ -552,22 +556,22 @@ def calculate_additional_metrics(prices: np.ndarray, method: str, optimal_params
             avg_trades = 0
             mean_return_per_trade = 0.0
             trading_frequency = 0.0
-        
+
         # Calculate class balance from all collected labels
         if all_labels:
             all_labels_array = np.array(all_labels)
             unique_labels, counts = np.unique(all_labels_array, return_counts=True)
             percentages = counts / len(all_labels_array) * 100
             balance_score = min(percentages) / max(percentages) * 100 if len(percentages) > 1 else 100
-            
+
             # Create label distribution string
-            label_dist = {str(label): f"{pct:.1f}%" for label, pct in zip(unique_labels, percentages)}
+            label_dist = {str(label): f"{pct:.1f}%" for label, pct in zip(unique_labels, percentages, strict=False)}
             num_classes = len(unique_labels)
         else:
             balance_score = 0.0
             label_dist = {}
             num_classes = 0
-        
+
         return {
             "class_balance_score": balance_score,
             "label_distribution": label_dist,
@@ -579,7 +583,7 @@ def calculate_additional_metrics(prices: np.ndarray, method: str, optimal_params
             "valid_windows": valid_windows,
             "total_windows": len(sample_windows) if 'sample_windows' in locals() else 0,
         }
-        
+
     except Exception as e:
         return {
             "error": f"Failed to calculate additional metrics: {e}",
@@ -596,32 +600,32 @@ def calculate_additional_metrics(prices: np.ndarray, method: str, optimal_params
 
 
 def optimize_symbol_dataset(
-    symbol_info: Dict[str, Any],
-    methods: List[str],
-    optimization_config: Dict[str, Any]
-) -> Dict[str, Dict[str, Any]]:
+    symbol_info: dict[str, Any],
+    methods: list[str],
+    optimization_config: dict[str, Any]
+) -> dict[str, dict[str, Any]]:
     """
     Run optimization on a single symbol dataset.
-    
+
     Args:
         symbol_info: Symbol dataset information
         methods: List of methods to optimize
         optimization_config: Optimization configuration
-        
+
     Returns:
         Optimization results for all methods
     """
     symbol = symbol_info['symbol']
     file_path = symbol_info['file_path']
     samples = symbol_info['samples']
-    
+
     print(f"\n{'='*80}")
     print(f"🔍 OPTIMIZING SYMBOL: {symbol.upper()}")
     print(f"{'='*80}")
     print(f"   📈 Dataset: {samples:,} samples ({symbol_info['size_mb']:.1f}MB)")
     if symbol_info['date_range']:
         print(f"   📅 Date range: {symbol_info['date_range']}")
-    
+
     # Load price data
     try:
         prices = load_symbol_data_from_parquet(file_path)
@@ -629,23 +633,23 @@ def optimize_symbol_dataset(
     except Exception as e:
         print(f"❌ Failed to load {symbol}: {e}")
         return {}
-    
+
     # Initialize optimizer with symbol-specific configuration
     optimizer = LargeScaleParameterOptimizer(
         **optimization_config,
         verbose=True
     )
-    
+
     results = {}
-    
+
     # Optimize each method
     for method in methods:
         try:
             print(f"\n{'-'*60}")
             print(f"🎯 METHOD: {method.upper()} | SYMBOL: {symbol}")
             print(f"{'-'*60}")
-            print(f"Starting optimization...")
-            
+            print("Starting optimization...")
+
             if method == 'ga_labeling':
                 result = optimizer.optimize_ga_labeling(prices)
             elif method == 'binary_ctl':
@@ -663,9 +667,9 @@ def optimize_symbol_dataset(
             else:
                 print(f"⚠️  Unknown method: {method}")
                 continue
-            
+
             results[method] = result
-            
+
             # Calculate additional metrics
             optimal_params = result.get('optimal_params', {})
             if optimal_params:
@@ -673,11 +677,11 @@ def optimize_symbol_dataset(
                 result.update(additional_metrics)  # Add metrics to result for storage
             else:
                 additional_metrics = {"error": "No optimal parameters found"}
-            
+
             print(f"\n✅ {method.upper()} OPTIMIZATION COMPLETE")
             print(f"   🎯 Best params: {result.get('optimal_params', 'N/A')}")
             print(f"   📈 Max returns: {result.get('maximum_returns', 'N/A'):.4f}")
-            
+
             # Display additional metrics
             if "error" not in additional_metrics:
                 print(f"   ⚖️  Class balance: {additional_metrics['class_balance_score']:.1f}% ({additional_metrics['num_classes']} classes)")
@@ -685,15 +689,15 @@ def optimize_symbol_dataset(
                 print(f"   🪟 Windows: {additional_metrics['valid_windows']}/{additional_metrics['total_windows']} valid")
                 print(f"   🔄 Trades: {additional_metrics['num_trades']:,}/window ({additional_metrics['trading_frequency']:.2f}% frequency)")
                 print(f"   💰 Mean return/trade: {additional_metrics['mean_return_per_trade']:.6f}")
-                
+
                 # Add note about windowing for clarity
                 if additional_metrics['total_windows'] > 1:
                     print(f"   ℹ️  Metrics calculated using {additional_metrics['total_windows']} sampled windows (matches optimization)")
             else:
                 print(f"   ⚠️  Metrics calculation failed: {additional_metrics.get('error', 'Unknown error')}")
-            
+
             print(f"{'-'*60}")
-            
+
         except ImportError as e:
             print(f"⚠️  Skipping {method}: {e}")
             continue
@@ -702,48 +706,48 @@ def optimize_symbol_dataset(
             print(f"   Error: {e}")
             print(f"{'-'*60}")
             continue
-    
+
     return results
 
 
 def run_all_symbol_optimizations(
     data_dir: str | Path = "/Users/danielfisher/data/databento/symbol_datasets/inputs",
-    methods: List[str] = None,
+    methods: list[str] = None,
     output_dir: str | Path = "optimization_results",
     max_symbols: int = None
-) -> Dict[str, Dict[str, Dict[str, Any]]]:
+) -> dict[str, dict[str, dict[str, Any]]]:
     """
     Run optimization on all discovered symbol datasets.
-    
+
     Args:
         data_dir: Directory containing symbol datasets
         methods: Methods to optimize (default: all available)
         output_dir: Directory to save results
         max_symbols: Maximum number of symbols to process (for testing)
-        
+
     Returns:
         Complete optimization results
     """
     if methods is None:
         methods = ['binary_ctl', 'ternary_ctl', 'triple_barrier', 'triple_exceedance']
-    
+
     # Discover symbol datasets
     print("🔍 DISCOVERING SYMBOL DATASETS")
     print("=" * 60)
-    
+
     symbols = discover_symbol_datasets(data_dir)
-    
+
     if not symbols:
         print(f"❌ No symbol datasets found in {data_dir}")
         return {}
-    
+
     print(f"✅ Found {len(symbols)} symbol datasets")
-    
+
     # Limit symbols for testing
     if max_symbols and len(symbols) > max_symbols:
         symbols = symbols[:max_symbols]
         print(f"🔄 Limited to first {max_symbols} symbols for testing")
-    
+
     # Optimization configuration with adaptive sampling and early stopping
     optimization_config = {
         'window_size': 25000,      # USER REQ: Max 25K sampling window
@@ -763,40 +767,40 @@ def run_all_symbol_optimizations(
         'random_state': 42,        # Reproducible results
         'use_optuna': True         # Enable Optuna optimizer
     }
-    
-    print(f"\n🎯 OPTIMIZATION CONFIGURATION")
+
+    print("\n🎯 OPTIMIZATION CONFIGURATION")
     print("=" * 60)
     for key, value in optimization_config.items():
         print(f"   {key}: {value}")
-    
+
     # Run optimization for each symbol
     all_results = {}
     successful_optimizations = 0
-    
+
     for i, symbol_info in enumerate(symbols, 1):
         symbol = symbol_info['symbol']
-        
+
         print(f"\n{'#'*100}")
         print(f"📊 DATASET {i}/{len(symbols)}: {symbol.upper()}")
         print(f"{'#'*100}")
-        
+
         try:
             symbol_results = optimize_symbol_dataset(
-                symbol_info, 
-                methods, 
+                symbol_info,
+                methods,
                 optimization_config
             )
-            
+
             if symbol_results:
                 all_results[symbol] = symbol_results
-                
+
                 # Save results immediately
-                saved_files = save_optimization_results(
-                    symbol, 
-                    symbol_results, 
+                save_optimization_results(
+                    symbol,
+                    symbol_results,
                     str(Path(output_dir) / "optimized_parameters")
                 )
-                
+
                 # Generate comprehensive 100k-window visualizations per symbol via diagnostics
                 try:
                     print(f"📊 Generating comprehensive 100k-window visualizations for {symbol} via diagnostics...")
@@ -809,78 +813,78 @@ def run_all_symbol_optimizations(
                     print(f"✅ Comprehensive windows generated for {symbol}")
                 except Exception as viz_error:
                     print(f"⚠️  Visualization failed for {symbol}: {viz_error}")
-                
+
                 print(f"✅ {symbol} optimization complete ({len(symbol_results)} methods)")
                 successful_optimizations += 1
             else:
                 print(f"⚠️  No results for {symbol}")
-                
+
         except Exception as e:
             print(f"❌ Failed to optimize {symbol}: {e}")
             continue
-    
-    print(f"\n🎉 OPTIMIZATION COMPLETE!")
+
+    print("\n🎉 OPTIMIZATION COMPLETE!")
     print("=" * 60)
     print(f"   Successfully optimized: {successful_optimizations}/{len(symbols)} symbols")
     print(f"   Total methods run: {sum(len(results) for results in all_results.values())}")
-    
+
     return all_results
 
 
 def generate_optimization_report(
-    results: Dict[str, Dict[str, Dict[str, Any]]],
+    results: dict[str, dict[str, dict[str, Any]]],
     output_dir: str | Path = "optimization_results"
 ) -> None:
     """
     Generate comprehensive optimization report with visualizations.
-    
+
     Args:
         results: Complete optimization results
         output_dir: Directory to save report and visualizations
     """
     output_path = Path(output_dir)
     output_path.mkdir(exist_ok=True)
-    
+
     # Initialize parameter storage
     storage = ParameterStorage(output_path / "optimized_parameters")
-    
-    print(f"\n📊 GENERATING OPTIMIZATION REPORT")
+
+    print("\n📊 GENERATING OPTIMIZATION REPORT")
     print("=" * 60)
-    
+
     # Create parameter comparison table
     try:
         comparison_df = storage.create_parameter_comparison_table()
-        
+
         if not comparison_df.empty:
             # Save CSV for analysis
             csv_path = output_path / "parameter_comparison.csv"
             comparison_df.to_csv(csv_path, index=False)
             print(f"✅ Parameter comparison CSV: {csv_path}")
-            
+
             # Create visualizations
             print("📈 Creating parameter visualizations...")
-            
+
             # Parameter distributions for each method
             for method in comparison_df['method'].unique():
                 viz_path = output_path / f"parameter_distributions_{method}.png"
                 fig = storage.visualize_parameter_distributions(method=method, save_path=viz_path)
                 if fig:
                     print(f"   ✅ {method} parameter distributions: {viz_path}")
-            
+
             # Returns comparison
             returns_path = output_path / "returns_comparison.png"
             fig = storage.create_returns_comparison(save_path=returns_path)
             if fig:
                 print(f"   ✅ Returns comparison: {returns_path}")
-            
+
             # Export markdown report
             markdown_path = output_path / "OPTIMIZATION_RESULTS.md"
             storage.export_to_markdown(markdown_path)
             print(f"✅ Markdown report: {markdown_path}")
-            
+
         else:
             print("⚠️  No parameter data available for report generation")
-            
+
     except Exception as e:
         print(f"❌ Failed to generate report: {e}")
         import traceback
@@ -934,7 +938,7 @@ def run_debug_m6am4():
             str(output_dir / 'optimized_parameters')
         )
         print(f"✅ Debug results saved. Files: {saved_files}")
-        
+
         # Generate debug visualizations
         try:
             print("📊 Generating debug visualizations...")
@@ -957,7 +961,7 @@ def main():
     print("This script optimizes parameters for all discovered symbol datasets")
     print("and generates comprehensive reports with visualizations.")
     print()
-    
+
     # Configuration
     data_dir = Path("/Users/danielfisher/data/databento/symbol_datasets/inputs")
     output_dir = Path("optimization_results")
@@ -974,7 +978,7 @@ def main():
         methods = ['triple_barrier', 'triple_exceedance']
         print("⚠️  TStrends not available - using GA labeling and Triple methods only")
     max_symbols = None  # Process all symbol datasets (no limit)
-    
+
     try:
         # Run optimizations
         results = run_all_symbol_optimizations(
@@ -983,14 +987,14 @@ def main():
             output_dir=output_dir,
             max_symbols=max_symbols
         )
-        
+
         # Generate report
         if results:
             generate_optimization_report(results, output_dir)
         else:
             print("❌ No optimization results to report")
-        
-        print(f"\n🎉 ALL DONE!")
+
+        print("\n🎉 ALL DONE!")
         print("=" * 80)
         print(f"Results saved to: {output_dir}")
         print("Check the following files:")
@@ -999,7 +1003,7 @@ def main():
         print(f"  • {output_dir}/*.png - Parameter distribution plots")
         print(f"  • {output_dir}/plots/optimisation/[SYMBOL]/comprehensive_all_methods_window_*.png - 100k-window comprehensive plots")
         print(f"  • {output_dir}/optimized_parameters/ - Individual parameter files")
-        
+
     except KeyboardInterrupt:
         print("\n⚠️  Optimization interrupted by user")
     except Exception as e:

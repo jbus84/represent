@@ -97,21 +97,21 @@ class ModularDatasetBuilder:
             # No target generators - return inputs-only dataset with row keys
             if self.verbose:
                 print("   📊 Creating inputs-only dataset (no target columns)")
-            
+
             # Create row index column
             result_df = symbol_df.with_row_index("row_idx")
-            
+
             # Add symbol column if provided
             if symbol:
                 result_df = result_df.with_columns(pl.lit(symbol).alias("symbol"))
-            
+
             # Add timestamp column if ts_event exists
             if "ts_event" in result_df.columns:
                 result_df = result_df.with_columns(pl.col("ts_event").alias("timestamp"))
-            
+
             if self.verbose:
                 print(f"   📊 Inputs-only dataset: {len(result_df)} rows, {len(result_df.columns)} columns")
-            
+
             return result_df
 
     def build_dataset(self, symbol_df: pl.DataFrame) -> pl.DataFrame:
