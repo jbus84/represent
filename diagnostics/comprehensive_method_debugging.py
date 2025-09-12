@@ -379,18 +379,34 @@ def create_all_methods_plot(window_df: pl.DataFrame, methods: list, window_num: 
             # Plot price line
             ax.plot(time_axis, prices_plot, 'black', linewidth=0.8, alpha=0.8, label='Price', zorder=3)
 
-            # Add barrier visualization if applicable
+            # Add barrier/threshold visualization for triple methods
+            threshold_pips = None
+
+            # Calculate threshold based on method type
             if method_config.get("has_barriers", False) and method_config.get("barrier_width"):
+                # Triple Barrier method
                 barrier_width = method_config["barrier_width"]
-                upper_barrier = prices_plot + barrier_width
-                lower_barrier = prices_plot - barrier_width
+                threshold_pips = barrier_width * 10000
+                upper_threshold = prices_plot + barrier_width
+                lower_threshold = prices_plot - barrier_width
 
-                ax.fill_between(time_axis, lower_barrier, upper_barrier,
-                               alpha=0.15, color='orange',
-                               label=f'±{barrier_width*10000:.1f} pip barriers', zorder=1)
+                # Plot as black dashed lines
+                ax.plot(time_axis, upper_threshold, '--', color='black', alpha=0.8, linewidth=1.0, zorder=2)
+                ax.plot(time_axis, lower_threshold, '--', color='black', alpha=0.8, linewidth=1.0, zorder=2)
 
-                ax.plot(time_axis, upper_barrier, '--', color='orange', alpha=0.6, linewidth=0.5, zorder=2)
-                ax.plot(time_axis, lower_barrier, '--', color='orange', alpha=0.6, linewidth=0.5, zorder=2)
+            elif method_config["method"] == "triple_exceedance":
+                # Triple Exceedance method - calculate threshold from scaling factor
+                scaling_factor = method_config["params"].get("scaling_factor", 3.0)
+                transaction_cost = 0.00007  # Standard 0.7 pip transaction cost
+                threshold = transaction_cost * scaling_factor
+                threshold_pips = threshold * 10000
+
+                upper_threshold = prices_plot + threshold
+                lower_threshold = prices_plot - threshold
+
+                # Plot as black dashed lines
+                ax.plot(time_axis, upper_threshold, '--', color='black', alpha=0.8, linewidth=1.0, zorder=2)
+                ax.plot(time_axis, lower_threshold, '--', color='black', alpha=0.8, linewidth=1.0, zorder=2)
 
             # Color regions by labels
             current_label = labels_plot[0] if len(labels_plot) > 0 else 0
@@ -425,11 +441,12 @@ def create_all_methods_plot(window_df: pl.DataFrame, methods: list, window_num: 
             # Legend
             legend_elements: list = [Line2D([0], [0], color='black', linewidth=0.8, label='Price')]
 
-            if method_config.get("has_barriers", False) and method_config.get("barrier_width"):
-                barrier_width = method_config["barrier_width"]
+            # Add threshold/barrier line to legend if applicable
+            if threshold_pips is not None:
+                threshold_label = f'±{threshold_pips:.0f} pip threshold'
                 legend_elements.append(
-                    mpatches.Patch(color='orange', alpha=0.15,
-                                 label=f'±{barrier_width*10000:.1f} pip barriers')
+                    Line2D([0], [0], color='black', linestyle='--', linewidth=1.0, alpha=0.8,
+                          label=threshold_label)
                 )
 
             for label_val, pct in zip(unique_labels, percentages, strict=False):

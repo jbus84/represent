@@ -632,7 +632,7 @@ def optimize_symbol_dataset(
 def run_all_symbol_optimizations(
     data_dir: str | Path = "/Users/danielfisher/data/databento/symbol_datasets/inputs",
     methods: list[str] = None,
-    output_dir: str | Path = "optimization_results",
+    output_dir: str | Path = "outputs/optimization_results",
     max_symbols: int = None
 ) -> dict[str, dict[str, dict[str, Any]]]:
     """
@@ -752,7 +752,7 @@ def run_all_symbol_optimizations(
 
 def generate_optimization_report(
     results: dict[str, dict[str, dict[str, Any]]],
-    output_dir: str | Path = "optimization_results"
+    output_dir: str | Path = "outputs/optimization_results"
 ) -> None:
     """
     Generate comprehensive optimization report with visualizations.
@@ -813,7 +813,7 @@ def generate_optimization_report(
 def run_debug_m6am4():
     """Run a short debug optimization on M6AM4 with four non-GA methods."""
     data_dir = Path("/Users/danielfisher/data/databento/symbol_datasets/inputs")
-    output_dir = Path("optimization_results")
+    output_dir = Path("outputs/optimization_results")
     output_dir.mkdir(exist_ok=True)
 
     # Discover and select M6AM4
@@ -872,7 +872,7 @@ def main():
 
     # Configuration
     data_dir = Path("/Users/danielfisher/data/databento/symbol_datasets/inputs")
-    output_dir = Path("optimization_results")
+    output_dir = Path("outputs/optimization_results")
     # Check if tstrends is available
     try:
         from represent.target_generators.tstrends_labeling import TSTRENDS_AVAILABLE
