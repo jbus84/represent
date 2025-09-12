@@ -712,8 +712,8 @@ class LargeScaleParameterOptimizer:
 
             # Single evaluation with fixed transaction cost
             try:
-                # Create generator with fixed 0.7 pip transaction cost
-                generator_params = {'transaction_cost': 0.00007}  # Fixed at 0.7 pips
+                # Create generator with fixed 0.35 pip one-way transaction cost (0.7 pip round-trip)
+                generator_params = {'transaction_cost': 0.000035}  # Fixed at 0.35 pips (one-way)
 
                 # Filter out incompatible params for generators that don't use transaction_cost
                 filtered_params = generator_params.copy()
@@ -1274,9 +1274,9 @@ class LargeScaleParameterOptimizer:
         except ImportError:
             raise ImportError("CTL labeling requires tstrends integration") from None  # noqa: B904
 
-        # SENSITIVITY-OPTIMIZED PARAMETERS: omega range validated for 90%+ balance
-        # Analysis shows omega 0.0-0.0001 works, fails at >=0.0005 - tightened to sweet spot
-        default_bounds = {'omega': (0.0, 0.0001)}  # Validated range for 90.4% balance, avoids 100% imbalanced region
+        # FIXED CTL PARAMETERS: prevent zero omega that causes position changes on every tick
+        # Minimum omega set to 0.0001 (1 pip) to ensure reasonable threshold for trend detection
+        default_bounds = {'omega': (0.0001, 0.001)}  # Realistic range prevents pathological overtrading
         if custom_bounds:
             default_bounds.update(custom_bounds)
 
@@ -1330,11 +1330,9 @@ class LargeScaleParameterOptimizer:
         except ImportError:
             raise ImportError("Oracle labeling requires tstrends integration") from None  # noqa: B904
 
-        # SENSITIVITY-OPTIMIZED Oracle Binary: higher transaction costs improve balance
-        # Analysis shows TC 0.0001 gives 60% balance vs 27% at lower costs
-        default_bounds = {
-            'transaction_cost': (0.00001, 0.0001),  # Sweet spot range for best balance (27-60%)
-        }
+        # FIXED Oracle Binary: use realistic 0.35 pip one-way cost (0.7 pip round-trip)
+        # Transaction cost should be fixed, not optimized, for realistic trading
+        default_bounds = {}
         if custom_bounds:
             default_bounds.update(custom_bounds)
 
@@ -1358,10 +1356,9 @@ class LargeScaleParameterOptimizer:
         except ImportError:
             raise ImportError("Oracle labeling requires tstrends integration") from None  # noqa: B904
 
-        # SENSITIVITY-OPTIMIZED Oracle Ternary: focused on optimal neutral reward factor
-        # Analysis shows NRF 0.5 gives best balance (21.5%), transaction cost less sensitive
+        # FIXED Oracle Ternary: use realistic 0.35 pip cost, optimize neutral reward factor
+        # Transaction cost fixed at 0.35 pips (0.7 pip round-trip), only optimize neutral factor
         default_bounds = {
-            'transaction_cost': (0.00001, 0.0001),  # Align with Binary Oracle range
             'neutral_reward_factor': (0.3, 0.7),  # Focused around optimal 0.5 value
         }
         if custom_bounds:

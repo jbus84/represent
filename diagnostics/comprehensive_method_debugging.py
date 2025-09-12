@@ -34,7 +34,7 @@ def get_all_optimization_methods():
         {
             "name": "Binary CTL",
             "method": "binary_ctl",
-            "params": {"omega": 0.0},  # Optimized parameter
+            "params": {"omega": 0.0001},  # Fixed minimum to prevent pathological overtrading
             "color_map": {-1: "red", 1: "green"},
             "label_names": {-1: "Short", 1: "Long"},
             "has_barriers": False
@@ -50,7 +50,7 @@ def get_all_optimization_methods():
         {
             "name": "Oracle Binary",
             "method": "oracle_binary",
-            "params": {"transaction_cost": 0.00007},  # Corrected transaction cost
+            "params": {"transaction_cost": 0.000035},  # Fixed at 0.35 pips (0.7 pip round-trip)
             "color_map": {-1: "red", 1: "green"},
             "label_names": {-1: "Short", 1: "Long"},
             "has_barriers": False
@@ -58,7 +58,7 @@ def get_all_optimization_methods():
         {
             "name": "Oracle Ternary",
             "method": "oracle_ternary",
-            "params": {"transaction_cost": 0.00007, "neutral_reward_factor": 0.1},  # Optimized parameters
+            "params": {"transaction_cost": 0.000035, "neutral_reward_factor": 0.5},  # Fixed cost, neutral factor in bounds
             "color_map": {0: "red", 1: "gray", 2: "green"},
             "label_names": {0: "Down", 1: "Neutral", 2: "Up"},
             "has_barriers": False
