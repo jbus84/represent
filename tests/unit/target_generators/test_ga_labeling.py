@@ -131,7 +131,8 @@ class TestGALabelingGenerator:
             verbose=False
         )
 
-        trades = generator._simulate_trading(signals, prices)
+        # Test long model simulation
+        trades = generator._simulate_specialized_trading(signals, prices, model_type="long")
 
         # Should have some trades
         assert len(trades) > 0

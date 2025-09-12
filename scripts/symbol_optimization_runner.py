@@ -81,7 +81,7 @@ def generate_diagnostics_comprehensive_plots_for_symbol(
 
     # Define subsets
     def is_classification(m):
-        return m.get('method') in {'binary_ctl', 'ternary_ctl'}
+        return m.get('method') in {'binary_ctl', 'ternary_ctl', 'ga_labeling'}
 
     def is_oracle(m):
         return m.get('method') in {'oracle_binary', 'oracle_ternary'}
@@ -89,11 +89,15 @@ def generate_diagnostics_comprehensive_plots_for_symbol(
     def is_triple(m):
         return 'triple' in (m.get('method') or '')
 
+    def is_ga(m):
+        return m.get('method') == 'ga_labeling'
+
     subsets = {
         'all': full_methods,
         'classification': [m for m in full_methods if is_classification(m)],
         'oracle': [m for m in full_methods if is_oracle(m)],
         'triple': [m for m in full_methods if is_triple(m)],
+        'ga': [m for m in full_methods if is_ga(m)],
     }
 
     # Ensure base output dirs exist
@@ -687,7 +691,7 @@ def run_all_symbol_optimizations(
         Complete optimization results
     """
     if methods is None:
-        methods = ['binary_ctl', 'ternary_ctl', 'triple_barrier', 'triple_exceedance']
+        methods = ['binary_ctl', 'ternary_ctl', 'ga_labeling', 'triple_barrier', 'triple_exceedance']
 
     # Discover symbol datasets
     print("🔍 DISCOVERING SYMBOL DATASETS")
@@ -862,7 +866,7 @@ def run_debug_m6am4():
         print("❌ Could not find M6AM4 dataset in inputs directory")
         return
 
-    methods = ['binary_ctl', 'ternary_ctl', 'oracle_binary', 'oracle_ternary']
+    methods = ['binary_ctl', 'ternary_ctl', 'oracle_binary', 'oracle_ternary', 'ga_labeling']
 
     optimization_config = {
         'window_size': 50000,       # More reasonable size - 50K samples (3.3% coverage)
@@ -916,13 +920,13 @@ def main():
     try:
         from represent.target_generators.tstrends_labeling import TSTRENDS_AVAILABLE
         if TSTRENDS_AVAILABLE:
-            methods = ['binary_ctl', 'ternary_ctl', 'oracle_binary', 'oracle_ternary', 'triple_exceedance', 'triple_barrier', ]
-            print("✅ TStrends available - including CTL, Oracle, and Triple methods")
+            methods = ['binary_ctl', 'ternary_ctl', 'oracle_binary', 'oracle_ternary', 'ga_labeling', 'triple_exceedance', 'triple_barrier']
+            print("✅ TStrends available - including CTL, Oracle, GA, and Triple methods")
         else:
-            methods = ['triple_barrier', 'triple_exceedance']
+            methods = ['ga_labeling', 'triple_barrier', 'triple_exceedance']
             print("⚠️  TStrends not available - using GA labeling and Triple methods only")
     except ImportError:
-        methods = ['triple_barrier', 'triple_exceedance']
+        methods = ['ga_labeling', 'triple_barrier', 'triple_exceedance']
         print("⚠️  TStrends not available - using GA labeling and Triple methods only")
     max_symbols = None  # Process all symbol datasets (no limit)
 

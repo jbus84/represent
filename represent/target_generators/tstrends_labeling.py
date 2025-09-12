@@ -63,41 +63,50 @@ class BinaryCTLGenerator(TargetGenerator):
         self.validate_input(df)
 
         # Extract price series - tstrends expects list of lists with native Python types
-        prices = df["mid_price"].to_numpy()
+        prices_original = df["mid_price"].to_numpy()
+        original_length = len(prices_original)
 
         # Ensure we have valid numeric data
-        prices = prices[~np.isnan(prices)]
-        if len(prices) == 0:
+        prices_clean = prices_original[~np.isnan(prices_original)]
+        if len(prices_clean) == 0:
             # Create base target DataFrame with keys and empty labels
             target_df = self._create_base_target_df(df, symbol)
-            empty_labels = np.zeros(len(df), dtype=np.int32)
+            empty_labels = np.zeros(original_length, dtype=np.int32)
             target_df = target_df.with_columns(pl.Series(self.target_name, empty_labels))
             return target_df
 
         # Convert to list of native Python floats
-        price_list = [float(p) for p in prices.tolist()]
+        price_list = [float(p) for p in prices_clean.tolist()]
 
         # Generate labels using Binary CTL (expects a 1D list of floats)
         raw_labels = self.labeller.get_labels(price_list)
 
         # Convert to numpy array of int32
-        labels = np.asarray(raw_labels, dtype=np.int32)
+        labels_clean = np.asarray(raw_labels, dtype=np.int32)
 
         # Remap TStrends binary labels {-1, 1} to {0, 1} for consistency
         # -1 (down) -> 0, 1 (up) -> 1
-        labels = np.where(labels == -1, 0, labels)
+        labels_clean = np.where(labels_clean == -1, 0, labels_clean)
 
-        # Ensure same length as input
-        if labels.shape[0] != prices.shape[0]:
-            if labels.shape[0] < prices.shape[0]:
-                labels = np.pad(
-                    labels,
-                    (0, prices.shape[0] - labels.shape[0]),
-                    mode="constant",
-                    constant_values=0,
-                )
-            else:
-                labels = labels[: prices.shape[0]]
+        # Create full-length labels array, mapping clean labels back to original positions
+        labels = np.zeros(original_length, dtype=np.int32)
+        clean_indices = ~np.isnan(prices_original)
+
+        # Ensure the clean labels fit in the available clean positions
+        n_clean_positions = np.sum(clean_indices)
+        if len(labels_clean) > n_clean_positions:
+            labels_clean = labels_clean[:n_clean_positions]
+        elif len(labels_clean) < n_clean_positions:
+            # Pad if needed
+            labels_clean = np.pad(
+                labels_clean,
+                (0, n_clean_positions - len(labels_clean)),
+                mode="constant",
+                constant_values=0,
+            )
+
+        # Map clean labels to original positions (NaN positions stay 0)
+        labels[clean_indices] = labels_clean
 
         # Create base target DataFrame with keys
         target_df = self._create_base_target_df(df, symbol)

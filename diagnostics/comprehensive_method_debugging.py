@@ -29,7 +29,7 @@ except ImportError as e:
 
 
 def get_all_optimization_methods():
-    """Get all methods used in optimization (excluding GA which is too slow)."""
+    """Get all methods used in optimization and diagnostics."""
     return [
         {
             "name": "Binary CTL",
@@ -90,6 +90,26 @@ def get_all_optimization_methods():
             "has_barriers": False,
             "target_column": "short",  # Specify to use short exceedance column
             "direction_type": "short"  # For direction correctness checking
+        },
+        {
+            "name": "GA Labeling (Long)",
+            "method": "ga_labeling",
+            "params": {"population_size": 50, "max_generations": 75, "lookforward_window": 250, "transaction_cost": 0.00007},
+            "color_map": {0: "gray", 1: "green"},
+            "label_names": {0: "Hold", 1: "Buy Long"},
+            "has_barriers": False,
+            "target_column": "long",
+            "direction_type": "long"
+        },
+        {
+            "name": "GA Labeling (Short)",
+            "method": "ga_labeling",
+            "params": {"population_size": 50, "max_generations": 75, "lookforward_window": 250, "transaction_cost": 0.00007},
+            "color_map": {0: "gray", 1: "red"},
+            "label_names": {0: "Hold", 1: "Sell Short"},
+            "has_barriers": False,
+            "target_column": "short",
+            "direction_type": "short"
         }
     ]
 
