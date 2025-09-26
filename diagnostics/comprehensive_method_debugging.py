@@ -66,7 +66,7 @@ def get_all_optimization_methods():
         {
             "name": "Triple Barrier",
             "method": "triple_barrier",
-            "params": {"lookforward_window": 2000, "barrier_width": 0.0001},
+            "params": {"lookforward_window": 6931, "barrier_width": 0.000523},  # CORRECTED: Use averaged optimized parameters across all symbols
             "color_map": {-1: "red", 0: "gray", 1: "green"},
             "label_names": {-1: "Short", 0: "Timeout", 1: "Long"},
             "has_barriers": True
@@ -74,7 +74,7 @@ def get_all_optimization_methods():
         {
             "name": "Triple Barrier Adaptive",
             "method": "triple_barrier_adaptive",
-            "params": {"lookforward_window": 2000, "lookback_window": 2000, "barrier_width": 1.0},
+            "params": {"lookforward_window": 3423, "lookback_window": 3495, "barrier_width": 1.59},  # CORRECTED: Use averaged optimized parameters across all symbols
             "color_map": {-1: "red", 0: "gray", 1: "green"},
             "label_names": {-1: "Short", 0: "Timeout", 1: "Long"},
             "has_barriers": True
@@ -82,7 +82,7 @@ def get_all_optimization_methods():
         {
             "name": "Triple Exceedance (Long)",
             "method": "triple_exceedance",
-            "params": {"lookforward_window": 2000, "scaling_factor": 3.0},
+            "params": {"lookforward_window": 2186, "scaling_factor": 3.36},  # CORRECTED: Use averaged optimized parameters across all symbols
             "color_map": {0: "red", 1: "green"},
             "label_names": {0: "Wrong Direction", 1: "Right Direction"},
             "has_barriers": False,
@@ -92,7 +92,7 @@ def get_all_optimization_methods():
         {
             "name": "Triple Exceedance (Short)",
             "method": "triple_exceedance",
-            "params": {"lookforward_window": 2000, "scaling_factor": 3.0},
+            "params": {"lookforward_window": 2186, "scaling_factor": 3.36},  # CORRECTED: Use averaged optimized parameters across all symbols
             "color_map": {0: "red", 1: "green"},
             "label_names": {0: "Wrong Direction", 1: "Right Direction"},
             "has_barriers": False,
@@ -411,11 +411,23 @@ def create_all_methods_plot(window_df: pl.DataFrame, methods: list, window_num: 
 
             # Calculate threshold based on method type
             if method_config.get("has_barriers", False):
-                # Triple Barrier method - use optimized barrier_width from params
-                barrier_width = method_config["params"].get("barrier_width", 0.0001)
-                threshold_pips = barrier_width * 10000
-                upper_threshold = prices_plot + barrier_width
-                lower_threshold = prices_plot - barrier_width
+                if method_config["method"] == "triple_barrier_adaptive":
+                    # Adaptive Triple Barrier - barriers are volatility-based (sigma multiplier)
+                    barrier_width = method_config["params"].get("barrier_width", 1.0)
+                    lookback_window = method_config["params"].get("lookback_window", 2000)
+
+                    # Calculate volatility-based barriers (similar to the actual method)
+                    volatility = np.std(prices_plot)  # Simplified volatility calculation
+                    actual_barrier = barrier_width * volatility
+                    threshold_pips = actual_barrier * 10000
+                    upper_threshold = prices_plot + actual_barrier
+                    lower_threshold = prices_plot - actual_barrier
+                else:
+                    # Regular Triple Barrier - barriers are fixed price differences
+                    barrier_width = method_config["params"].get("barrier_width", 0.0001)
+                    threshold_pips = barrier_width * 10000
+                    upper_threshold = prices_plot + barrier_width
+                    lower_threshold = prices_plot - barrier_width
 
                 # Plot as black dashed lines
                 ax.plot(time_axis, upper_threshold, '--', color='black', alpha=0.8, linewidth=1.0, zorder=2)
@@ -436,23 +448,77 @@ def create_all_methods_plot(window_df: pl.DataFrame, methods: list, window_num: 
                 ax.plot(time_axis, upper_threshold, '--', color='black', alpha=0.8, linewidth=1.0, zorder=2)
                 ax.plot(time_axis, lower_threshold, '--', color='black', alpha=0.8, linewidth=1.0, zorder=2)
 
-            # Color regions by labels
-            current_label = labels_plot[0] if len(labels_plot) > 0 else 0
-            start_idx = 0
+            # Color regions based on price position relative to barriers (for barrier methods)
+            if method_config.get("has_barriers", False):
+                # Color based on where price is relative to barriers
+                if method_config["method"] == "triple_barrier_adaptive":
+                    # Calculate dynamic barriers for each point
+                    lookback_window = method_config["params"].get("lookback_window", 2000)
+                    barrier_width = method_config["params"].get("barrier_width", 1.0)
 
-            for j in range(1, len(labels_plot) + 1):
-                if j == len(labels_plot) or (j < len(labels_plot) and labels_plot[j] != current_label):
-                    end_idx = j - 1
+                    for j in range(len(prices_plot)):
+                        # Calculate volatility for this point (simplified)
+                        start_idx_vol = max(0, j - lookback_window//step)
+                        vol = np.std(prices_plot[start_idx_vol:j+1]) if j > 0 else np.std(prices_plot[:10])
 
-                    if current_label in method_config["color_map"]:
-                        color = method_config["color_map"][current_label]
-                        start_time = time_axis[start_idx] if start_idx < len(time_axis) else time_axis[-1]
-                        end_time = time_axis[end_idx] if end_idx < len(time_axis) else time_axis[-1]
-                        ax.axvspan(start_time, end_time, alpha=0.3, color=color, zorder=0)
+                        upper_barrier = prices_plot[j] + (barrier_width * vol)
+                        lower_barrier = prices_plot[j] - (barrier_width * vol)
 
-                    if j < len(labels_plot):
-                        start_idx = j
-                        current_label = labels_plot[j]
+                        # Color based on price movement (simplified for visualization)
+                        if j < len(prices_plot) - 1:
+                            next_j = min(j + 1, len(prices_plot) - 1)
+
+                            # Use a reference price (moving average for stability)
+                            ref_window = min(10, j + 1)
+                            reference_price = np.mean(prices_plot[j-ref_window+1:j+1])
+
+                            current_barrier = barrier_width * vol
+                            if prices_plot[j] > reference_price + current_barrier:
+                                color = "green"  # Strong upward movement
+                            elif prices_plot[j] < reference_price - current_barrier:
+                                color = "red"    # Strong downward movement
+                            else:
+                                color = "gray"   # Within normal range
+
+                            ax.axvspan(time_axis[j], time_axis[next_j], alpha=0.3, color=color, zorder=0)
+                else:
+                    # Fixed barriers (regular triple barrier)
+                    barrier_width = method_config["params"].get("barrier_width", 0.0001)
+
+                    for j in range(len(prices_plot)):
+                        if j < len(prices_plot) - 1:
+                            next_j = min(j + 1, len(prices_plot) - 1)
+
+                            # Use a reference price (moving average for stability)
+                            ref_window = min(10, j + 1)
+                            reference_price = np.mean(prices_plot[j-ref_window+1:j+1])
+
+                            if prices_plot[j] > reference_price + barrier_width:
+                                color = "green"  # Above barrier threshold
+                            elif prices_plot[j] < reference_price - barrier_width:
+                                color = "red"    # Below barrier threshold
+                            else:
+                                color = "gray"   # Within barriers
+
+                            ax.axvspan(time_axis[j], time_axis[next_j], alpha=0.3, color=color, zorder=0)
+            else:
+                # For non-barrier methods, color by labels (keep original logic)
+                current_label = labels_plot[0] if len(labels_plot) > 0 else 0
+                start_idx = 0
+
+                for j in range(1, len(labels_plot) + 1):
+                    if j == len(labels_plot) or (j < len(labels_plot) and labels_plot[j] != current_label):
+                        end_idx = j - 1
+
+                        if current_label in method_config["color_map"]:
+                            color = method_config["color_map"][current_label]
+                            start_time = time_axis[start_idx] if start_idx < len(time_axis) else time_axis[-1]
+                            end_time = time_axis[end_idx] if end_idx < len(time_axis) else time_axis[-1]
+                            ax.axvspan(start_time, end_time, alpha=0.3, color=color, zorder=0)
+
+                        if j < len(labels_plot):
+                            start_idx = j
+                            current_label = labels_plot[j]
 
             # Statistics
             unique_labels, counts = np.unique(labels_display, return_counts=True)

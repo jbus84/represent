@@ -14,23 +14,7 @@ from typing import Any
 import numpy as np
 import polars as pl
 
-# Try to import optimization dependencies
-try:
-    # Apply NumPy 2.x compatibility patch for scikit-optimize
-    import numpy as np
-    # For compatibility with newer numpy versions that deprecated numpy.int/float
-    if not hasattr(np, 'int'):
-        np.int = int  # type: ignore[attr-defined]
-        np.float = float  # type: ignore[attr-defined]
-
-    from skopt import gp_minimize
-    from skopt.space import Integer, Real
-    from skopt.utils import use_named_args
-    SCIKIT_OPTIMIZE_AVAILABLE = True
-except ImportError:
-    SCIKIT_OPTIMIZE_AVAILABLE = False
-
-# Try to import Optuna for better optimization
+# Try to import Optuna for optimization
 try:
     import optuna
     from optuna.samplers import TPESampler
@@ -38,7 +22,7 @@ try:
 except ImportError:
     OPTUNA_AVAILABLE = False
 
-OPTIMIZATION_AVAILABLE = SCIKIT_OPTIMIZE_AVAILABLE or OPTUNA_AVAILABLE
+OPTIMIZATION_AVAILABLE = OPTUNA_AVAILABLE
 
 # Try to import tqdm for progress bars
 try:
@@ -85,8 +69,6 @@ class LargeScaleParameterOptimizer:
         n_calls: int = 50,
         random_state: int | None = None,
         verbose: bool = True,
-        # Optimization backend selection
-        use_optuna: bool = True,  # Prefer Optuna over scikit-optimize
         # Adaptive sampling parameters
         adaptive_sampling: bool = True,
         min_window_size: int = 15000,  # USER REQ: Reduced to 15K min sampling window
@@ -96,6 +78,12 @@ class LargeScaleParameterOptimizer:
         growth_factor: float = 1.5,
         early_stopping: bool = True,
         early_stopping_patience: int = 10,
+        # Class balance penalty
+        class_balance_weight: float = 0.5,  # Weight for class balance penalty
+        # Robust sampling parameters
+        target_coverage: float = 0.25,  # Target 25% dataset coverage
+        use_cross_validation: bool = True,  # Enable cross-validation
+        validation_split: float = 0.3,  # 30% for validation
         # Debug logging
         debug_log_path: str | Path | None = None,
     ):
@@ -120,8 +108,8 @@ class LargeScaleParameterOptimizer:
         """
         if not OPTIMIZATION_AVAILABLE:
             raise ImportError(
-                "Parameter optimization requires scikit-optimize. "
-                "Install with: pip install scikit-optimize"
+                "Parameter optimization requires Optuna. "
+                "Install with: pip install optuna"
             )
 
         if not TSTRENDS_AVAILABLE:
@@ -139,11 +127,8 @@ class LargeScaleParameterOptimizer:
         self.random_state = random_state
         self.verbose = verbose
 
-        # Optimization backend preference
-        self.use_optuna = use_optuna and OPTUNA_AVAILABLE
-        if use_optuna and not OPTUNA_AVAILABLE:
-            warnings.warn("Optuna not available, falling back to scikit-optimize", stacklevel=2)
-            self.use_optuna = False
+        # Optuna is the only backend
+        self.use_optuna = True
 
         # Adaptive sampling parameters
         self.adaptive_sampling = adaptive_sampling
@@ -154,6 +139,11 @@ class LargeScaleParameterOptimizer:
         self.growth_factor = growth_factor
         self.early_stopping = early_stopping
         self.early_stopping_patience = early_stopping_patience
+        self.class_balance_weight = class_balance_weight
+        # Robust sampling parameters
+        self.target_coverage = target_coverage
+        self.use_cross_validation = use_cross_validation
+        self.validation_split = validation_split
         # Debug logging path
         self.debug_log_path = Path(debug_log_path) if debug_log_path else None
 
@@ -219,7 +209,7 @@ class LargeScaleParameterOptimizer:
         def optuna_objective(trial):
             params = {}
             for param_name, (low, high) in bounds.items():
-                if param_name in ['population_size', 'max_generations', 'lookforward_window',
+                if param_name in ['population_size', 'max_generations', 'lookforward_window', 'lookback_window',
                                  'min_trades', 'window_size']:
                     params[param_name] = trial.suggest_int(param_name, int(low), int(high))
                 else:
@@ -316,12 +306,53 @@ class LargeScaleParameterOptimizer:
 
                 avg_return = total_pnl / valid_evaluations
 
-                # Parameter stability check for adaptive sampling
-                if self.adaptive_sampling and evaluation_count[0] > 1:
-                    self._check_parameter_stability(params)
+                # Calculate class balance score as primary optimization objective
+                balance_score = 0.0
+                if method_name in ['Triple Barrier (Large-Scale)', 'Triple Barrier Adaptive (Large-Scale)', 'Triple Exceedance (Large-Scale)']:
+                    all_labels = []
+                    for window_prices in windows:
+                        try:
+                            generator = generator_class(**casted_params)
+                            window_df = pl.DataFrame({
+                                "ts_event": range(len(window_prices)),
+                                "mid_price": window_prices,
+                            })
+                            targets = generator.generate_targets(window_df)
+                            target_info = generator.get_target_info()
+                            target_col = target_info['target_names'][0]
+                            window_labels = targets[target_col].to_numpy()
+                            all_labels.extend(window_labels.tolist())
+                        except Exception:
+                            continue
 
-                # Update simple progress display
-                current_return = -avg_return  # Minimize negative return
+                    if len(all_labels) > 0:
+                        # Calculate class balance score (min/max * 100, higher is better)
+                        unique_labels, counts = np.unique(all_labels, return_counts=True)
+                        if len(unique_labels) > 1:
+                            percentages = counts / len(all_labels) * 100
+                            balance_score = min(percentages) / max(percentages) * 100
+                        else:
+                            balance_score = 100.0  # Perfect balance for single class
+
+                        if self.verbose:
+                            print(f"   ⚖️  Class balance score: {balance_score:.1f}% (higher is better)")
+                            print(f"      Distribution: {dict(zip(unique_labels, percentages, strict=True))}")
+                            print(f"      Returns: {avg_return:.3f}, Balance: {balance_score:.1f}%")
+
+                # Track parameter history for stability analysis (if adaptive sampling is enabled)
+                if self.adaptive_sampling:
+                    self.parameter_history.append(params.copy())
+
+                    # Check parameter stability after initial phase
+                    if evaluation_count[0] > self.initial_points:
+                        self._check_parameter_stability(params)
+
+                        # Now check if we should increase sampling based on updated stability
+                        if self._should_increase_sampling():
+                            self._increase_sampling()
+
+                # Optimize ONLY for class balance score (minimize negative balance score)
+                current_return = -balance_score  # Minimize negative balance score
                 if -current_return > best_return[0]:
                     best_return[0] = -current_return
 
@@ -405,9 +436,10 @@ class LargeScaleParameterOptimizer:
 
         # Create a simple result object that mimics scikit-optimize result
         class OptunaResult:
-            def __init__(self, x, fun, trials):
+            def __init__(self, x, fun, trials, best_params):
                 self.x = x
                 self.fun = fun
+                self.best_params = best_params
                 self.func_vals = [t.value for t in trials if t.value is not None]
                 self.x_iters = [[t.params[name] for name in bounds.keys()] for t in trials if t.value is not None]
 
@@ -420,7 +452,7 @@ class LargeScaleParameterOptimizer:
             def __contains__(self, key):
                 return hasattr(self, key)
 
-        return OptunaResult(result_x, result_fun, study.trials)
+        return OptunaResult(result_x, result_fun, study.trials, best_trial.params if best_trial else {})
 
     def _normalize_labels_for_pnl(self, labels: np.ndarray) -> np.ndarray:
         """
@@ -670,6 +702,101 @@ class LargeScaleParameterOptimizer:
 
         return windows
 
+    def sample_windows_robust(
+        self,
+        prices: np.ndarray,
+        n_windows: int | None = None,
+        target_coverage: float = 0.25,
+        validation_split: float = 0.3
+    ) -> tuple[list[np.ndarray], list[np.ndarray]]:
+        """
+        Sample windows with robust cross-validation and higher coverage.
+
+        This addresses the overfitting issue where optimization uses only 2.3%
+        of the dataset by increasing coverage to 20-30% and using cross-validation.
+
+        Args:
+            prices: Full price series
+            n_windows: Number of windows (uses self.n_windows if None)
+            target_coverage: Target dataset coverage (0.25 = 25%)
+            validation_split: Fraction of windows for validation (0.3 = 30%)
+
+        Returns:
+            Tuple of (training_windows, validation_windows)
+        """
+        if n_windows is None:
+            n_windows = self.n_windows
+
+        total_samples = len(prices)
+        window_size = self.current_window_size if self.adaptive_sampling else self.window_size
+
+        # Calculate number of windows needed for target coverage
+        samples_per_window = window_size
+        target_samples = int(total_samples * target_coverage)
+        required_windows = max(n_windows, target_samples // samples_per_window)
+
+        if self.verbose:
+            current_coverage = (n_windows * window_size / total_samples) * 100
+            new_coverage = (required_windows * window_size / total_samples) * 100
+            print(f"   🔄 Robust sampling: {current_coverage:.1f}% → {new_coverage:.1f}% coverage")
+            print(f"   📊 Windows: {n_windows} → {required_windows} ({validation_split:.0%} for validation)")
+
+        # Generate more windows with stratified sampling for better representation
+        all_windows = []
+
+        if self.sampling_strategy == "stratified":
+            # Create stratified segments across the entire time series
+            segment_size = total_samples // required_windows
+
+            for i in range(required_windows):
+                segment_start = i * segment_size
+                segment_end = min((i + 1) * segment_size, total_samples)
+
+                if segment_end - segment_start >= window_size:
+                    # Randomly sample within each segment for diversity
+                    max_start = segment_end - window_size
+                    start_idx = self.rng.randint(segment_start, max_start + 1)
+                    end_idx = start_idx + window_size
+                    all_windows.append(prices[start_idx:end_idx])
+
+        elif self.sampling_strategy == "uniform":
+            # Uniform random sampling with higher coverage
+            for _ in range(required_windows):
+                start_idx = self.rng.randint(0, total_samples - window_size + 1)
+                end_idx = start_idx + window_size
+                all_windows.append(prices[start_idx:end_idx])
+
+        else:
+            # Fallback to temporal sampling
+            step_size = (total_samples - window_size) // (required_windows - 1) if required_windows > 1 else 0
+            for i in range(required_windows):
+                start_idx = min(i * step_size, total_samples - window_size)
+                end_idx = start_idx + window_size
+                all_windows.append(prices[start_idx:end_idx])
+
+        # Split into training and validation sets
+        n_validation = max(1, int(len(all_windows) * validation_split))
+        n_training = len(all_windows) - n_validation
+
+        # Shuffle and split
+        indices = np.arange(len(all_windows))
+        self.rng.shuffle(indices)
+
+        train_indices = indices[:n_training]
+        val_indices = indices[n_training:]
+
+        training_windows = [all_windows[i] for i in train_indices]
+        validation_windows = [all_windows[i] for i in val_indices]
+
+        # Report coverage
+        total_samples_used = sum(len(w) for w in all_windows)
+        coverage = (total_samples_used / total_samples) * 100
+
+        if self.verbose:
+            print(f"   ✅ Robust sampling complete: {coverage:.1f}% coverage, {n_training} train + {n_validation} val windows")
+
+        return training_windows, validation_windows
+
     def optimize_with_sampling(
         self,
         generator_class: type[TargetGenerator],
@@ -834,25 +961,7 @@ class LargeScaleParameterOptimizer:
                     'error': str(e)
                 }
 
-        # Create optimization space
-        param_names = list(bounds.keys())
-        dimensions = []
-
-        for param_name in param_names:
-            low, high = bounds[param_name]
-            if param_name in ['population_size', 'max_generations', 'lookforward_window',
-                             'min_trades', 'window_size']:
-                dimensions.append(Integer(low, high, name=param_name))
-            else:
-                dimensions.append(Real(low, high, name=param_name))
-
-        # Progress tracking for large-scale optimization
-        evaluation_count = [0]
-        best_return_so_far = [float('-inf')]
-        progress_bar = None
-
-        # Helper: directional PnL for {-1,0,1} label streams (long/short/flat)
-        def _estimate_directional_pnl(prices_arr: np.ndarray, labels_arr: np.ndarray, fee: float) -> float:
+        # Use Optuna-only optimization
             pnl = 0.0
             position = 0  # -1 short, 0 flat, 1 long
             for t in range(1, len(prices_arr)):
@@ -869,10 +978,10 @@ class LargeScaleParameterOptimizer:
             return pnl
         # Progress tracking handled by manual progress display in Optuna version
 
-        @use_named_args(dimensions)
-        def objective(**params):
-            """Objective function using adaptive sampled windows."""
-            evaluation_count[0] += 1
+        # Scikit-optimize objective function removed - using Optuna only
+        # def objective(**params):
+        #     """Objective function using adaptive sampled windows."""
+        #     evaluation_count[0] += 1
 
             # Progress tracking handled by Optuna version with manual display
 
@@ -907,8 +1016,21 @@ class LargeScaleParameterOptimizer:
 
                 generator = generator_class(**casted_params)
 
-                # Sample windows for this evaluation using adaptive sizes
-                windows = self.sample_windows(prices, n_windows=self.current_n_windows)
+                # Use robust sampling with cross-validation if enabled
+                if self.use_cross_validation:
+                    training_windows, validation_windows = self.sample_windows_robust(
+                        prices,
+                        n_windows=self.current_n_windows,
+                        target_coverage=self.target_coverage,
+                        validation_split=self.validation_split
+                    )
+                    # Use training windows for optimization, validation for final check
+                    windows = training_windows
+                    cv_windows = validation_windows
+                else:
+                    # Standard sampling for backwards compatibility
+                    windows = self.sample_windows(prices, n_windows=self.current_n_windows)
+                    cv_windows = []
 
                 total_returns = 0.0
                 total_signals = 0  # Track signal count for frequency penalty
@@ -1006,19 +1128,87 @@ class LargeScaleParameterOptimizer:
 
                 avg_returns = total_returns / valid_windows
 
-                # Apply signal frequency penalty for triple methods
-                final_score = avg_returns
-                if method_name in ['Triple Barrier (Large-Scale)', 'Triple Exceedance (Large-Scale)'] and total_samples > 0:
-                    signal_frequency = total_signals / total_samples
-                    min_frequency = 0.05  # Require at least 5% signal frequency
+                # Calculate class balance score as primary optimization objective
+                balance_score = 0.0
+                if method_name in ['Triple Barrier (Large-Scale)', 'Triple Barrier Adaptive (Large-Scale)', 'Triple Exceedance (Large-Scale)']:
+                    all_labels = []
+                    for window_prices in windows:
+                        try:
+                            generator = generator_class(**casted_params)
+                            window_df = pl.DataFrame({
+                                "ts_event": range(len(window_prices)),
+                                "mid_price": window_prices,
+                            })
+                            targets = generator.generate_targets(window_df)
+                            target_info = generator.get_target_info()
+                            target_col = target_info['target_names'][0]
+                            window_labels = targets[target_col].to_numpy()
+                            all_labels.extend(window_labels.tolist())
+                        except Exception:
+                            continue
 
-                    if signal_frequency < min_frequency:
-                        # Heavy penalty for sparse signals: penalize by missing frequency
-                        frequency_penalty = (min_frequency - signal_frequency) * 10.0  # 10x penalty
-                        final_score = avg_returns - frequency_penalty
+                    if len(all_labels) > 0:
+                        # Calculate class balance score (min/max * 100, higher is better)
+                        unique_labels, counts = np.unique(all_labels, return_counts=True)
+                        if len(unique_labels) > 1:
+                            percentages = counts / len(all_labels) * 100
+                            balance_score = min(percentages) / max(percentages) * 100
+                        else:
+                            balance_score = 100.0  # Perfect balance for single class
 
-                        if self.verbose and evaluation_count[0] % 10 == 0:  # Log occasionally
-                            print(f"   Signal frequency penalty: {signal_frequency:.3f} < {min_frequency:.3f}, penalty: {frequency_penalty:.4f}")
+                        if self.verbose and evaluation_count[0] <= 3:
+                            print(f"   ⚖️  Class balance score: {balance_score:.1f}% (higher is better)")
+                            print(f"      Distribution: {dict(zip(unique_labels, percentages, strict=True))}")
+                            print(f"      Returns: {avg_returns:.3f}, Balance: {balance_score:.1f}%")
+
+                # Cross-validation check if enabled
+                cv_penalty = 0.0
+                if self.use_cross_validation and cv_windows:
+                    cv_balance_score = 0.0
+                    cv_all_labels = []
+
+                    # Evaluate on validation windows
+                    for cv_window_prices in cv_windows:
+                        try:
+                            cv_df = pl.DataFrame({
+                                'mid_price': cv_window_prices,
+                                'timestamp': range(len(cv_window_prices))
+                            })
+
+                            cv_result_df = generator.generate_targets(cv_df)
+                            if hasattr(generator, 'target_name'):
+                                cv_labels = cv_result_df[generator.target_name].to_numpy()
+                            else:
+                                # Fallback for generators without target_name
+                                cv_cols = [col for col in cv_result_df.columns if 'label' in col.lower()]
+                                if cv_cols:
+                                    cv_labels = cv_result_df[cv_cols[0]].to_numpy()
+                                else:
+                                    continue
+
+                            cv_all_labels.extend(cv_labels)
+                        except Exception:
+                            continue
+
+                    # Calculate validation balance score
+                    if cv_all_labels:
+                        cv_unique_labels, cv_counts = np.unique(cv_all_labels, return_counts=True)
+                        if len(cv_unique_labels) > 1:
+                            cv_percentages = (cv_counts / len(cv_all_labels)) * 100
+                            cv_balance_score = min(cv_percentages) / max(cv_percentages) * 100
+                        else:
+                            cv_balance_score = 100.0
+
+                        # Penalize if validation performance is much worse than training
+                        performance_gap = balance_score - cv_balance_score
+                        if performance_gap > 10.0:  # More than 10% gap suggests overfitting
+                            cv_penalty = performance_gap * 0.5  # Moderate penalty
+
+                        if self.verbose and evaluation_count[0] <= 3:
+                            print(f"   🔄 CV balance score: {cv_balance_score:.1f}% (gap: {performance_gap:.1f}%, penalty: {cv_penalty:.1f})")
+
+                # Final score with cross-validation penalty
+                final_score = balance_score - cv_penalty
 
                 # Track parameter history for stability analysis (if adaptive sampling is enabled)
                 if self.adaptive_sampling:
@@ -1108,21 +1298,10 @@ class LargeScaleParameterOptimizer:
             warnings.simplefilter("ignore")
 
             try:
-                if self.use_optuna:
-                    # Create Optuna-compatible objective function without the decorator
-                    result = self._run_optuna_optimization(
-                        objective, bounds, method_name, generator_class, prices
-                    )
-                else:
-                    result = gp_minimize(
-                        func=objective,
-                        dimensions=dimensions,
-                        n_calls=self.n_calls,
-                        n_initial_points=self.initial_points,
-                        random_state=self.random_state,
-                        callback=early_stopping_callback,
-                        verbose=False  # Disable skopt verbose to avoid conflicts with tqdm
-                    )
+                # Use Optuna for optimization
+                result = self._run_optuna_optimization(
+                    None, bounds, method_name, generator_class, prices
+                )
             except EarlyStoppingException:
                 # Early stopping was triggered - create a partial result
                 if self.verbose:
@@ -1132,10 +1311,9 @@ class LargeScaleParameterOptimizer:
                 # We'll use the last parameters from history as the "best" result
                 if self.parameter_history:
                     best_params_dict = self.parameter_history[-1]
-                    result_x = [best_params_dict[param_name] for param_name in param_names]
-                    result_fun = best_return_so_far[0]  # This is the best return found
+                    result_fun = -float('inf')  # No meaningful result for broken code
 
-                    # Create a simple result object that mimics scikit-optimize result
+                    # Create a simple result object
                     class EarlyStopResult:
                         def __init__(self, x, fun):
                             self.x = x
@@ -1168,16 +1346,14 @@ class LargeScaleParameterOptimizer:
         # Extract optimal parameters
         optimal_params: dict[str, int | float] = {}
         # Type assertion to help PyRight understand result is not None
-        assert result is not None, "Result should always be set by optimization"
-        if result.x is not None:
-            result_x = result.x  # Cache to help type checker
-            for i, param_name in enumerate(param_names):
-                value = result_x[i]
-                if param_name in ['population_size', 'max_generations', 'lookforward_window',
-                                 'min_trades', 'window_size']:
-                    optimal_params[param_name] = int(value)
-                else:
-                    optimal_params[param_name] = float(value)
+        # Process Optuna results (scikit-optimize result processing removed)
+        if hasattr(result, 'best_params') and result.best_params:
+            optimal_params = result.best_params.copy()
+            # Ensure integer parameters are properly cast
+            for param_name in ['population_size', 'max_generations', 'lookforward_window',
+                              'lookback_window', 'min_trades', 'window_size', 'volatility_window']:
+                if param_name in optimal_params:
+                    optimal_params[param_name] = int(optimal_params[param_name])
 
         optimal_returns = -result.fun if result.fun is not None else 0.0
 
@@ -1392,7 +1568,7 @@ class LargeScaleParameterOptimizer:
         # Lookforward limited to 5K samples max, sampling windows to 25K max
         # Bounds centered around proven diagnostic values that generated good signals
         default_bounds = {
-            'lookforward_window': (1000, 3000),    # 1K-3K ticks: proven range around 2K
+            'lookforward_window': (1000, 10000),    # 1K-3K ticks: proven range around 2K
             'barrier_width': (0.0003, 0.001), # 3-10 pips
         }
 
@@ -1420,9 +1596,9 @@ class LargeScaleParameterOptimizer:
         # Lookforward limited to 5K samples max, sampling windows to 25K max
         # Bounds centered around proven diagnostic values that generated good signals
         default_bounds = {
-            'lookforward_window': (1000, 10000),    # 1K-3K ticks: proven range around 2K
-            'barrier_width': (0.5, 4), # sigma
-            'lookback_window': (1000, 10000),    # 1K-3K ticks: proven range around 2K
+            'lookforward_window': (1000, 5000),    # 1K-5K ticks: more reasonable range
+            'barrier_width': (0.5, 2.0), # 0.5-2 sigma barriers: tighter for better signal generation
+            'lookback_window': (1000, 5000),    # 1K-5K ticks: more reasonable range
         }
 
         if custom_bounds:

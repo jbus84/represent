@@ -328,6 +328,7 @@ def convert_params_for_generator(method: str, params: dict[str, Any]) -> dict[st
     # Parameters that should be integers for various methods
     int_params_by_method = {
         'triple_barrier': ['lookforward_window', 'volatility_window'],
+        'triple_barrier_adaptive': ['lookforward_window', 'lookback_window'],
         'triple_exceedance': ['lookforward_window', 'volatility_window'],
         'ternary_ctl': ['window_size'],
     }
@@ -363,22 +364,30 @@ def calculate_additional_metrics(prices: np.ndarray, method: str, optimal_params
 
         from represent.target_generators.factory import TargetGeneratorFactory
 
-        # Use same windowing parameters as optimization (from large_scale_optimization.py)
-        window_size = 25000  # USER REQ: Max 25K sampling window
-        n_windows = 5         # Same as optimization
+        # Use EXACT same windowing parameters and sampling strategy as optimization
+        # This ensures metrics match what optimization actually optimized for
+        from represent.large_scale_optimization import LargeScaleParameterOptimizer
 
-        if len(prices) <= window_size:
-            # Small dataset - use entire dataset
-            sample_windows = [prices]
+        # Create temporary optimizer just to use its sampling method (with SAME parameters as optimization)
+        temp_optimizer = LargeScaleParameterOptimizer(
+            window_size=50000,      # Same as optimization config
+            n_windows=10,           # Same as optimization config
+            sampling_strategy='stratified',  # Same as optimization config
+            random_state=42,        # Same random seed for reproducibility
+            use_cross_validation=True,  # Same robust sampling
+            target_coverage=0.25,   # Same coverage
+            validation_split=0.3    # Same validation split
+        )
+
+        # Use the exact same robust sampling method as optimization
+        if temp_optimizer.use_cross_validation:
+            training_windows, validation_windows = temp_optimizer.sample_windows_robust(
+                prices, n_windows=10, target_coverage=0.25, validation_split=0.3
+            )
+            # Use training windows for final metrics (same as optimization)
+            sample_windows = training_windows
         else:
-            # Large dataset - use same stratified sampling as optimization
-            sample_windows = []
-            for _ in range(n_windows):
-                # Stratified sampling like optimization does
-                start_idx = np.random.randint(0, max(1, len(prices) - window_size + 1))
-                end_idx = start_idx + window_size
-                window_prices = prices[start_idx:end_idx]
-                sample_windows.append(window_prices)
+            sample_windows = temp_optimizer.sample_windows(prices, n_windows=10)
 
         # Aggregate results across windows (same as optimization)
         total_returns = 0.0
@@ -470,8 +479,9 @@ def calculate_additional_metrics(prices: np.ndarray, method: str, optimal_params
             avg_trades = total_trades / valid_windows   # Average trades per window
             mean_return_per_trade = avg_return / avg_trades if avg_trades > 0 else 0.0
 
-            # Calculate trading frequency as percentage of window size
-            trading_frequency = avg_trades / window_size * 100 if window_size > 0 else 0.0
+            # Calculate trading frequency as percentage of actual window size used
+            actual_window_size = len(sample_windows[0]) if sample_windows else 50000
+            trading_frequency = avg_trades / actual_window_size * 100 if actual_window_size > 0 else 0.0
         else:
             avg_return = 0.0
             avg_trades = 0
@@ -708,7 +718,7 @@ def run_all_symbol_optimizations(
         symbols = symbols[:max_symbols]
         print(f"🔄 Limited to first {max_symbols} symbols for testing")
 
-    # Optimization configuration with adaptive sampling and early stopping
+    # Optimization configuration with robust sampling and cross-validation
     optimization_config = {
         'window_size': 50000,      # USER REQ: Max 25K sampling window
         'n_windows': 10,            # More windows for better sampling
@@ -723,9 +733,13 @@ def run_all_symbol_optimizations(
         'early_stopping_patience': 7,  # Extra evaluations after stabilization
         'fee_pips': 0.7,           # Correct 0.7 pip transaction costs
         'initial_points': 15,      # More initial samples for exploration
-        'n_calls': 50,             # Max optimization calls
+        'n_calls': 50,            # Increased optimization calls for better convergence
         'random_state': 42,        # Reproducible results
-        'use_optuna': True         # Enable Optuna optimizer
+        'class_balance_weight': 0.3,  # Weight for class balance penalty (not used in new balance score optimization)
+        # NEW: Robust sampling parameters to address overfitting
+        'use_cross_validation': True,  # Enable cross-validation to prevent overfitting
+        'target_coverage': 0.25,      # Increase dataset coverage from 2.3% to 25%
+        'validation_split': 0.3,      # 30% of windows for validation
     }
 
     print("\n🎯 OPTIMIZATION CONFIGURATION")
@@ -755,10 +769,12 @@ def run_all_symbol_optimizations(
                 all_results[symbol] = symbol_results
 
                 # Save results immediately
+                params_dir = Path(output_dir) / "optimized_parameters"
+                params_dir.mkdir(parents=True, exist_ok=True)
                 save_optimization_results(
                     symbol,
                     symbol_results,
-                    str(Path(output_dir) / "optimized_parameters")
+                    str(params_dir)
                 )
 
                 # Generate comprehensive 100k-window visualizations per symbol via diagnostics
@@ -849,58 +865,6 @@ def generate_optimization_report(
         print(f"❌ Failed to generate report: {e}")
         import traceback
         traceback.print_exc()
-
-
-def run_debug_m6am4():
-    """Run a short debug optimization on M6AM4 with four non-GA methods."""
-    data_dir = Path("/Users/danielfisher/data/databento/symbol_datasets/inputs")
-    output_dir = Path("outputs/optimization_results")
-    output_dir.mkdir(exist_ok=True)
-
-    # Discover and select M6AM4
-    symbols = discover_symbol_datasets(data_dir)
-    m6am4 = next((s for s in symbols if s['symbol'].startswith('M6AM4')), None)
-    if not m6am4:
-        print("❌ Could not find M6AM4 dataset in inputs directory")
-        return
-
-    methods = ['binary_ctl', 'ternary_ctl', 'oracle_binary', 'oracle_ternary', 'ga_labeling']
-
-    optimization_config = {
-        'window_size': 50000,       # More reasonable size - 50K samples (3.3% coverage)
-        'n_windows': 5,             # More windows for better sampling
-        'sampling_strategy': 'stratified',
-        'adaptive_sampling': True,
-        'stabilization_threshold': 0.05,
-        'stabilization_patience': 3,
-        'growth_factor': 1.5,
-        'max_window_size': 150000,  # Reasonable max - 150K (10% coverage)
-        'early_stopping': True,
-        'early_stopping_patience': 7,
-        'fee_pips': 0.7,            # Correct 0.7 pip transaction costs
-        'initial_points': 10,       # More initial points for better exploration
-        'n_calls': 25,              # More optimization calls
-        'random_state': 7,
-        'debug_log_path': output_dir / 'M6AM4' / 'debug.log',
-        'use_optuna': True,         # Enable Optuna optimizer
-    }
-
-    print("\n🚀 DEBUG RUN: M6AM4 (4 methods, n_calls=25, OPTUNA + OPTIMIZED WINDOWS)")
-    print("=" * 60)
-    for k, v in optimization_config.items():
-        print(f"   {k}: {v}")
-
-    results = optimize_symbol_dataset(m6am4, methods, optimization_config)
-    if results:
-        saved_files = save_optimization_results(
-            m6am4['symbol'],
-            results,
-            str(output_dir / 'optimized_parameters')
-        )
-        print(f"✅ Debug results saved. Files: {saved_files}")
-
-    else:
-        print("❌ No results produced in debug run")
 
 
 def main():
