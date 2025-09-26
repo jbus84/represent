@@ -242,7 +242,7 @@ class LargeScaleParameterOptimizer:
 
                 # Generic casting for known integer/boolean parameters
                 int_like_params = {
-                    'population_size', 'max_generations', 'lookforward_window', 'min_trades',
+                    'population_size', 'max_generations', 'lookforward_window', 'lookback_window', 'min_trades',
                     'window_size', 'volatility_window'
                 }
 
@@ -291,6 +291,13 @@ class LargeScaleParameterOptimizer:
                             sell_labels = targets[f"{generator.target_name}_short"].to_numpy()
                             window_pnl = (buy_labels - half_fee).sum()
                             window_pnl += (sell_labels - half_fee).sum()
+                            total_pnl += window_pnl
+                            valid_evaluations += 1
+
+                        elif method_name in ['Triple Barrier Adaptive (Large-Scale)']:
+                            # Use pre-calculated returns from the adaptive method
+                            returns = targets[f"{generator.target_name}_return"].to_numpy()
+                            window_pnl = returns.sum()  # Returns already include transaction costs
                             total_pnl += window_pnl
                             valid_evaluations += 1
 
@@ -884,7 +891,7 @@ class LargeScaleParameterOptimizer:
 
                 # Generic casting for known integer/boolean parameters
                 int_like_params = {
-                    'population_size', 'max_generations', 'lookforward_window', 'min_trades',
+                    'population_size', 'max_generations', 'lookforward_window', 'lookback_window', 'min_trades',
                     'window_size', 'volatility_window'
                 }
 
@@ -1397,6 +1404,35 @@ class LargeScaleParameterOptimizer:
             prices,
             default_bounds,
             "Triple Barrier (Large-Scale)",
+            data_loader
+        )
+
+    def optimize_triple_barrier_adaptive(
+        self,
+        prices: np.ndarray | str | Path,
+        custom_bounds: dict[str, tuple] | None = None,
+        data_loader: Callable | None = None
+    ) -> dict[str, Any]:
+        """Optimize Triple Barrier with window sampling."""
+        from .target_generators.triple_barrier_adaptive import TripleBarrierGeneratorAdaptive
+
+        # PROVEN bounds based on successful diagnostic parameters (2K window, 1 pip barriers)
+        # Lookforward limited to 5K samples max, sampling windows to 25K max
+        # Bounds centered around proven diagnostic values that generated good signals
+        default_bounds = {
+            'lookforward_window': (1000, 10000),    # 1K-3K ticks: proven range around 2K
+            'barrier_width': (0.5, 4), # sigma
+            'lookback_window': (1000, 10000),    # 1K-3K ticks: proven range around 2K
+        }
+
+        if custom_bounds:
+            default_bounds.update(custom_bounds)
+
+        return self.optimize_with_sampling(
+            TripleBarrierGeneratorAdaptive,
+            prices,
+            default_bounds,
+            "Triple Barrier Adaptive (Large-Scale)",
             data_loader
         )
 

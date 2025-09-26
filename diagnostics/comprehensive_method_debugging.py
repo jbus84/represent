@@ -29,7 +29,7 @@ except ImportError as e:
 
 
 def get_all_optimization_methods():
-    """Get all methods used in optimization and diagnostics."""
+    """Get all methods available for optimization and diagnostics."""
     return [
         {
             "name": "Binary CTL",
@@ -67,6 +67,14 @@ def get_all_optimization_methods():
             "name": "Triple Barrier",
             "method": "triple_barrier",
             "params": {"lookforward_window": 2000, "barrier_width": 0.0001},
+            "color_map": {-1: "red", 0: "gray", 1: "green"},
+            "label_names": {-1: "Short", 0: "Timeout", 1: "Long"},
+            "has_barriers": True
+        },
+        {
+            "name": "Triple Barrier Adaptive",
+            "method": "triple_barrier_adaptive",
+            "params": {"lookforward_window": 2000, "lookback_window": 2000, "barrier_width": 1.0},
             "color_map": {-1: "red", 0: "gray", 1: "green"},
             "label_names": {-1: "Short", 0: "Timeout", 1: "Long"},
             "has_barriers": True
@@ -544,13 +552,10 @@ def main():
 
         print("\n🎯 COMPREHENSIVE DEBUGGING COMPLETE")
         print("=" * 80)
-        print("Created comprehensive plots for ALL optimization methods:")
-        print("✅ Binary CTL, Ternary CTL")
-        print("✅ Oracle Binary, Oracle Ternary")
-        print("✅ Triple Barrier (Short & Long)")
-        print("✅ Triple Exceedance")
-        print("✅ Full 100K sample analysis")
-        print("✅ Triple Barrier logic verification")
+        print("Created comprehensive plots for selected optimization methods:")
+        print("✅ All configured methods processed")
+        print("✅ Full sampling window analysis")
+        print("✅ Method logic verification")
         print("\nPlots saved to outputs/plots/optimization/comprehensive_all_methods_window_[1-3].png")
         print("Use these to debug any method issues and verify optimization behavior!")
 

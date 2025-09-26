@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import polars as pl
+from tqdm import tqdm
 
 from .target_generators.base import TargetGenerator
 from .target_generators.factory import TargetGeneratorFactory
@@ -159,6 +160,107 @@ class ModularDatasetBuilder:
         # Build targets
         return self.build_targets(symbol_df, symbol=symbol)
 
+    def build_targets_from_parquet_chunked(
+        self,
+        parquet_path: str | Path,
+        symbol: str | None = None,
+        chunk_size: int = 500_000
+    ) -> pl.DataFrame:
+        """
+        Build targets from parquet file using chunked processing for memory efficiency.
+
+        Args:
+            parquet_path: Path to input parquet file
+            symbol: Optional symbol identifier
+            chunk_size: Number of samples to process per chunk (default: 500K)
+
+        Returns:
+            DataFrame with generated targets (keys + targets only)
+        """
+        parquet_path = Path(parquet_path)
+        if not parquet_path.exists():
+            raise FileNotFoundError(f"Parquet file not found: {parquet_path}")
+
+        # Get dataset info without loading all data
+        df_scan = pl.scan_parquet(parquet_path)
+        total_rows = df_scan.select(pl.len()).collect().item()
+        schema = df_scan.collect_schema()
+
+        if self.verbose:
+            print(f"📂 Processing file: {parquet_path.name}")
+            print(f"   📊 Dataset has {total_rows:,} samples")
+            print(f"   🔄 Processing in chunks of {chunk_size:,}")
+
+        # Extract symbol from filename if not provided
+        if symbol is None:
+            symbol = parquet_path.stem.split('_')[0]
+
+        # Ensure required columns exist
+        if 'mid_price' not in schema:
+            raise ValueError(f"Required column 'mid_price' not found in {parquet_path}")
+
+        all_target_chunks = []
+
+        # Process each generator
+        for i, generator in enumerate(self.target_generators):
+            if self.verbose:
+                print(f"   🎯 Generator {i+1}/{len(self.target_generators)}: {generator.__class__.__name__}")
+
+            generator_chunks = []
+
+            # Process in chunks with progress bar
+            with tqdm(total=total_rows, desc=f"      Processing samples", unit="samples", leave=False) as pbar:
+                for offset in range(0, total_rows, chunk_size):
+                    # Read chunk efficiently using Polars slice
+                    current_chunk_size = min(chunk_size, total_rows - offset)
+                    chunk_df = pl.scan_parquet(parquet_path).slice(offset, current_chunk_size).collect()
+
+                    # Generate targets for this chunk
+                    chunk_targets = generator.generate_targets(chunk_df, symbol=symbol)
+
+                    # Fix row_idx to be continuous across chunks
+                    if 'row_idx' in chunk_targets.columns:
+                        chunk_targets = chunk_targets.with_columns(
+                            (pl.col('row_idx') + offset).alias('row_idx')
+                        )
+
+                    # Store the chunk targets
+                    generator_chunks.append(chunk_targets)
+
+                    pbar.update(len(chunk_df))
+
+            # Concatenate all chunks for this generator
+            generator_targets = pl.concat(generator_chunks)
+
+            # Remove duplicates after chunk concatenation
+            generator_targets = self._remove_duplicates(
+                generator_targets,
+                verbose_prefix=f"      "
+            )
+
+            all_target_chunks.append(generator_targets)
+
+        # Combine all generators on the same keys
+        if len(all_target_chunks) == 1:
+            return all_target_chunks[0]
+
+        # Join all target DataFrames on keys
+        result_df = all_target_chunks[0]
+        for target_df in all_target_chunks[1:]:
+            # Join on row keys
+            if 'row_idx' in result_df.columns and 'row_idx' in target_df.columns:
+                result_df = result_df.join(target_df, on='row_idx', how='left')
+            else:
+                # Fallback: horizontal concatenation (assuming same order)
+                # Drop overlapping keys from subsequent DataFrames
+                target_cols_only = target_df.drop(['row_idx', 'timestamp'] if 'timestamp' in target_df.columns else ['row_idx'])
+                result_df = pl.concat([result_df, target_cols_only], how="horizontal")
+
+        if self.verbose:
+            print(f"   ✅ Generated {len(result_df):,} target rows with {len(result_df.columns)} columns")
+
+        return result_df
+
     def build_from_parquet(self, parquet_path: str | Path) -> pl.DataFrame:
         """
         DEPRECATED: Use build_targets_from_parquet() instead.
@@ -294,6 +396,42 @@ class ModularDatasetBuilder:
             info = generator.get_target_info()
             all_names.extend(info.get("target_names", []))
         return all_names
+
+    def _remove_duplicates(self, df: pl.DataFrame, verbose_prefix: str = "") -> pl.DataFrame:
+        """Remove duplicate rows using smart column-based deduplication."""
+        before_len = len(df)
+
+        # For target data with fixed row_idx, row_idx should be unique
+        # so we primarily check for timestamp-based duplicates
+        timestamp_col = "timestamp" if "timestamp" in df.columns else "ts_event"
+
+        # Smart column detection for deduplication (most granular first)
+        if "seqnum" in df.columns and timestamp_col in df.columns:
+            dedup_subset = [timestamp_col, "seqnum"]
+        elif "ts_recv" in df.columns and timestamp_col in df.columns:
+            dedup_subset = [timestamp_col, "ts_recv"]
+        elif "symbol" in df.columns and timestamp_col in df.columns:
+            dedup_subset = [timestamp_col, "symbol"]
+        elif timestamp_col in df.columns:
+            dedup_subset = [timestamp_col]
+        elif "row_idx" in df.columns:
+            # If we have row_idx but no timestamps, use row_idx for deduplication
+            dedup_subset = ["row_idx"]
+        else:
+            # Fallback: drop exact duplicate rows
+            deduplicated = df.unique(maintain_order=True)
+            after_len = len(deduplicated)
+            if self.verbose and before_len != after_len:
+                print(f"{verbose_prefix}🧹 Removed {before_len - after_len:,} duplicate rows")
+            return deduplicated
+
+        deduplicated = df.unique(subset=dedup_subset, maintain_order=True)
+        after_len = len(deduplicated)
+
+        if self.verbose and before_len != after_len:
+            print(f"{verbose_prefix}🧹 Removed {before_len - after_len:,} duplicate rows using {dedup_subset}")
+
+        return deduplicated
 
 
 def create_modular_builder(generator_configs: list[dict[str, Any]]) -> ModularDatasetBuilder:

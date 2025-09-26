@@ -184,6 +184,14 @@ def _register_builtin_generators():
     except ImportError:
         pass  # Triple barrier dependencies not available
 
+    # Triple Barrier Adaptive generator
+    try:
+        from .triple_barrier_adaptive import TripleBarrierGeneratorAdaptive
+
+        TargetGeneratorFactory.register("triple_barrier_adaptive", TripleBarrierGeneratorAdaptive)
+    except ImportError:
+        pass  # Triple barrier adaptive dependencies not available
+
     # Triple Exceedance generator
     try:
         from .triple_exceedance import TripleExceedanceGenerator

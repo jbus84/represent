@@ -133,8 +133,8 @@ class TripleExceedanceGenerator(TargetGenerator):
     def _compute_exceedance_labels(self, prices: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 
         n_samples = len(prices)
-        long_labels = np.zeros(n_samples, dtype=np.float32)  # Long exceedance: 1=exceed, 0=fail
-        short_labels = np.zeros(n_samples, dtype=np.float32)  # Short exceedance: 1=exceed, 0=fail
+        long_labels = np.zeros(n_samples, dtype=np.int32)  # Long exceedance: 1=exceed, 0=fail (BINARY)
+        short_labels = np.zeros(n_samples, dtype=np.int32)  # Short exceedance: 1=exceed, 0=fail (BINARY)
 
         # Process each position with FIXED DURATION
         for i in range(n_samples - self.lookforward_window):
@@ -152,14 +152,15 @@ class TripleExceedanceGenerator(TargetGenerator):
             # DUAL-SIDED BINARY CLASSIFICATION (INDEPENDENT):
             # Long exceedance: Does upward move exceed threshold?
             if move >= threshold:
-                long_labels[i] = move
+                long_labels[i] = 1  # Binary: 1 = exceed threshold
             else:
-                long_labels[i] = 0
+                long_labels[i] = 0  # Binary: 0 = fail to exceed
 
+            # Short exceedance: Does downward move exceed threshold?
             if move < 0 and abs(move) >= threshold:
-                short_labels[i] = abs(move)
+                short_labels[i] = 1  # Binary: 1 = exceed threshold
             else:
-                short_labels[i] = 0
+                short_labels[i] = 0  # Binary: 0 = fail to exceed
 
         return long_labels, short_labels
 

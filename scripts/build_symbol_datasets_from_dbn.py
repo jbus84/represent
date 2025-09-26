@@ -250,11 +250,39 @@ def load_and_process_dbn_files(
 
             # Final merge of all chunks for this symbol
             merged_df = pl.concat(merged_dfs, how="vertical")
-            merged_df = merged_df.sort("ts_event")
+            
+            # Sort by event time for determinism
+            if "ts_event" in merged_df.columns:
+                merged_df = merged_df.sort("ts_event")
+            
+            # De-duplicate rows to avoid duplicated index keys when indexing onto inputs
+            before_len = len(merged_df)
+            dedup_subset = None
+            if "ts_event" in merged_df.columns:
+                # Prefer most-granular unique keys if available
+                if "seqnum" in merged_df.columns:
+                    dedup_subset = ["ts_event", "seqnum"]
+                elif "ts_recv" in merged_df.columns:
+                    dedup_subset = ["ts_event", "ts_recv"]
+                elif "symbol" in merged_df.columns:
+                    dedup_subset = ["ts_event", "symbol"]
+                else:
+                    dedup_subset = ["ts_event"]
+            
+            if dedup_subset is not None:
+                merged_df = merged_df.unique(subset=dedup_subset, maintain_order=True)
+            else:
+                # Fallback: drop exact duplicate rows
+                merged_df = merged_df.unique(maintain_order=True)
+            
+            after_len = len(merged_df)
+            dropped = before_len - after_len
 
             print(
                 f"   📊 Merged dataset: {len(merged_df):,} samples from {len(chunk_files)} chunks"
             )
+            if dropped > 0:
+                print(f"   🧹 De-duplicated {dropped:,} rows using subset={dedup_subset}")
 
             if len(merged_df) < 5000:  # Skip symbols with insufficient data
                 print(f"   ⚠️  Insufficient data ({len(merged_df)} samples), skipping")
@@ -275,15 +303,8 @@ def load_and_process_dbn_files(
 
             output_path = output_dir / filename
 
-            # Save dataset (this preserves ALL original DBN columns + adds labels)
-            builder.save_dataset(labeled_dataset, output_path)
-
-            print(f"   ✅ Saved: {output_path}")
-            print(
-                f"   📊 Final dataset: {len(labeled_dataset):,} samples, {len(labeled_dataset.columns)} columns"
-            )
-
-            # Report on target columns created
+            # Select only merge keys + target columns (targets-only output)
+            key_cols = [c for c in ["ts_event", "symbol", "ts_recv"] if c in labeled_dataset.columns]
             original_cols = ["symbol", "mid_price", "ts_event"]
             target_cols = [
                 col
@@ -291,6 +312,18 @@ def load_and_process_dbn_files(
                 if col not in original_cols
                 and not col.startswith(("bid_", "ask_", "ts_", "size_", "ct_"))
             ]
+            targets_only_cols = list(dict.fromkeys(key_cols + target_cols))  # preserve order, dedupe
+            targets_only_df = labeled_dataset.select(targets_only_cols)
+
+            # Save targets-only dataset
+            builder.save_dataset(targets_only_df, output_path)
+
+            print(f"   ✅ Saved: {output_path}")
+            print(
+                f"   📊 Final targets-only dataset: {len(targets_only_df):,} samples, {len(targets_only_df.columns)} columns"
+            )
+
+            # Report on target columns created
             if target_cols:
                 print(f"   🎯 Target columns: {', '.join(target_cols)}")
 
@@ -298,12 +331,12 @@ def load_and_process_dbn_files(
                 {
                     "symbol": symbol,
                     "path": output_path,
-                    "samples": len(labeled_dataset),
-                    "columns": len(labeled_dataset.columns),
+                    "samples": len(targets_only_df),
+                    "columns": len(targets_only_df.columns),
                     "targets": target_cols,
                 }
             )
-            total_samples += len(labeled_dataset)
+            total_samples += len(targets_only_df)
 
         except Exception as e:
             print(f"   ❌ Error processing symbol {symbol}: {e}")

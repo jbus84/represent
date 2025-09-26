@@ -55,8 +55,11 @@ def generate_diagnostics_comprehensive_plots_for_symbol(
     # Build fixed 100k windows using diagnostic sampler
     win_list = simulate_optimization_sampling(df, window_size, n_windows=windows)
 
-    # Get full method configs from diagnostics (include all available methods)
-    full_methods = list(get_all_optimization_methods())
+    # Get full method configs from diagnostics, but filter to only optimized methods
+    all_available_methods = list(get_all_optimization_methods())
+    # Filter to only methods that were actually optimized for this symbol
+    optimized_method_names = set(symbol_results.keys())
+    full_methods = [m for m in all_available_methods if m.get('method') in optimized_method_names]
 
     # Helper to inject optimized parameters
     def with_optimized_params(methods_in: list[dict]) -> list[dict]:
@@ -81,7 +84,7 @@ def generate_diagnostics_comprehensive_plots_for_symbol(
 
     # Define subsets
     def is_classification(m):
-        return m.get('method') in {'binary_ctl', 'ternary_ctl', 'ga_labeling'}
+        return m.get('method') in {'binary_ctl', 'ternary_ctl'}
 
     def is_oracle(m):
         return m.get('method') in {'oracle_binary', 'oracle_ternary'}
@@ -89,15 +92,11 @@ def generate_diagnostics_comprehensive_plots_for_symbol(
     def is_triple(m):
         return 'triple' in (m.get('method') or '')
 
-    def is_ga(m):
-        return m.get('method') == 'ga_labeling'
-
     subsets = {
         'all': full_methods,
         'classification': [m for m in full_methods if is_classification(m)],
         'oracle': [m for m in full_methods if is_oracle(m)],
         'triple': [m for m in full_methods if is_triple(m)],
-        'ga': [m for m in full_methods if is_ga(m)],
     }
 
     # Ensure base output dirs exist
@@ -331,7 +330,6 @@ def convert_params_for_generator(method: str, params: dict[str, Any]) -> dict[st
         'triple_barrier': ['lookforward_window', 'volatility_window'],
         'triple_exceedance': ['lookforward_window', 'volatility_window'],
         'ternary_ctl': ['window_size'],
-        'ga_labeling': ['population_size', 'max_generations', 'lookforward_window'],
     }
 
 
@@ -612,9 +610,7 @@ def optimize_symbol_dataset(
             print(f"{'-'*60}")
             print("Starting optimization...")
 
-            if method == 'ga_labeling':
-                result = optimizer.optimize_ga_labeling(prices)
-            elif method == 'binary_ctl':
+            if method == 'binary_ctl':
                 result = optimizer.optimize_binary_ctl(prices)
             elif method == 'ternary_ctl':
                 result = optimizer.optimize_ternary_ctl(prices)
@@ -624,6 +620,8 @@ def optimize_symbol_dataset(
                 result = optimizer.optimize_oracle_ternary(prices)
             elif method == 'triple_barrier':
                 result = optimizer.optimize_triple_barrier(prices)
+            elif method == 'triple_barrier_adaptive':
+                result = optimizer.optimize_triple_barrier_adaptive(prices)
             elif method == 'triple_exceedance':
                 result = optimizer.optimize_triple_exceedance(prices)
             else:
@@ -691,7 +689,7 @@ def run_all_symbol_optimizations(
         Complete optimization results
     """
     if methods is None:
-        methods = ['binary_ctl', 'ternary_ctl', 'ga_labeling', 'triple_barrier', 'triple_exceedance']
+        methods = ['triple_barrier', 'triple_barrier_adaptive', 'triple_exceedance']
 
     # Discover symbol datasets
     print("🔍 DISCOVERING SYMBOL DATASETS")
@@ -712,15 +710,15 @@ def run_all_symbol_optimizations(
 
     # Optimization configuration with adaptive sampling and early stopping
     optimization_config = {
-        'window_size': 25000,      # USER REQ: Max 25K sampling window
-        'n_windows': 5,            # More windows for better sampling
+        'window_size': 50000,      # USER REQ: Max 25K sampling window
+        'n_windows': 10,            # More windows for better sampling
         'sampling_strategy': 'stratified',  # Ensure good coverage
         'adaptive_sampling': True,  # Enable adaptive sampling
         'stabilization_threshold': 0.05,  # 5% parameter change threshold
         'stabilization_patience': 3,  # Require 3 stable evaluations
         'growth_factor': 1.5,      # 50% growth per increase
         'min_window_size': 15000,  # USER REQ: Min 15K sampling window
-        'max_window_size': 25000,  # USER REQ: Max 25K sampling window
+        'max_window_size': 50000,  # USER REQ: Max 25K sampling window
         'early_stopping': True,    # Stop early when parameters stabilize
         'early_stopping_patience': 7,  # Extra evaluations after stabilization
         'fee_pips': 0.7,           # Correct 0.7 pip transaction costs
@@ -916,18 +914,9 @@ def main():
     # Configuration
     data_dir = Path("/Users/danielfisher/data/databento/symbol_datasets/inputs")
     output_dir = Path("outputs/optimization_results")
-    # Check if tstrends is available
-    try:
-        from represent.target_generators.tstrends_labeling import TSTRENDS_AVAILABLE
-        if TSTRENDS_AVAILABLE:
-            methods = ['binary_ctl', 'ternary_ctl', 'oracle_binary', 'oracle_ternary', 'ga_labeling', 'triple_exceedance', 'triple_barrier']
-            print("✅ TStrends available - including CTL, Oracle, GA, and Triple methods")
-        else:
-            methods = ['ga_labeling', 'triple_barrier', 'triple_exceedance']
-            print("⚠️  TStrends not available - using GA labeling and Triple methods only")
-    except ImportError:
-        methods = ['ga_labeling', 'triple_barrier', 'triple_exceedance']
-        print("⚠️  TStrends not available - using GA labeling and Triple methods only")
+    # Use only triple barrier methods
+    methods = ['triple_barrier', 'triple_barrier_adaptive', 'triple_exceedance']
+    print("🎯 Using Triple Barrier methods only")
     max_symbols = None  # Process all symbol datasets (no limit)
 
     try:
