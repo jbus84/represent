@@ -8,6 +8,14 @@
 
 Built for quantitative finance ML applications requiring efficient feature extraction and sophisticated target labeling from tick-level market data.
 
+
+## Producing Data
+
+Targets: `make create-symbol-inputs`
+Optmisation: `uv run python scripts/symbol_optimization_runner.py`
+Triple barrier labels: `uv run python scripts/process_symbols_with_triple_methods.py`
+
+
 ## 🚀 Key Features
 
 - **📊 Normalized LOB Representations**: Transform raw tick data into ML-ready tensor formats

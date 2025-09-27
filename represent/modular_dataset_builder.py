@@ -150,6 +150,10 @@ class ModularDatasetBuilder:
         # Load data
         symbol_df = pl.read_parquet(parquet_path)
 
+        # Check and rename price column if needed
+        if 'price' in symbol_df.columns and 'mid_price' not in symbol_df.columns:
+            symbol_df = symbol_df.rename({'price': 'mid_price'})
+
         if self.verbose:
             print(f"   📊 Loaded {len(symbol_df):,} rows")
 
@@ -195,9 +199,15 @@ class ModularDatasetBuilder:
         if symbol is None:
             symbol = parquet_path.stem.split('_')[0]
 
-        # Ensure required columns exist
-        if 'mid_price' not in schema:
-            raise ValueError(f"Required column 'mid_price' not found in {parquet_path}")
+        # Ensure required columns exist - check for mid_price or price
+        has_mid_price = 'mid_price' in schema
+        has_price = 'price' in schema
+
+        if not has_mid_price and not has_price:
+            raise ValueError(f"Required column 'mid_price' or 'price' not found in {parquet_path}")
+
+        # Use price column name that exists
+        price_column = 'mid_price' if has_mid_price else 'price'
 
         all_target_chunks = []
 
@@ -214,6 +224,10 @@ class ModularDatasetBuilder:
                     # Read chunk efficiently using Polars slice
                     current_chunk_size = min(chunk_size, total_rows - offset)
                     chunk_df = pl.scan_parquet(parquet_path).slice(offset, current_chunk_size).collect()
+
+                    # Rename price column to mid_price if needed for compatibility
+                    if price_column == 'price':
+                        chunk_df = chunk_df.rename({'price': 'mid_price'})
 
                     # Generate targets for this chunk
                     chunk_targets = generator.generate_targets(chunk_df, symbol=symbol)

@@ -57,6 +57,13 @@ def load_optimized_parameters(symbol_name: str) -> dict[str, dict]:
             data = json.load(f)
             optimized_params['triple_exceedance'] = data['optimal_params']
 
+    # Load triple_barrier_adaptive parameters
+    adaptive_file = symbol_dir / "triple_barrier_adaptive_params.json"
+    if adaptive_file.exists():
+        with open(adaptive_file) as f:
+            data = json.load(f)
+            optimized_params['triple_barrier_adaptive'] = data['optimal_params']
+
     return optimized_params
 
 def process_symbol_with_triple_methods_chunked(input_file: Path, output_dir: Path) -> dict:
@@ -86,8 +93,8 @@ def process_symbol_with_triple_methods_chunked(input_file: Path, output_dir: Pat
 
     results = {}
 
-    # Process with both triple methods using existing infrastructure
-    triple_methods = ['triple_barrier', 'triple_exceedance']
+    # Process with all three triple methods using existing infrastructure
+    triple_methods = ['triple_barrier', 'triple_exceedance', 'triple_barrier_adaptive']
 
     for method in triple_methods:
         try:

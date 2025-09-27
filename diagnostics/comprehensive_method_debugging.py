@@ -19,6 +19,7 @@ from pathlib import Path
 
 import matplotlib.patches as mpatches
 from matplotlib.lines import Line2D
+import matplotlib.pyplot as plt
 
 try:
     from represent.target_generators.factory import TargetGeneratorFactory
@@ -66,7 +67,7 @@ def get_all_optimization_methods():
         {
             "name": "Triple Barrier",
             "method": "triple_barrier",
-            "params": {"lookforward_window": 6931, "barrier_width": 0.000523},  # CORRECTED: Use averaged optimized parameters across all symbols
+            "params": {"lookforward_window": 7598, "barrier_width": 0.000527},  # CURRENT: Latest optimization results average
             "color_map": {-1: "red", 0: "gray", 1: "green"},
             "label_names": {-1: "Short", 0: "Timeout", 1: "Long"},
             "has_barriers": True
@@ -74,7 +75,7 @@ def get_all_optimization_methods():
         {
             "name": "Triple Barrier Adaptive",
             "method": "triple_barrier_adaptive",
-            "params": {"lookforward_window": 3423, "lookback_window": 3495, "barrier_width": 1.59},  # CORRECTED: Use averaged optimized parameters across all symbols
+            "params": {"lookforward_window": 2935, "lookback_window": 3803, "barrier_width": 1.51},  # CURRENT: Latest optimization results average
             "color_map": {-1: "red", 0: "gray", 1: "green"},
             "label_names": {-1: "Short", 0: "Timeout", 1: "Long"},
             "has_barriers": True
@@ -82,20 +83,20 @@ def get_all_optimization_methods():
         {
             "name": "Triple Exceedance (Long)",
             "method": "triple_exceedance",
-            "params": {"lookforward_window": 2186, "scaling_factor": 3.36},  # CORRECTED: Use averaged optimized parameters across all symbols
+            "params": {"lookforward_window": 2900, "scaling_factor": 2.97},  # CURRENT: Latest optimization results average
             "color_map": {0: "red", 1: "green"},
             "label_names": {0: "Wrong Direction", 1: "Right Direction"},
-            "has_barriers": False,
+            "has_barriers": True,  # FIXED: Triple exceedance also has time barriers
             "target_column": "long",  # Specify to use long exceedance column
             "direction_type": "long"  # For direction correctness checking
         },
         {
             "name": "Triple Exceedance (Short)",
             "method": "triple_exceedance",
-            "params": {"lookforward_window": 2186, "scaling_factor": 3.36},  # CORRECTED: Use averaged optimized parameters across all symbols
+            "params": {"lookforward_window": 2900, "scaling_factor": 2.97},  # CURRENT: Latest optimization results average
             "color_map": {0: "red", 1: "green"},
             "label_names": {0: "Wrong Direction", 1: "Right Direction"},
-            "has_barriers": False,
+            "has_barriers": True,  # FIXED: Triple exceedance also has time barriers
             "target_column": "short",  # Specify to use short exceedance column
             "direction_type": "short"  # For direction correctness checking
         },
@@ -404,103 +405,263 @@ def create_all_methods_plot(window_df: pl.DataFrame, methods: list, window_num: 
             labels_plot = labels_plot[:len(prices_plot)]
 
             # Plot price line
-            ax.plot(time_axis, prices_plot, 'black', linewidth=0.8, alpha=0.8, label='Price', zorder=3)
+            ax.plot(time_axis, prices_plot, 'black', linewidth=0.8, alpha=0.8, label='Price', zorder=1)
 
-            # Add barrier/threshold visualization for triple methods
-            threshold_pips = None
-
-            # Calculate threshold based on method type
+            # PROPER TRIPLE BARRIER VISUALIZATION: Show actual barriers and trades
             if method_config.get("has_barriers", False):
-                if method_config["method"] == "triple_barrier_adaptive":
-                    # Adaptive Triple Barrier - barriers are volatility-based (sigma multiplier)
-                    barrier_width = method_config["params"].get("barrier_width", 1.0)
-                    lookback_window = method_config["params"].get("lookback_window", 2000)
+                # Extract parameters
+                lookforward_window = method_config["params"].get("lookforward_window", 2000)
+                barrier_width = method_config["params"].get("barrier_width", 0.0005)
+                lookback_window = method_config["params"].get("lookback_window", None)
 
-                    # Calculate volatility-based barriers (similar to the actual method)
-                    volatility = np.std(prices_plot)  # Simplified volatility calculation
-                    actual_barrier = barrier_width * volatility
-                    threshold_pips = actual_barrier * 10000
-                    upper_threshold = prices_plot + actual_barrier
-                    lower_threshold = prices_plot - actual_barrier
-                else:
-                    # Regular Triple Barrier - barriers are fixed price differences
-                    barrier_width = method_config["params"].get("barrier_width", 0.0001)
-                    threshold_pips = barrier_width * 10000
-                    upper_threshold = prices_plot + barrier_width
-                    lower_threshold = prices_plot - barrier_width
+                # Show representative trades sampled to capture label diversity
+                max_trades = 8
 
-                # Plot as black dashed lines
-                ax.plot(time_axis, upper_threshold, '--', color='black', alpha=0.8, linewidth=1.0, zorder=2)
-                ax.plot(time_axis, lower_threshold, '--', color='black', alpha=0.8, linewidth=1.0, zorder=2)
+                # Get label distribution and sample positions for each label type
+                unique_labels, label_counts = np.unique(labels_plot, return_counts=True)
+                print(f"    Label distribution (plot samples): {dict(zip(unique_labels, label_counts))}")
 
-            elif method_config["method"] == "triple_exceedance":
-                # Triple Exceedance method - use optimized parameters
-                scaling_factor = method_config["params"].get("scaling_factor", 3.0)
-                # Get transaction_cost from params, fallback to standard 0.7 pip
-                transaction_cost = method_config["params"].get("transaction_cost", 0.00007)
-                threshold = transaction_cost * scaling_factor
-                threshold_pips = threshold * 10000
+                # Sample diverse trade positions across the plot data ensuring proper index alignment
+                trade_indices = []
 
-                upper_threshold = prices_plot + threshold
-                lower_threshold = prices_plot - threshold
+                # Ensure labels_plot and prices_plot are aligned
+                min_length = min(len(labels_plot), len(prices_plot))
+                labels_plot = labels_plot[:min_length]
+                prices_plot = prices_plot[:min_length]
+                time_axis = time_axis[:min_length]
 
-                # Plot as black dashed lines
-                ax.plot(time_axis, upper_threshold, '--', color='black', alpha=0.8, linewidth=1.0, zorder=2)
-                ax.plot(time_axis, lower_threshold, '--', color='black', alpha=0.8, linewidth=1.0, zorder=2)
-
-            # Color regions based on price position relative to barriers (for barrier methods)
-            if method_config.get("has_barriers", False):
-                # Color based on where price is relative to barriers
-                if method_config["method"] == "triple_barrier_adaptive":
-                    # Calculate dynamic barriers for each point
-                    lookback_window = method_config["params"].get("lookback_window", 2000)
-                    barrier_width = method_config["params"].get("barrier_width", 1.0)
-
-                    for j in range(len(prices_plot)):
-                        # Calculate volatility for this point (simplified)
-                        start_idx_vol = max(0, j - lookback_window//step)
-                        vol = np.std(prices_plot[start_idx_vol:j+1]) if j > 0 else np.std(prices_plot[:10])
-
-                        upper_barrier = prices_plot[j] + (barrier_width * vol)
-                        lower_barrier = prices_plot[j] - (barrier_width * vol)
-
-                        # Color based on price movement (simplified for visualization)
-                        if j < len(prices_plot) - 1:
-                            next_j = min(j + 1, len(prices_plot) - 1)
-
-                            # Use a reference price (moving average for stability)
-                            ref_window = min(10, j + 1)
-                            reference_price = np.mean(prices_plot[j-ref_window+1:j+1])
-
-                            current_barrier = barrier_width * vol
-                            if prices_plot[j] > reference_price + current_barrier:
-                                color = "green"  # Strong upward movement
-                            elif prices_plot[j] < reference_price - current_barrier:
-                                color = "red"    # Strong downward movement
+                # For each label type, find positions and sample them
+                for label_val in unique_labels:
+                    if len(trade_indices) >= max_trades:
+                        break
+                    label_positions = np.where(labels_plot == label_val)[0]
+                    if len(label_positions) > 0:
+                        # Sample up to 2 positions for this label type
+                        n_samples = min(2, len(label_positions), max_trades - len(trade_indices))
+                        if len(label_positions) >= n_samples:
+                            # Sample evenly across this label's positions
+                            if n_samples == 1:
+                                # Pick middle position for single sample
+                                sampled_positions = [label_positions[len(label_positions)//2]]
                             else:
-                                color = "gray"   # Within normal range
+                                # Sample evenly for multiple samples
+                                indices = np.linspace(0, len(label_positions)-1, n_samples, dtype=int)
+                                sampled_positions = label_positions[indices]
+                            trade_indices.extend(sampled_positions)
 
-                            ax.axvspan(time_axis[j], time_axis[next_j], alpha=0.3, color=color, zorder=0)
-                else:
-                    # Fixed barriers (regular triple barrier)
-                    barrier_width = method_config["params"].get("barrier_width", 0.0001)
+                # Ensure we have some trades and remove duplicates
+                trade_indices = sorted(list(set(trade_indices)))
 
-                    for j in range(len(prices_plot)):
-                        if j < len(prices_plot) - 1:
-                            next_j = min(j + 1, len(prices_plot) - 1)
+                # Ensure indices are within bounds and avoid problematic early data points
+                # For adaptive methods, skip early points where volatility calculation is unreliable
+                min_start_idx = 50 if method_config["method"] == "triple_barrier_adaptive" else 0
+                trade_indices = [idx for idx in trade_indices if idx >= min_start_idx and idx < min_length - 50]
 
-                            # Use a reference price (moving average for stability)
-                            ref_window = min(10, j + 1)
-                            reference_price = np.mean(prices_plot[j-ref_window+1:j+1])
+                # CRITICAL FIX: Remove overlapping trades to prevent multiple symbols in same area
+                # Calculate minimum spacing needed to prevent overlaps
+                lookforward_ticks = method_config["params"].get("lookforward_window", 2000)
+                # Use a more reasonable spacing - enough to prevent visual overlap but allow multiple trades
+                min_spacing_ticks = max(500, lookforward_ticks // 4)  # Quarter of lookforward window
+                # Estimate step from the data subsampling
+                estimated_step = max(1, len(labels_display) // len(labels_plot)) if len(labels_plot) > 0 else 3
+                min_spacing_plot = max(50, min_spacing_ticks // estimated_step)
 
-                            if prices_plot[j] > reference_price + barrier_width:
-                                color = "green"  # Above barrier threshold
-                            elif prices_plot[j] < reference_price - barrier_width:
-                                color = "red"    # Below barrier threshold
+                # Filter out overlapping trades
+                non_overlapping_indices = []
+                for idx in trade_indices:
+                    # Check if this trade overlaps with any already selected
+                    overlaps = False
+                    for existing_idx in non_overlapping_indices:
+                        if abs(idx - existing_idx) < min_spacing_plot:
+                            overlaps = True
+                            break
+
+                    if not overlaps:
+                        non_overlapping_indices.append(idx)
+
+                    # Stop if we have enough trades
+                    if len(non_overlapping_indices) >= max_trades:
+                        break
+
+                trade_indices = non_overlapping_indices
+
+                # Fallback if no diverse sampling worked
+                if len(trade_indices) == 0:
+                    entry_spacing = max(min_spacing_plot, min_length // (max_trades + 2))
+                    trade_indices = list(range(entry_spacing, min_length - entry_spacing, entry_spacing))
+
+                trade_count = 0
+                for j in trade_indices[:max_trades]:
+                    if trade_count >= max_trades:
+                        break
+
+                    entry_price = prices_plot[j]
+                    entry_time = time_axis[j]
+
+                    # Calculate barriers based on method type
+                    if method_config["method"] == "triple_exceedance":
+                        # Triple exceedance only has time barriers - no price barriers
+                        # For visualization, show reference level but only one barrier based on direction
+                        scaling_factor = method_config["params"].get("scaling_factor", 3.0)
+                        vol_estimate = np.std(prices_plot[max(0, j-20):j+1]) if j > 20 else np.std(prices_plot[:50])
+
+                        # Only show one barrier based on direction - corrected logic
+                        if "Long" in method_config["name"]:
+                            # Long positions: show lower barrier (minimum threshold to exceed upward)
+                            lower_barrier = entry_price - (scaling_factor * vol_estimate)
+                            upper_barrier = entry_price  # Set to entry price (won't be shown)
+                        else:
+                            # Short positions: show upper barrier (maximum threshold to exceed downward)
+                            upper_barrier = entry_price + (scaling_factor * vol_estimate)
+                            lower_barrier = entry_price  # Set to entry price (won't be shown)
+
+                        # For triple exceedance, all exits should be at time expiry (no price exits)
+                        # The actual method only uses time-based exits with directional analysis
+                    elif lookback_window and method_config["method"] == "triple_barrier_adaptive":
+                        # Adaptive barriers based on volatility using actual lookback_window
+                        estimated_step = max(1, len(labels_display) // len(labels_plot)) if len(labels_plot) > 0 else 3
+                        lookback_plot = lookback_window // estimated_step
+                        vol_start = max(0, j - lookback_plot)  # Use actual lookback window for volatility
+                        if j > vol_start and len(prices_plot[vol_start:j+1]) > 10:
+                            volatility = np.std(prices_plot[vol_start:j+1])
+                        else:
+                            # Use a reasonable window for volatility calculation when lookback is insufficient
+                            end_idx = min(j + 100, len(prices_plot))
+                            start_idx = max(0, end_idx - 100)
+                            volatility = np.std(prices_plot[start_idx:end_idx])
+                            if volatility == 0:  # Still zero volatility - use a minimum
+                                volatility = entry_price * 0.0001  # 1 basis point as minimum
+                        # Apply barrier_width as scaling factor to the volatility
+                        upper_barrier = entry_price + (barrier_width * volatility)
+                        lower_barrier = entry_price - (barrier_width * volatility)
+                    else:
+                        # Fixed barriers (regular triple barrier)
+                        upper_barrier = entry_price + barrier_width
+                        lower_barrier = entry_price - barrier_width
+
+                    # Time barrier (vertical line) - use actual lookforward window
+                    lookforward_ticks = method_config["params"].get("lookforward_window", 2000)
+                    estimated_step = max(1, len(labels_display) // len(labels_plot)) if len(labels_plot) > 0 else 3
+                    lookforward_plot = lookforward_ticks // estimated_step
+                    exit_time_idx = min(j + lookforward_plot, len(time_axis) - 1)
+                    exit_time = time_axis[exit_time_idx]
+
+                    # Get the label for this position
+                    if j < len(labels_plot):
+                        first_label = labels_plot[j]
+
+                        # Debug: Print the specific trade info
+                        if trade_count < 3:  # Show first few trades
+                            print(f"    Trade {trade_count+1}: position {j}, label {first_label}")
+
+                        # Interpret labels based on method type
+                        if method_config["method"] == "triple_exceedance":
+                            # For triple exceedance, labels represent directional correctness
+                            if first_label == 1:
+                                barrier_color = 'green'  # Correct direction
+                                exit_marker = '^'
+                            else:  # 0 = wrong direction or timeout
+                                barrier_color = 'red'    # Wrong direction
+                                exit_marker = 'v'
+                        else:
+                            # For true triple barrier methods (barrier hits)
+                            if first_label == 1:
+                                barrier_color = 'green'  # Upper barrier hit
+                                exit_marker = '^'
+                            elif first_label == -1:
+                                barrier_color = 'red'    # Lower barrier hit
+                                exit_marker = 'v'
                             else:
-                                color = "gray"   # Within barriers
+                                barrier_color = 'orange' # Timeout
+                                exit_marker = 's'
+                    else:
+                        first_label = 0
+                        barrier_color = 'gray'
+                        exit_marker = 'o'
 
-                            ax.axvspan(time_axis[j], time_axis[next_j], alpha=0.3, color=color, zorder=0)
+                    alpha = 0.8
+
+                    # Entry point - larger and more visible
+                    ax.scatter(entry_time, entry_price, color='blue', s=60, marker='o',
+                             zorder=5, alpha=alpha, edgecolors='darkblue', linewidth=1)
+
+                    if method_config["method"] == "triple_exceedance":
+                        # For triple exceedance, show only one reference line based on direction
+                        if "Long" in method_config["name"]:
+                            # Long: show lower barrier (minimum threshold to exceed upward)
+                            ax.hlines(lower_barrier, entry_time, exit_time, colors='red',
+                                     linestyles=':', alpha=alpha*0.7, linewidth=1.5, zorder=3)
+                            # Vertical barrier (time expiry) - from lower barrier to entry
+                            ax.vlines(exit_time, lower_barrier, entry_price, colors='orange',
+                                     linestyles='-', alpha=alpha, linewidth=3.0, zorder=3)
+                        else:
+                            # Short: show upper barrier (maximum threshold to exceed downward)
+                            ax.hlines(upper_barrier, entry_time, exit_time, colors='green',
+                                     linestyles=':', alpha=alpha*0.7, linewidth=1.5, zorder=3)
+                            # Vertical barrier (time expiry) - from entry to upper barrier
+                            ax.vlines(exit_time, entry_price, upper_barrier, colors='orange',
+                                     linestyles='-', alpha=alpha, linewidth=3.0, zorder=3)
+                    else:
+                        # For true triple barrier methods, show solid price barriers
+                        # Upper barrier (profit target) - thicker and more visible
+                        ax.hlines(upper_barrier, entry_time, exit_time, colors='green',
+                                 linestyles='--', alpha=alpha, linewidth=2.0, zorder=3)
+                        # Lower barrier (stop loss) - thicker and more visible
+                        ax.hlines(lower_barrier, entry_time, exit_time, colors='red',
+                                 linestyles='--', alpha=alpha, linewidth=2.0, zorder=3)
+                        # Vertical barrier (time expiry) - thicker and more visible
+                        ax.vlines(exit_time, lower_barrier, upper_barrier, colors='orange',
+                                 linestyles=':', alpha=alpha, linewidth=2.5, zorder=3)
+
+                    # Exit point positioning depends on method type
+                    if method_config["method"] == "triple_exceedance":
+                        # Triple exceedance exits at time barrier (all exits are time-based)
+                        exit_plot_price = (upper_barrier + lower_barrier) / 2
+                    else:
+                        # Triple barrier methods - position based on barrier hit
+                        if first_label == 1:
+                            # Profit exit - align with upper barrier
+                            exit_plot_price = upper_barrier
+                        elif first_label == -1:
+                            # Loss exit - align with lower barrier
+                            exit_plot_price = lower_barrier
+                        else:
+                            # Timeout exit - align with midpoint of time barrier
+                            exit_plot_price = (upper_barrier + lower_barrier) / 2
+
+                    edge_color = 'darkgreen' if barrier_color == 'green' else 'darkred' if barrier_color == 'red' else 'darkorange'
+                    ax.scatter(exit_time, exit_plot_price, color=barrier_color, s=80,
+                             marker=exit_marker, zorder=6, alpha=alpha, edgecolors=edge_color, linewidth=1.5)
+
+                    trade_count += 1
+
+                # Method-specific legends
+                if method_config["method"] == "triple_exceedance":
+                    legend_elements = [
+                        plt.Line2D([0], [0], color='black', linewidth=0.8, label='Price'),
+                        plt.Line2D([0], [0], color='blue', marker='o', markersize=6, linestyle='None', label='Entry Point'),
+                        plt.Line2D([0], [0], color='orange', linestyle='-', linewidth=3.0, label='Time Barrier (Expiry)'),
+                        plt.Line2D([0], [0], color='green', marker='^', markersize=8, linestyle='None', label='Right Direction'),
+                        plt.Line2D([0], [0], color='red', marker='v', markersize=8, linestyle='None', label='Wrong Direction'),
+                    ]
+
+                    # Add direction-specific reference level
+                    if "Long" in method_config["name"]:
+                        legend_elements.insert(2, plt.Line2D([0], [0], color='red', linestyle=':', linewidth=1.5, alpha=0.5, label='Reference Level (Lower)'))
+                    else:
+                        legend_elements.insert(2, plt.Line2D([0], [0], color='green', linestyle=':', linewidth=1.5, alpha=0.5, label='Reference Level (Upper)'))
+                else:
+                    legend_elements = [
+                        plt.Line2D([0], [0], color='black', linewidth=0.8, label='Price'),
+                        plt.Line2D([0], [0], color='blue', marker='o', markersize=6, linestyle='None', label='Entry Point'),
+                        plt.Line2D([0], [0], color='green', linestyle='--', linewidth=2.0, label='Upper Barrier (Profit)'),
+                        plt.Line2D([0], [0], color='red', linestyle='--', linewidth=2.0, label='Lower Barrier (Stop Loss)'),
+                        plt.Line2D([0], [0], color='orange', linestyle=':', linewidth=2.5, label='Time Barrier (Expiry)'),
+                        plt.Line2D([0], [0], color='green', marker='^', markersize=8, linestyle='None', label='Profit Exit'),
+                        plt.Line2D([0], [0], color='red', marker='v', markersize=8, linestyle='None', label='Loss Exit'),
+                        plt.Line2D([0], [0], color='orange', marker='s', markersize=6, linestyle='None', label='Timeout Exit'),
+                    ]
+                ax.legend(handles=legend_elements, loc='upper right', fontsize=8, framealpha=0.9)
             else:
                 # For non-barrier methods, color by labels (keep original logic)
                 current_label = labels_plot[0] if len(labels_plot) > 0 else 0
@@ -545,26 +706,20 @@ def create_all_methods_plot(window_df: pl.DataFrame, methods: list, window_num: 
                 if tick_mark < len(time_axis):
                     ax.axvline(x=time_axis[tick_mark], color='gray', linestyle=':', alpha=0.5, linewidth=0.8, zorder=1)
 
-            # Legend
-            legend_elements: list = [Line2D([0], [0], color='black', linewidth=0.8, label='Price')]
+            # Legend - for barrier methods, this is handled within the barrier visualization
+            if not method_config.get("has_barriers", False):
+                # Only add legend for non-barrier methods
+                legend_elements: list = [Line2D([0], [0], color='black', linewidth=0.8, label='Price')]
 
-            # Add threshold/barrier line to legend if applicable
-            if threshold_pips is not None:
-                threshold_label = f'±{threshold_pips:.0f} pip threshold'
-                legend_elements.append(
-                    Line2D([0], [0], color='black', linestyle='--', linewidth=1.0, alpha=0.8,
-                          label=threshold_label)
-                )
+                for label_val, pct in zip(unique_labels, percentages, strict=False):
+                    if label_val in method_config["color_map"]:
+                        name = method_config["label_names"].get(label_val, str(label_val))
+                        legend_elements.append(
+                            mpatches.Patch(color=method_config["color_map"][label_val], alpha=0.3,
+                                         label=f'{name} ({pct:.1f}%)')
+                        )
 
-            for label_val, pct in zip(unique_labels, percentages, strict=False):
-                if label_val in method_config["color_map"]:
-                    name = method_config["label_names"].get(label_val, str(label_val))
-                    legend_elements.append(
-                        mpatches.Patch(color=method_config["color_map"][label_val], alpha=0.3,
-                                     label=f'{name} ({pct:.1f}%)')
-                    )
-
-            ax.legend(handles=legend_elements, loc='upper left', fontsize=10)
+                ax.legend(handles=legend_elements, loc='upper left', fontsize=10)
 
             # Detailed statistics
             stats_lines = [
