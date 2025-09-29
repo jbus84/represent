@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Process All Symbols with Triple Methods - CORRECT VERSION
+Process All Symbols with Adaptive Triple Barrier Method
 
 This script uses the existing ModularDatasetBuilder infrastructure to process
-symbol datasets with triple_barrier and triple_exceedance methods, using
+symbol datasets with ONLY the triple_barrier_adaptive method, using
 actual optimized parameters from JSON files.
 
-Output: Target-only files with keys (row_idx, timestamp) + target columns
+Output: Target-only files with keys (row_idx, timestamp) + adaptive triple barrier target columns
 """
 
 import sys
@@ -43,26 +43,14 @@ def load_optimized_parameters(symbol_name: str) -> dict[str, dict]:
 
     optimized_params = {}
 
-    # Load triple_barrier parameters
-    barrier_file = symbol_dir / "triple_barrier_params.json"
-    if barrier_file.exists():
-        with open(barrier_file) as f:
-            data = json.load(f)
-            optimized_params['triple_barrier'] = data['optimal_params']
-
-    # Load triple_exceedance parameters
-    exceedance_file = symbol_dir / "triple_exceedance_params.json"
-    if exceedance_file.exists():
-        with open(exceedance_file) as f:
-            data = json.load(f)
-            optimized_params['triple_exceedance'] = data['optimal_params']
-
-    # Load triple_barrier_adaptive parameters
+    # Load ONLY triple_barrier_adaptive parameters (as requested)
     adaptive_file = symbol_dir / "triple_barrier_adaptive_params.json"
     if adaptive_file.exists():
         with open(adaptive_file) as f:
             data = json.load(f)
             optimized_params['triple_barrier_adaptive'] = data['optimal_params']
+    else:
+        raise ValueError(f"No triple_barrier_adaptive parameters found for {symbol_name}")
 
     return optimized_params
 
@@ -93,8 +81,8 @@ def process_symbol_with_triple_methods_chunked(input_file: Path, output_dir: Pat
 
     results = {}
 
-    # Process with all three triple methods using existing infrastructure
-    triple_methods = ['triple_barrier', 'triple_exceedance', 'triple_barrier_adaptive']
+    # Process ONLY with adaptive triple barrier method (as requested)
+    triple_methods = ['triple_barrier_adaptive']
 
     for method in triple_methods:
         try:
@@ -120,10 +108,11 @@ def process_symbol_with_triple_methods_chunked(input_file: Path, output_dir: Pat
             builder = ModularDatasetBuilder([generator], verbose=True)
 
             # Process using the builder's new chunked infrastructure
+            # Use smaller chunk size for two-pass adaptive processing to avoid memory issues
             targets_df = builder.build_targets_from_parquet_chunked(
                 input_file,
                 symbol=symbol_name,
-                chunk_size=500_000  # Use proven 500K chunk size
+                chunk_size=200_000  # Reduced chunk size for memory-efficient two-pass processing
             )
 
             # Get target info for metadata
@@ -163,10 +152,10 @@ def process_symbol_with_triple_methods_chunked(input_file: Path, output_dir: Pat
 
 def main():
     """Main execution function."""
-    print("🚀 PROCESSING ALL SYMBOLS WITH TRIPLE METHODS (CORRECT VERSION)")
+    print("🚀 PROCESSING ALL SYMBOLS WITH ADAPTIVE TRIPLE BARRIER METHOD")
     print("=" * 80)
     print("Using ACTUAL optimized parameters and ModularDatasetBuilder infrastructure")
-    print("Output: Target-only files with keys + target columns")
+    print("Output: Target-only files with keys + adaptive triple barrier target columns")
     print()
 
     # Define paths
@@ -204,9 +193,9 @@ def main():
                 print(f"   ⚠️  Symbol processing failed: {results['error']}")
                 all_results[symbol_file.stem] = results
             else:
-                # Count successful methods
+                # Count successful methods (only adaptive triple barrier now)
                 successful_methods = sum(1 for r in results.values() if r.get('success', False))
-                print(f"   🎉 Symbol complete: {successful_methods}/2 methods successful")
+                print(f"   🎉 Symbol complete: {successful_methods}/1 method successful")
 
                 all_results[symbol_file.stem] = results
                 if successful_methods > 0:

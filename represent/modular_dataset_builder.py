@@ -8,6 +8,7 @@ to create datasets with multiple target types (classification and regression).
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import polars as pl
 from tqdm import tqdm
 
@@ -216,35 +217,26 @@ class ModularDatasetBuilder:
             if self.verbose:
                 print(f"   🎯 Generator {i+1}/{len(self.target_generators)}: {generator.__class__.__name__}")
 
-            generator_chunks = []
+            # Check if generator needs lookback data (for adaptive methods)
+            lookback_window = getattr(generator, 'lookback_window', 0)
+            lookforward_window = getattr(generator, 'lookforward_window', 0)
 
-            # Process in chunks with progress bar
-            with tqdm(total=total_rows, desc=f"      Processing samples", unit="samples", leave=False) as pbar:
-                for offset in range(0, total_rows, chunk_size):
-                    # Read chunk efficiently using Polars slice
-                    current_chunk_size = min(chunk_size, total_rows - offset)
-                    chunk_df = pl.scan_parquet(parquet_path).slice(offset, current_chunk_size).collect()
+            # CRITICAL FIX: Use memory-efficient two-pass processing for adaptive methods
+            # Two-pass processing avoids boundary corruption while maintaining memory efficiency
+            if lookback_window > 0 or lookforward_window > 0:
+                if self.verbose:
+                    print(f"      🔄 Using memory-efficient two-pass processing (lookback: {lookback_window:,}, lookforward: {lookforward_window:,})")
 
-                    # Rename price column to mid_price if needed for compatibility
-                    if price_column == 'price':
-                        chunk_df = chunk_df.rename({'price': 'mid_price'})
-
-                    # Generate targets for this chunk
-                    chunk_targets = generator.generate_targets(chunk_df, symbol=symbol)
-
-                    # Fix row_idx to be continuous across chunks
-                    if 'row_idx' in chunk_targets.columns:
-                        chunk_targets = chunk_targets.with_columns(
-                            (pl.col('row_idx') + offset).alias('row_idx')
-                        )
-
-                    # Store the chunk targets
-                    generator_chunks.append(chunk_targets)
-
-                    pbar.update(len(chunk_df))
-
-            # Concatenate all chunks for this generator
-            generator_targets = pl.concat(generator_chunks)
+                generator_targets = self._process_with_two_pass_method(
+                    generator, parquet_path, symbol, price_column, chunk_size
+                )
+            else:
+                if self.verbose:
+                    print(f"      🔄 Using standard chunking")
+                generator_targets = self._process_with_standard_chunks(
+                    generator, parquet_path, symbol, price_column,
+                    chunk_size, total_rows
+                )
 
             # Remove duplicates after chunk concatenation
             generator_targets = self._remove_duplicates(
@@ -446,6 +438,332 @@ class ModularDatasetBuilder:
             print(f"{verbose_prefix}🧹 Removed {before_len - after_len:,} duplicate rows using {dedup_subset}")
 
         return deduplicated
+
+    def _process_with_standard_chunks(
+        self,
+        generator,
+        parquet_path: Path,
+        symbol: str,
+        price_column: str,
+        chunk_size: int,
+        total_rows: int
+    ) -> pl.DataFrame:
+        """Process generator using standard (non-overlapping) chunks."""
+        from tqdm import tqdm
+
+        generator_chunks = []
+
+        # Process in chunks with progress bar
+        with tqdm(total=total_rows, desc=f"      Processing samples", unit="samples", leave=False) as pbar:
+            for offset in range(0, total_rows, chunk_size):
+                # Read chunk efficiently using Polars slice
+                current_chunk_size = min(chunk_size, total_rows - offset)
+                chunk_df = pl.scan_parquet(parquet_path).slice(offset, current_chunk_size).collect()
+
+                # Rename price column to mid_price if needed for compatibility
+                if price_column == 'price':
+                    chunk_df = chunk_df.rename({'price': 'mid_price'})
+
+                # Generate targets for this chunk
+                chunk_targets = generator.generate_targets(chunk_df, symbol=symbol)
+
+                # Fix row_idx to be continuous across chunks
+                if 'row_idx' in chunk_targets.columns:
+                    chunk_targets = chunk_targets.with_columns(
+                        (pl.col('row_idx') + offset).alias('row_idx')
+                    )
+
+                # Store the chunk targets
+                generator_chunks.append(chunk_targets)
+
+                pbar.update(len(chunk_df))
+
+        # Concatenate all chunks for this generator
+        return pl.concat(generator_chunks)
+
+    def _process_with_overlapped_chunks(
+        self,
+        generator,
+        parquet_path: Path,
+        symbol: str,
+        price_column: str,
+        chunk_size: int,
+        lookback_window: int,
+        total_rows: int
+    ) -> pl.DataFrame:
+        """Process generator using overlapped chunks to preserve lookback windows."""
+        from tqdm import tqdm
+
+        generator_chunks = []
+        processed_rows = 0
+
+        # Get lookforward window for proper chunk extension
+        lookforward_window = getattr(generator, 'lookforward_window', 0)
+
+        # Process in chunks with overlap for lookback and lookforward data
+        with tqdm(total=total_rows, desc=f"      Processing samples", unit="samples", leave=False) as pbar:
+            offset = 0
+
+            while offset < total_rows:
+                # For first chunk, start from 0
+                # For subsequent chunks, include lookback_window overlap
+                chunk_start = max(0, offset - lookback_window) if offset > 0 else 0
+
+                # CRITICAL FIX: Extend chunk_end to include lookforward window
+                # This ensures the generator has sufficient future data to compute proper labels
+                chunk_end_base = min(offset + chunk_size, total_rows)
+                chunk_end = min(chunk_end_base + lookforward_window, total_rows)
+
+                # Read chunk with lookback AND lookforward data
+                chunk_df = pl.scan_parquet(parquet_path).slice(
+                    chunk_start, chunk_end - chunk_start
+                ).collect()
+
+                # Rename price column to mid_price if needed for compatibility
+                if price_column == 'price':
+                    chunk_df = chunk_df.rename({'price': 'mid_price'})
+
+                # Generate targets for this chunk
+                chunk_targets = generator.generate_targets(chunk_df, symbol=symbol)
+
+                # Fix row_idx to be continuous across chunks
+                if 'row_idx' in chunk_targets.columns:
+                    chunk_targets = chunk_targets.with_columns(
+                        (pl.col('row_idx') + chunk_start).alias('row_idx')
+                    )
+
+                # For overlapped chunks, only keep the new data (not the overlapped part)
+                if offset > 0:
+                    # Filter to only include rows from the new part of the chunk
+                    chunk_targets = chunk_targets.filter(
+                        pl.col('row_idx') >= offset
+                    )
+
+                # The extended chunk now has sufficient lookforward data
+                # Let the generator handle natural boundaries - no additional filtering needed
+
+                # Store the chunk targets
+                if len(chunk_targets) > 0:
+                    generator_chunks.append(chunk_targets)
+                    processed_rows += len(chunk_targets)
+
+                pbar.update(min(chunk_size, chunk_end_base - offset))
+                offset = chunk_end_base
+
+        # Concatenate all chunks for this generator
+        if generator_chunks:
+            return pl.concat(generator_chunks)
+        else:
+            # Return empty DataFrame with expected schema
+            return generator.generate_targets(pl.DataFrame({"mid_price": []}), symbol=symbol)
+
+    def _process_with_two_pass_method(
+        self,
+        generator,
+        parquet_path: Path,
+        symbol: str,
+        price_column: str,
+        chunk_size: int
+    ) -> pl.DataFrame:
+        """Process generator using memory-efficient two-pass method for adaptive methods."""
+        from tqdm import tqdm
+
+        lookback_window = getattr(generator, 'lookback_window', 0)
+        lookforward_window = getattr(generator, 'lookforward_window', 0)
+        barrier_width = getattr(generator, 'barrier_width', 1.0)
+
+        # Get total rows
+        total_rows = pl.scan_parquet(parquet_path).select(pl.len()).collect().item()
+
+        if self.verbose:
+            print(f"         📊 Two-pass processing {total_rows:,} samples")
+
+        # PASS 1: Compute volatility for entire dataset
+        if self.verbose:
+            print(f"         📊 Pass 1: Computing volatility stream")
+
+        volatilities = np.full(total_rows, np.nan, dtype=np.float32)
+
+        with tqdm(total=total_rows, desc="         Computing volatility", unit="samples", leave=False) as pbar:
+            offset = 0
+
+            while offset < total_rows:
+                # Calculate chunk bounds with lookback overlap
+                chunk_start = max(0, offset - lookback_window) if offset > 0 else 0
+                chunk_end = min(offset + chunk_size, total_rows)
+
+                # Load chunk
+                chunk_df = pl.scan_parquet(parquet_path).slice(
+                    chunk_start, chunk_end - chunk_start
+                ).collect()
+
+                # Clean and extract prices
+                if price_column == 'price':
+                    chunk_df = chunk_df.rename({'price': 'mid_price'})
+
+                chunk_clean = chunk_df.filter(
+                    pl.col('bid_px_00').is_not_null() &
+                    pl.col('ask_px_00').is_not_null()
+                ).with_columns(
+                    ((pl.col('bid_px_00') + pl.col('ask_px_00')) / 2).alias('mid_price')
+                ).filter(
+                    pl.col('mid_price').is_not_null() &
+                    pl.col('mid_price').is_finite()
+                )
+
+                if len(chunk_clean) == 0:
+                    pbar.update(chunk_end - offset)
+                    offset = chunk_end
+                    continue
+
+                prices = chunk_clean['mid_price'].to_numpy()
+
+                # Compute volatility for this chunk
+                for i in range(len(prices)):
+                    global_idx = chunk_start + i
+                    if global_idx >= total_rows:
+                        break
+
+                    if i >= lookback_window:  # Sufficient lookback data
+                        vol_window = prices[max(0, i - lookback_window):i + 1]
+                        volatilities[global_idx] = np.std(vol_window)
+
+                pbar.update(chunk_end - offset)
+                offset = chunk_end
+
+        # PASS 2: Apply triple barrier using pre-computed volatility
+        if self.verbose:
+            print(f"         🎯 Pass 2: Applying triple barrier labels")
+
+        all_results = []
+
+        with tqdm(total=total_rows, desc="         Applying barriers", unit="samples", leave=False) as pbar:
+            offset = 0
+
+            while offset < total_rows:
+                # Calculate chunk bounds with lookforward extension
+                chunk_start = offset
+                chunk_end_base = min(offset + chunk_size, total_rows)
+                chunk_end = min(chunk_end_base + lookforward_window, total_rows)
+
+                # Load chunk with lookforward data
+                chunk_df = pl.scan_parquet(parquet_path).slice(
+                    chunk_start, chunk_end - chunk_start
+                ).collect()
+
+                # Clean chunk
+                if price_column == 'price':
+                    chunk_df = chunk_df.rename({'price': 'mid_price'})
+
+                chunk_clean = chunk_df.filter(
+                    pl.col('bid_px_00').is_not_null() &
+                    pl.col('ask_px_00').is_not_null()
+                ).with_columns(
+                    ((pl.col('bid_px_00') + pl.col('ask_px_00')) / 2).alias('mid_price')
+                ).filter(
+                    pl.col('mid_price').is_not_null() &
+                    pl.col('mid_price').is_finite()
+                )
+
+                if len(chunk_clean) == 0:
+                    pbar.update(chunk_end_base - offset)
+                    offset = chunk_end_base
+                    continue
+
+                # Apply triple barrier with pre-computed volatility
+                chunk_labels = self._compute_two_pass_labels(
+                    chunk_clean, volatilities[chunk_start:chunk_end],
+                    lookforward_window, barrier_width, chunk_start
+                )
+
+                # Only keep labels for the main chunk (not the lookforward extension)
+                main_chunk_size = chunk_end_base - chunk_start
+                if len(chunk_labels) > main_chunk_size:
+                    chunk_labels = chunk_labels[:main_chunk_size]
+                    chunk_clean = chunk_clean[:main_chunk_size]
+
+                # Create result DataFrame
+                result_df = self._create_two_pass_result(chunk_clean, chunk_labels, chunk_start, symbol, barrier_width)
+                all_results.append(result_df)
+
+                pbar.update(len(chunk_labels))
+                offset = chunk_end_base
+
+        # Concatenate all results
+        return pl.concat(all_results) if all_results else pl.DataFrame()
+
+    def _compute_two_pass_labels(self, chunk_df: pl.DataFrame, chunk_volatilities: np.ndarray,
+                               lookforward_window: int, barrier_width: float, global_offset: int) -> np.ndarray:
+        """Compute triple barrier labels using pre-computed volatilities."""
+
+        prices = chunk_df['mid_price'].to_numpy()
+        labels = np.zeros(len(prices), dtype=np.int32)
+
+        # Process each position
+        for i in range(len(prices)):
+            vol_idx = min(i, len(chunk_volatilities) - 1)
+
+            # Skip if insufficient data
+            if (i + lookforward_window >= len(prices) or
+                vol_idx >= len(chunk_volatilities) or
+                np.isnan(chunk_volatilities[vol_idx])):
+                continue
+
+            entry_price = prices[i]
+            volatility = chunk_volatilities[vol_idx]
+
+            # Calculate barriers using pre-computed volatility
+            upper_threshold = entry_price + (volatility * barrier_width)
+            lower_threshold = entry_price - (volatility * barrier_width)
+
+            # Look ahead for barrier hits
+            future_prices = prices[i + 1:i + 1 + lookforward_window]
+
+            # Find first barrier hit
+            upper_hits = np.where(future_prices >= upper_threshold)[0]
+            lower_hits = np.where(future_prices <= lower_threshold)[0]
+
+            if len(upper_hits) > 0 and len(lower_hits) > 0:
+                # Both barriers hit - use the first one
+                if upper_hits[0] < lower_hits[0]:
+                    labels[i] = 1  # Long signal
+                else:
+                    labels[i] = -1  # Short signal
+            elif len(upper_hits) > 0:
+                labels[i] = 1  # Long signal
+            elif len(lower_hits) > 0:
+                labels[i] = -1  # Short signal
+            else:
+                labels[i] = 0  # Timeout
+
+        return labels
+
+    def _create_two_pass_result(self, chunk_df: pl.DataFrame, labels: np.ndarray,
+                              global_offset: int, symbol: str, barrier_width: float) -> pl.DataFrame:
+        """Create result DataFrame for two-pass processing."""
+
+        # Create row indices
+        row_indices = np.arange(global_offset, global_offset + len(labels))
+
+        # Get timestamps
+        if 'ts_event' in chunk_df.columns:
+            timestamps = chunk_df['ts_event'].to_numpy()[:len(labels)]
+        elif 'timestamp' in chunk_df.columns:
+            timestamps = chunk_df['timestamp'].to_numpy()[:len(labels)]
+        else:
+            timestamps = row_indices  # Fallback
+
+        # Create base DataFrame for targets
+        result_df = pl.DataFrame({
+            'row_idx': row_indices,
+            'symbol': [symbol] * len(labels),
+            'timestamp': timestamps,
+            'adaptive_triple_barrier_label': labels,
+            'adaptive_triple_barrier_label_return': np.zeros(len(labels), dtype=np.float32),
+            'adaptive_triple_barrier_label_barrier_width': np.full(len(labels), barrier_width)
+        })
+
+        return result_df
 
 
 def create_modular_builder(generator_configs: list[dict[str, Any]]) -> ModularDatasetBuilder:

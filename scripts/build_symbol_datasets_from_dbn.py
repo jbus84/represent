@@ -303,7 +303,7 @@ def load_and_process_dbn_files(
 
             output_path = output_dir / filename
 
-            # Select only merge keys + target columns (targets-only output)
+            # Determine output columns based on whether we have target generators
             key_cols = [c for c in ["ts_event", "symbol", "ts_recv"] if c in labeled_dataset.columns]
             original_cols = ["symbol", "mid_price", "ts_event"]
             target_cols = [
@@ -312,31 +312,61 @@ def load_and_process_dbn_files(
                 if col not in original_cols
                 and not col.startswith(("bid_", "ask_", "ts_", "size_", "ct_"))
             ]
-            targets_only_cols = list(dict.fromkeys(key_cols + target_cols))  # preserve order, dedupe
-            targets_only_df = labeled_dataset.select(targets_only_cols)
 
-            # Save targets-only dataset
-            builder.save_dataset(targets_only_df, output_path)
+            if target_generators:
+                # Standard behavior: select only merge keys + target columns (targets-only output)
+                output_cols = list(dict.fromkeys(key_cols + target_cols))  # preserve order, dedupe
+                output_df = labeled_dataset.select(output_cols)
+                output_type = "targets-only"
 
-            print(f"   ✅ Saved: {output_path}")
-            print(
-                f"   📊 Final targets-only dataset: {len(targets_only_df):,} samples, {len(targets_only_df.columns)} columns"
-            )
+                # Save targets-only dataset
+                builder.save_dataset(output_df, output_path)
 
-            # Report on target columns created
-            if target_cols:
-                print(f"   🎯 Target columns: {', '.join(target_cols)}")
+                print(f"   ✅ Saved: {output_path}")
+                print(
+                    f"   📊 Final targets-only dataset: {len(output_df):,} samples, {len(output_df.columns)} columns"
+                )
+
+                # Report on target columns created
+                if target_cols:
+                    print(f"   🎯 Target columns: {', '.join(target_cols)}")
+            else:
+                # inputs_only preset: include ALL original DBN columns for optimization
+                # Keep all columns including bid_, ask_, size_, ct_ for comprehensive inputs
+                excluded_cols = {"ts_recv"}  # Only exclude duplicate timestamps, keep ts_event
+                output_cols = [
+                    col for col in labeled_dataset.columns
+                    if col not in excluded_cols
+                ]
+                output_df = labeled_dataset.select(output_cols)
+                output_type = "inputs-only (all DBN columns)"
+
+                # Save full inputs dataset
+                builder.save_dataset(output_df, output_path)
+
+                print(f"   ✅ Saved: {output_path}")
+                print(
+                    f"   📊 Final inputs dataset: {len(output_df):,} samples, {len(output_df.columns)} columns (all DBN columns preserved)"
+                )
+
+                # Report on preserved LOB columns
+                lob_cols = [col for col in output_df.columns if col.startswith(("bid_", "ask_"))]
+                if lob_cols:
+                    print(f"   📈 LOB columns preserved: {len(lob_cols)} (bid_px, ask_px, bid_sz, ask_sz, bid_ct, ask_ct)")
+                else:
+                    print("   ⚠️  No LOB columns found in source data")
 
             created_datasets.append(
                 {
                     "symbol": symbol,
                     "path": output_path,
-                    "samples": len(targets_only_df),
-                    "columns": len(targets_only_df.columns),
-                    "targets": target_cols,
+                    "samples": len(output_df),
+                    "columns": len(output_df.columns),
+                    "targets": target_cols if target_generators else [],
+                    "output_type": output_type,
                 }
             )
-            total_samples += len(targets_only_df)
+            total_samples += len(output_df)
 
         except Exception as e:
             print(f"   ❌ Error processing symbol {symbol}: {e}")
@@ -484,10 +514,12 @@ Examples:
 
         for dataset in results["created_datasets"]:
             print(
-                f"  • {dataset['symbol']}: {dataset['samples']:,} samples, {dataset['columns']} columns"
+                f"  • {dataset['symbol']}: {dataset['samples']:,} samples, {dataset['columns']} columns ({dataset['output_type']})"
             )
             if dataset["targets"]:
                 print(f"    🎯 Targets: {', '.join(dataset['targets'])}")
+            elif dataset['output_type'] == "inputs-only (all DBN columns)":
+                print(f"    📈 All original DBN columns preserved for optimization")
 
         print("\n🚀 Symbol datasets ready for ML training!")
         print("💡 Each dataset contains ALL original DBN columns PLUS the generated target labels")

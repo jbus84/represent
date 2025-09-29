@@ -208,16 +208,20 @@ class ParameterStorage:
         n_rows = (n_params + n_cols - 1) // n_cols
 
         fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, 5 * n_rows))
+
+        # Ensure axes is always a 2D array for consistent indexing
         if n_params == 1:
-            axes = [axes]
+            axes = np.array([[axes]])
         elif n_rows == 1:
             axes = axes.reshape(1, -1)
+        elif n_cols == 1:
+            axes = axes.reshape(-1, 1)
 
         # Plot each parameter
         for i, param in enumerate(param_cols):
             row = i // n_cols
             col = i % n_cols
-            ax = axes[row, col] if n_rows > 1 else axes[col]
+            ax = axes[row, col]
 
             # Create box plot or violin plot depending on data
             if df[param].nunique() > 1:

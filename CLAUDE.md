@@ -233,9 +233,10 @@ When working on this codebase:
 5. **TYPE SAFETY** - Fix all type annotations, use Pydantic configs
 6. **VECTORIZED OPERATIONS** - Use Polars/NumPy for all data operations
 7. **NO BACKWARDS COMPATIBILITY** - Remove old approaches that don't fit architecture
-8. **TEST THOROUGHLY** - Include performance tests with benchmarks
-9. **VALIDATE AT STARTUP** - Pre-validate schemas, use lookups over calculations
-10. **MODULAR DESIGN** - Each target generator should be independent and composable
+8. **NO FALLBACKS** - Never use default/fallback parameters that hide bugs or inconsistencies
+9. **TEST THOROUGHLY** - Include performance tests with benchmarks
+10. **VALIDATE AT STARTUP** - Pre-validate schemas, use lookups over calculations
+11. **MODULAR DESIGN** - Each target generator should be independent and composable
 
 ## Key Files and Components
 

@@ -20,7 +20,242 @@ from represent.large_scale_optimization import LargeScaleParameterOptimizer
 from represent.parameter_storage import ParameterStorage, save_optimization_results
 
 
-def generate_diagnostics_comprehensive_plots_for_symbol(
+def generate_label_grouped_plots_for_symbol(
+    symbol_info: dict[str, Any],
+    symbol_results: dict[str, dict[str, Any]],
+    examples_per_label: int = 10,
+    window_size: int = 100_000
+) -> None:
+    """Generate 3 plots grouped by label type (-1, 0, +1) with multiple examples per plot.
+
+    Output structure:
+    - outputs/plots/optimization/[SYMBOL]/label_long_examples.png (label = +1)
+    - outputs/plots/optimization/[SYMBOL]/label_timeout_examples.png (label = 0)
+    - outputs/plots/optimization/[SYMBOL]/label_short_examples.png (label = -1)
+    """
+    from pathlib import Path as _P
+    import polars as pl
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from represent.target_generators.factory import TargetGeneratorFactory
+
+    from diagnostics.comprehensive_method_debugging import simulate_optimization_sampling
+
+    symbol_name = symbol_info['symbol']
+
+    # Only process adaptive triple barrier method for cleaner visualization
+    if 'triple_barrier_adaptive' not in symbol_results:
+        print(f"⚠️  No adaptive triple barrier results for {symbol_name}")
+        return
+
+    method_result = symbol_results['triple_barrier_adaptive']
+    optimal_params = method_result.get('optimal_params', {})
+
+    print(f"   Using parameters: {optimal_params}")
+
+    # Load full dataset for the symbol
+    df = pl.read_parquet(symbol_info['file_path'])
+    df = df.filter(pl.col('mid_price').is_not_null())
+
+    # Generate many windows to find diverse examples
+    total_windows = examples_per_label * 5  # Generate 5x more to ensure diversity
+    win_list = simulate_optimization_sampling(df, window_size, n_windows=total_windows)
+
+    # Create generator with optimized parameters
+    generator = TargetGeneratorFactory.create("triple_barrier_adaptive", **optimal_params)
+
+    # Collect examples for each label type
+    label_examples = {-1: [], 0: [], 1: []}
+
+    print(f"   Searching for label examples in {total_windows} windows...")
+
+    for window_idx, window_df in enumerate(win_list):
+        if all(len(examples) >= examples_per_label for examples in label_examples.values()):
+            break  # Found enough examples for all labels
+
+        # Generate labels for this window
+        targets_df = generator.generate_targets(window_df)
+        labels = targets_df['adaptive_triple_barrier_label'].to_numpy()
+        prices = window_df['mid_price'].to_numpy()
+
+        # Extract metadata for plotting (no more recalculation needed!)
+        volatilities = targets_df['adaptive_triple_barrier_label_volatility'].to_numpy()
+        upper_barriers = targets_df['adaptive_triple_barrier_label_upper_barrier'].to_numpy()
+        lower_barriers = targets_df['adaptive_triple_barrier_label_lower_barrier'].to_numpy()
+        exit_prices = targets_df['adaptive_triple_barrier_label_exit_price'].to_numpy()
+        exit_indices = targets_df['adaptive_triple_barrier_label_exit_index'].to_numpy()
+
+        # Find representative examples of each label in this window
+        for label_value in [-1, 0, 1]:
+            if len(label_examples[label_value]) >= examples_per_label:
+                continue
+
+            label_indices = np.where(labels == label_value)[0]
+            if len(label_indices) > 0:
+                # Pick a representative example from this window
+                mid_idx = label_indices[len(label_indices) // 2]  # Middle example
+
+                # VALIDATION: Ensure the selected label actually matches what we expect
+                actual_label = labels[mid_idx]
+                if actual_label != label_value:
+                    print(f"   ⚠️  Label mismatch at index {mid_idx}: expected {label_value}, got {actual_label}")
+                    continue
+
+                # Extract a focused window around this example
+                lookforward = optimal_params.get('lookforward_window', 1000)
+                start_idx = max(0, mid_idx - lookforward)
+                end_idx = min(len(prices), mid_idx + lookforward * 2)
+
+                example = {
+                    'window_idx': window_idx,
+                    'label_idx': mid_idx,
+                    'prices': prices[start_idx:end_idx],
+                    'labels': labels[start_idx:end_idx],
+                    'focus_idx': mid_idx - start_idx,  # Index of the target label in the extracted segment
+                    'label_value': label_value,
+                    'validated_label': actual_label,  # Store the validated label for double-checking
+                    # Add stored metadata - NO MORE RECALCULATION NEEDED!
+                    'volatility': volatilities[mid_idx],
+                    'upper_barrier': upper_barriers[mid_idx],
+                    'lower_barrier': lower_barriers[mid_idx],
+                    'exit_price': exit_prices[mid_idx],
+                    'exit_index': exit_indices[mid_idx]
+                }
+                label_examples[label_value].append(example)
+
+    # Create 3 plots: one for each label type
+    label_names = {-1: 'Short', 0: 'Timeout', 1: 'Long'}
+
+    base_dir = _P('outputs/plots/optimization') / symbol_name
+    base_dir.mkdir(parents=True, exist_ok=True)
+
+    for label_value, examples in label_examples.items():
+        if not examples:
+            print(f"   ⚠️  No examples found for label {label_value} ({label_names[label_value]})")
+            continue
+
+        # Limit to requested number of examples
+        examples = examples[:examples_per_label]
+
+        print(f"   📊 Creating {label_names[label_value]} plot with {len(examples)} examples...")
+
+        # Create subplot grid
+        n_examples = len(examples)
+        n_cols = min(5, n_examples)
+        n_rows = (n_examples + n_cols - 1) // n_cols
+
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=(4 * n_cols, 3 * n_rows))
+
+        # Handle single subplot case
+        if n_examples == 1:
+            axes = np.array([[axes]])
+        elif n_rows == 1:
+            axes = axes.reshape(1, -1)
+        elif n_cols == 1:
+            axes = axes.reshape(-1, 1)
+
+        fig.suptitle(f'{symbol_name} - {label_names[label_value]} Examples (Label {label_value})',
+                    fontsize=16, fontweight='bold')
+
+        for i, example in enumerate(examples):
+            row = i // n_cols
+            col = i % n_cols
+            ax = axes[row, col]
+
+            prices = example['prices']
+            labels = example['labels']
+            focus_idx = example['focus_idx']
+
+            # Plot price line
+            time_axis = np.arange(len(prices))
+            ax.plot(time_axis, prices, 'black', linewidth=1.0, alpha=0.8, label='Price')
+
+            # TRIPLE BARRIER VISUALIZATION: Show actual barriers and trade execution
+            if focus_idx < len(prices):
+                entry_price = prices[focus_idx]
+                lookforward_window = optimal_params.get('lookforward_window', 1000)
+
+                # Use STORED metadata instead of recalculating - this ensures consistency!
+                upper_barrier = example['upper_barrier']
+                lower_barrier = example['lower_barrier']
+                volatility = example['volatility']
+
+                print(f"    Using stored barriers: upper={upper_barrier:.4f}, lower={lower_barrier:.4f}, volatility={volatility:.6f}")
+
+                # Draw barriers
+                barrier_start = focus_idx
+                barrier_end = min(len(prices), focus_idx + lookforward_window)
+                barrier_time = np.arange(barrier_start, barrier_end)
+
+                if len(barrier_time) > 0:
+                    ax.plot(barrier_time, [upper_barrier] * len(barrier_time),
+                           'g--', alpha=0.7, linewidth=2, label='Upper Barrier')
+                    ax.plot(barrier_time, [lower_barrier] * len(barrier_time),
+                           'r--', alpha=0.7, linewidth=2, label='Lower Barrier')
+
+                    # Draw time barrier (vertical line)
+                    if barrier_end - 1 < len(time_axis):
+                        ax.axvline(x=barrier_end - 1, color='orange', linestyle=':',
+                                  alpha=0.7, linewidth=2, label='Time Barrier')
+
+                # Highlight entry point
+                ax.scatter(focus_idx, entry_price, color='blue', s=120, alpha=0.9,
+                          zorder=5, marker='o', edgecolors='white', linewidth=2,
+                          label='Entry Point')
+
+                # Use the ORIGINAL label outcome instead of recalculating
+                # This ensures consistency with the filtering
+                original_label = example['label_value']
+                label_to_reason = {1: 'Upper Hit', -1: 'Lower Hit', 0: 'Timeout'}
+                label_to_color = {1: 'green', -1: 'red', 0: 'orange'}
+
+                exit_reason = label_to_reason[original_label]
+                exit_color = label_to_color[original_label]
+
+                # Use STORED exit information instead of recalculating - this ensures consistency!
+                stored_exit_index = example['exit_index']  # Relative index from generator
+                stored_exit_price = example['exit_price']
+                exit_idx = focus_idx + 1 + stored_exit_index  # Convert to absolute index in price window
+
+                print(f"    Using stored exit: relative_idx={stored_exit_index}, exit_price={stored_exit_price:.4f}")
+
+                # Highlight exit point
+                if exit_idx is not None and exit_idx < len(prices):
+                    ax.scatter(exit_idx, prices[exit_idx], color=exit_color, s=100,
+                              alpha=0.9, zorder=5, marker='X', label=f'Exit ({exit_reason})')
+
+            # VALIDATION: Double-check the example is correctly filtered
+            validated_label = example.get('validated_label', example['label_value'])
+            if validated_label != label_value:
+                validation_status = "⚠️ MISMATCH"
+            else:
+                validation_status = "✅"
+
+            ax.set_title(f'Example {i+1}: {label_names[label_value]} Signal {validation_status}\n(Window {example["window_idx"]+1})')
+            ax.set_xlabel('Time (ticks)')
+            ax.set_ylabel('Price')
+            ax.grid(True, alpha=0.3)
+
+            if i == 0:  # Add legend to first subplot
+                ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+
+        # Hide empty subplots
+        for i in range(n_examples, n_rows * n_cols):
+            row = i // n_cols
+            col = i % n_cols
+            axes[row, col].set_visible(False)
+
+        plt.tight_layout()
+
+        # Save plot
+        output_file = base_dir / f'label_{label_names[label_value].lower()}_examples.png'
+        plt.savefig(output_file, dpi=150, bbox_inches='tight')
+        plt.close()
+
+        print(f"   ✅ Saved: {output_file}")
+
+
+def generate_diagnostics_comprehensive_plots_for_symbol_DEPRECATED(
     symbol_info: dict[str, Any],
     symbol_results: dict[str, dict[str, Any]],
     windows: int = 3,
@@ -361,7 +596,6 @@ def calculate_additional_metrics(prices: np.ndarray, method: str, optimal_params
     try:
         # Import here to avoid circular imports
         import polars as pl
-
         from represent.target_generators.factory import TargetGeneratorFactory
 
         # Use EXACT same windowing parameters and sampling strategy as optimization
@@ -604,9 +838,32 @@ def optimize_symbol_dataset(
         print(f"❌ Failed to load {symbol}: {e}")
         return {}
 
+    # Smart processing strategy based on dataset size
+    dataset_size = len(prices)
+    sequential_max = 5_000_000
+
+    # Create symbol-specific config
+    symbol_config = optimization_config.copy()
+
+    if dataset_size <= sequential_max:
+        # Use full sequential processing for smaller datasets
+        symbol_config['use_sequential_processing'] = True
+        print(f"   🔄 Using SEQUENTIAL processing (dataset: {dataset_size:,} ≤ {sequential_max:,})")
+    elif dataset_size <= 10_000_000:
+        # Use sequential processing with subset for medium datasets
+        symbol_config['use_sequential_processing'] = True
+        symbol_config['sequential_subset_size'] = 3_000_000  # Use 3M sample subset
+        print(f"   🔄 Using SEQUENTIAL processing with 3M subset (dataset: {dataset_size:,})")
+    else:
+        # Use windowed processing with larger windows for very large datasets
+        symbol_config['use_sequential_processing'] = False
+        symbol_config['window_size'] = 100_000  # 100K samples per window for large datasets
+        symbol_config['n_windows'] = 10  # More windows for better coverage
+        print(f"   🔄 Using WINDOWED processing with 100K windows (dataset: {dataset_size:,} > 10M)")
+
     # Initialize optimizer with symbol-specific configuration
     optimizer = LargeScaleParameterOptimizer(
-        **optimization_config,
+        **symbol_config,
         verbose=True
     )
 
@@ -699,7 +956,7 @@ def run_all_symbol_optimizations(
         Complete optimization results
     """
     if methods is None:
-        methods = ['triple_barrier', 'triple_barrier_adaptive', 'triple_exceedance']
+        methods = ['triple_barrier_adaptive']  # Only run adaptive method for easier iteration
 
     # Discover symbol datasets
     print("🔍 DISCOVERING SYMBOL DATASETS")
@@ -740,6 +997,8 @@ def run_all_symbol_optimizations(
         'use_cross_validation': True,  # Enable cross-validation to prevent overfitting
         'target_coverage': 0.25,      # Increase dataset coverage from 2.3% to 25%
         'validation_split': 0.3,      # 30% of windows for validation
+        # FIXED: Use sequential processing to match application behavior
+        'use_sequential_processing': False,  # Will be enabled conditionally based on dataset size
     }
 
     print("\n🎯 OPTIMIZATION CONFIGURATION")
@@ -777,16 +1036,16 @@ def run_all_symbol_optimizations(
                     str(params_dir)
                 )
 
-                # Generate comprehensive 100k-window visualizations per symbol via diagnostics
+                # Generate comprehensive label-grouped visualizations per symbol via diagnostics
                 try:
-                    print(f"📊 Generating comprehensive Nk-window visualizations for {symbol} via diagnostics...")
-                    generate_diagnostics_comprehensive_plots_for_symbol(
+                    print(f"📊 Generating label-grouped visualizations for {symbol} via diagnostics...")
+                    generate_label_grouped_plots_for_symbol(
                         symbol_info,
                         symbol_results,
-                        windows=3,
-                        window_size=25_000,  # USER REQ: Max 25K sampling window
+                        examples_per_label=10,  # 10 examples per label type
+                        window_size=100_000,  # Match optimization window size to see timeouts
                     )
-                    print(f"✅ Comprehensive windows generated for {symbol}")
+                    print(f"✅ Label-grouped plots generated for {symbol}")
                 except Exception as viz_error:
                     print(f"⚠️  Visualization failed for {symbol}: {viz_error}")
 
@@ -843,19 +1102,19 @@ def generate_optimization_report(
             # Parameter distributions for each method
             for method in comparison_df['method'].unique():
                 viz_path = output_path / f"parameter_distributions_{method}.png"
-                fig = storage.visualize_parameter_distributions(method=method, save_path=viz_path)
+                fig = storage.visualize_parameter_distributions(method=method, save_path=str(viz_path))
                 if fig:
                     print(f"   ✅ {method} parameter distributions: {viz_path}")
 
             # Returns comparison
             returns_path = output_path / "returns_comparison.png"
-            fig = storage.create_returns_comparison(save_path=returns_path)
+            fig = storage.create_returns_comparison(save_path=str(returns_path))
             if fig:
                 print(f"   ✅ Returns comparison: {returns_path}")
 
             # Export markdown report
             markdown_path = output_path / "OPTIMIZATION_RESULTS.md"
-            storage.export_to_markdown(markdown_path)
+            storage.export_to_markdown(str(markdown_path))
             print(f"✅ Markdown report: {markdown_path}")
 
         else:
@@ -879,8 +1138,8 @@ def main():
     data_dir = Path("/Users/danielfisher/data/databento/symbol_datasets/inputs")
     output_dir = Path("outputs/optimization_results")
     # Use only triple barrier methods
-    methods = ['triple_barrier', 'triple_barrier_adaptive', 'triple_exceedance']
-    print("🎯 Using Triple Barrier methods only")
+    methods = ['triple_barrier_adaptive']  # Only run adaptive method for easier iteration
+    print("🎯 Using only Adaptive Triple Barrier method")
     max_symbols = None  # Process all symbol datasets (no limit)
 
     try:

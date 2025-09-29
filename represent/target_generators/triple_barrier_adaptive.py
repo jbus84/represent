@@ -98,8 +98,14 @@ class TripleBarrierGeneratorAdaptive(TargetGenerator):
             )
             labels = np.zeros(len(prices), dtype=np.int32)
             label_metadata = np.zeros(len(prices), dtype=np.float32)
+            # Create empty plotting metadata for insufficient data case
+            volatilities = np.zeros(len(prices), dtype=np.float32)
+            upper_barriers = np.zeros(len(prices), dtype=np.float32)
+            lower_barriers = np.zeros(len(prices), dtype=np.float32)
+            exit_prices = np.zeros(len(prices), dtype=np.float32)
+            exit_indices = np.zeros(len(prices), dtype=np.int32)
         else:
-            labels, label_metadata = self._compute_triple_barrier_labels(prices)
+            labels, label_metadata, volatilities, upper_barriers, lower_barriers, exit_prices, exit_indices = self._compute_triple_barrier_labels_with_metadata(prices)
 
         # Create base DataFrame with metadata
         result_df = self._create_base_target_df(df, symbol)
@@ -107,13 +113,109 @@ class TripleBarrierGeneratorAdaptive(TargetGenerator):
         # Add target column
         result_df = result_df.with_columns(pl.Series(self.target_name, labels))
 
-        # Add metadata columns for analysis
+        # Add ALL metadata columns for complete plotting information
         result_df = result_df.with_columns([
             pl.Series(f"{self.target_name}_return", label_metadata),  # Expected return
-            pl.Series(f"{self.target_name}_barrier_width", np.full(len(labels), self.barrier_width))
+            pl.Series(f"{self.target_name}_barrier_width", np.full(len(labels), self.barrier_width)),  # Parameter
+            pl.Series(f"{self.target_name}_volatility", volatilities),  # Actual volatility used
+            pl.Series(f"{self.target_name}_upper_barrier", upper_barriers),  # Upper barrier level
+            pl.Series(f"{self.target_name}_lower_barrier", lower_barriers),  # Lower barrier level
+            pl.Series(f"{self.target_name}_exit_price", exit_prices),  # Exit price
+            pl.Series(f"{self.target_name}_exit_index", exit_indices),  # Exit index (relative to entry)
         ])
 
         return result_df
+
+    def _compute_triple_barrier_labels_with_metadata(self, prices: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Compute triple barrier labels WITH full plotting metadata.
+
+        Returns:
+            Tuple of (labels, returns, volatilities, upper_barriers, lower_barriers, exit_prices, exit_indices)
+        """
+        n_samples = len(prices)
+        labels = np.zeros(n_samples, dtype=np.int32)
+        metadata = np.zeros(n_samples, dtype=np.float32)
+
+        # NEW: Store all plotting information
+        volatilities = np.zeros(n_samples, dtype=np.float32)
+        upper_barriers = np.zeros(n_samples, dtype=np.float32)
+        lower_barriers = np.zeros(n_samples, dtype=np.float32)
+        exit_prices = np.zeros(n_samples, dtype=np.float32)
+        exit_indices = np.zeros(n_samples, dtype=np.int32)
+
+        # Process each position
+        for i in range(self.lookback_window, n_samples - self.lookforward_window):
+            entry_price = prices[i]
+
+            # Calculate and STORE volatility
+            volatility = np.std(prices[i-self.lookback_window:i+1])
+            volatilities[i] = volatility
+
+            # Calculate and STORE barrier levels
+            upper_threshold = entry_price + (volatility * self.barrier_width)
+            lower_threshold = entry_price - (volatility * self.barrier_width)
+            upper_barriers[i] = upper_threshold
+            lower_barriers[i] = lower_threshold
+
+            # Look ahead for barrier hits
+            future_prices = prices[i+1:i+1+self.lookforward_window]
+
+            # Find first barrier hit and STORE exit information
+            upper_hits = np.where(future_prices >= upper_threshold)[0]
+            lower_hits = np.where(future_prices <= lower_threshold)[0]
+
+            if len(upper_hits) > 0 and len(lower_hits) > 0:
+                # Both barriers hit - use the first one
+                upper_time = upper_hits[0]
+                lower_time = lower_hits[0]
+
+                if upper_time < lower_time:
+                    # Upper barrier hit first → LONG signal
+                    labels[i] = 1
+                    exit_idx = upper_time
+                    exit_price = future_prices[upper_time]
+                    realized_return = (exit_price - entry_price) / entry_price - self.transaction_cost
+                elif lower_time < upper_time:
+                    # Lower barrier hit first → SHORT signal
+                    labels[i] = -1
+                    exit_idx = lower_time
+                    exit_price = future_prices[lower_time]
+                    realized_return = (entry_price - exit_price) / entry_price - self.transaction_cost
+                else:
+                    # Simultaneous hit (rare) - treat as timeout
+                    labels[i] = 0
+                    exit_idx = len(future_prices) - 1
+                    exit_price = future_prices[-1]
+                    realized_return = abs(exit_price - entry_price) / entry_price - self.transaction_cost
+
+            elif len(upper_hits) > 0:
+                # Only upper barrier hit → LONG signal
+                labels[i] = 1
+                exit_idx = upper_hits[0]
+                exit_price = future_prices[upper_hits[0]]
+                realized_return = (exit_price - entry_price) / entry_price - self.transaction_cost
+
+            elif len(lower_hits) > 0:
+                # Only lower barrier hit → SHORT signal
+                labels[i] = -1
+                exit_idx = lower_hits[0]
+                exit_price = future_prices[lower_hits[0]]
+                realized_return = (entry_price - exit_price) / entry_price - self.transaction_cost
+
+            else:
+                # Time barrier hit (timeout) - no directional move
+                labels[i] = 0
+                exit_idx = len(future_prices) - 1
+                exit_price = future_prices[-1]
+                realized_return = (exit_price - entry_price) / entry_price - self.transaction_cost
+
+            # Store exit information
+            exit_prices[i] = exit_price
+            exit_indices[i] = exit_idx  # Relative to entry point
+            metadata[i] = realized_return
+
+        return labels, metadata, volatilities, upper_barriers, lower_barriers, exit_prices, exit_indices
 
     def _compute_triple_barrier_labels(self, prices: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """

@@ -86,6 +86,9 @@ class LargeScaleParameterOptimizer:
         validation_split: float = 0.3,  # 30% for validation
         # Debug logging
         debug_log_path: str | Path | None = None,
+        # Sequential processing (to match application behavior)
+        use_sequential_processing: bool = False,  # NEW: Process full dataset sequentially
+        sequential_subset_size: int | None = None,  # Optional subset size for large datasets
     ):
         """
         Initialize large-scale parameter optimizer.
@@ -105,6 +108,7 @@ class LargeScaleParameterOptimizer:
             stabilization_threshold: Parameter change threshold for stability (default: 0.05)
             stabilization_patience: Required stable evaluations before stopping growth (default: 3)
             growth_factor: Window size growth factor when unstable (default: 1.5)
+            use_sequential_processing: Process full dataset sequentially to match application (default: False)
         """
         if not OPTIMIZATION_AVAILABLE:
             raise ImportError(
@@ -146,6 +150,9 @@ class LargeScaleParameterOptimizer:
         self.validation_split = validation_split
         # Debug logging path
         self.debug_log_path = Path(debug_log_path) if debug_log_path else None
+        # Sequential processing flag
+        self.use_sequential_processing = use_sequential_processing
+        self.sequential_subset_size = sequential_subset_size
 
         # Adaptive sampling state
         self.current_window_size = window_size
@@ -244,9 +251,23 @@ class LargeScaleParameterOptimizer:
                         casted_params[k] = v
 
                 # Sample multiple windows and evaluate
-                current_n_windows = self.current_n_windows if self.adaptive_sampling else self.n_windows
-
-                windows = self.sample_windows(prices, current_n_windows)
+                if self.use_sequential_processing:
+                    # Use dataset sequentially to match application behavior
+                    if self.sequential_subset_size and len(prices) > self.sequential_subset_size:
+                        # Use random subset for large datasets
+                        subset_indices = self.rng.choice(len(prices), self.sequential_subset_size, replace=False)
+                        subset_indices.sort()  # Keep temporal order
+                        subset_prices = prices[subset_indices]
+                        windows = [subset_prices]
+                        current_n_windows = 1
+                    else:
+                        # Use full dataset
+                        windows = [prices]
+                        current_n_windows = 1
+                else:
+                    # Standard windowed sampling
+                    current_n_windows = self.current_n_windows if self.adaptive_sampling else self.n_windows
+                    windows = self.sample_windows(prices, current_n_windows)
 
                 total_pnl = 0.0
                 valid_evaluations = 0
@@ -336,7 +357,9 @@ class LargeScaleParameterOptimizer:
 
                         if self.verbose:
                             print(f"   ⚖️  Class balance score: {balance_score:.1f}% (higher is better)")
-                            print(f"      Distribution: {dict(zip(unique_labels, percentages, strict=True))}")
+                            # Convert to integer percentages for cleaner display
+                            int_percentages = [f"{p:.0f}%" for p in percentages]
+                            print(f"      Distribution: {dict(zip(unique_labels, int_percentages, strict=True))}")
                             print(f"      Returns: {avg_return:.3f}, Balance: {balance_score:.1f}%")
 
                 # Track parameter history for stability analysis (if adaptive sampling is enabled)
@@ -857,7 +880,20 @@ class LargeScaleParameterOptimizer:
                 generator = generator_class(**filtered_params)
 
                 # Sample windows for evaluation
-                windows = self.sample_windows(prices, self.current_n_windows)
+                if self.use_sequential_processing:
+                    # Use dataset sequentially to match application behavior
+                    if self.sequential_subset_size and len(prices) > self.sequential_subset_size:
+                        # Use random subset for large datasets
+                        subset_indices = self.rng.choice(len(prices), self.sequential_subset_size, replace=False)
+                        subset_indices.sort()  # Keep temporal order
+                        subset_prices = prices[subset_indices]
+                        windows = [subset_prices]
+                    else:
+                        # Use full dataset
+                        windows = [prices]
+                else:
+                    # Standard windowed sampling
+                    windows = self.sample_windows(prices, self.current_n_windows)
 
                 # Evaluate across all windows
                 total_pnl = 0.0
@@ -1016,8 +1052,25 @@ class LargeScaleParameterOptimizer:
 
                 generator = generator_class(**casted_params)
 
-                # Use robust sampling with cross-validation if enabled
-                if self.use_cross_validation:
+                # Choose evaluation strategy based on configuration
+                if self.use_sequential_processing:
+                    # NEW: Process dataset sequentially to match application behavior
+                    if self.sequential_subset_size and len(prices) > self.sequential_subset_size:
+                        # Use random subset for large datasets
+                        subset_indices = self.rng.choice(len(prices), self.sequential_subset_size, replace=False)
+                        subset_indices.sort()  # Keep temporal order
+                        subset_prices = prices[subset_indices]
+                        windows = [subset_prices]
+                        if self.verbose:
+                            print(f"      🔄 Using sequential processing on subset ({len(subset_prices):,} / {len(prices):,} samples)")
+                    else:
+                        # Use full dataset
+                        windows = [prices]
+                        if self.verbose:
+                            print(f"      🔄 Using sequential processing on full dataset ({len(prices):,} samples)")
+                    cv_windows = []
+                elif self.use_cross_validation:
+                    # Use robust sampling with cross-validation
                     training_windows, validation_windows = self.sample_windows_robust(
                         prices,
                         n_windows=self.current_n_windows,
@@ -1027,10 +1080,14 @@ class LargeScaleParameterOptimizer:
                     # Use training windows for optimization, validation for final check
                     windows = training_windows
                     cv_windows = validation_windows
+                    if self.verbose:
+                        print(f"      🔄 Using cross-validated sampling ({len(windows)} training windows)")
                 else:
                     # Standard sampling for backwards compatibility
                     windows = self.sample_windows(prices, n_windows=self.current_n_windows)
                     cv_windows = []
+                    if self.verbose:
+                        print(f"      🔄 Using standard windowed sampling ({len(windows)} windows)")
 
                 total_returns = 0.0
                 total_signals = 0  # Track signal count for frequency penalty
@@ -1132,7 +1189,10 @@ class LargeScaleParameterOptimizer:
                 balance_score = 0.0
                 if method_name in ['Triple Barrier (Large-Scale)', 'Triple Barrier Adaptive (Large-Scale)', 'Triple Exceedance (Large-Scale)']:
                     all_labels = []
-                    for window_prices in windows:
+                    # Use the same windows as the main evaluation (already handles sequential vs windowed)
+                    evaluation_windows = windows
+
+                    for window_prices in evaluation_windows:
                         try:
                             generator = generator_class(**casted_params)
                             window_df = pl.DataFrame({
@@ -1158,7 +1218,9 @@ class LargeScaleParameterOptimizer:
 
                         if self.verbose and evaluation_count[0] <= 3:
                             print(f"   ⚖️  Class balance score: {balance_score:.1f}% (higher is better)")
-                            print(f"      Distribution: {dict(zip(unique_labels, percentages, strict=True))}")
+                            # Convert to integer percentages for cleaner display
+                            int_percentages = [f"{p:.0f}%" for p in percentages]
+                            print(f"      Distribution: {dict(zip(unique_labels, int_percentages, strict=True))}")
                             print(f"      Returns: {avg_returns:.3f}, Balance: {balance_score:.1f}%")
 
                 # Cross-validation check if enabled
@@ -1389,6 +1451,62 @@ class LargeScaleParameterOptimizer:
                 print(f"   📊 Sample efficiency: {efficiency:.1f}% of dataset used")
 
             print(f"   ⏱️  Effective speedup: ~{total_samples/samples_per_eval:.0f}x faster")
+
+        # FINAL EVALUATION: Apply best parameters to entire dataset
+        if self.verbose:
+            print("\n🔄 Final evaluation on entire dataset...")
+
+        try:
+            # Create generator with optimal parameters
+            final_generator = generator_class(**optimal_params)
+
+            # Apply to full dataset
+            if self.use_sequential_processing:
+                # Use full dataset for final evaluation
+                final_data = prices
+            else:
+                # Use a large representative sample for final evaluation
+                max_final_samples = min(1_000_000, len(prices))  # Up to 1M samples
+                if len(prices) > max_final_samples:
+                    final_indices = self.rng.choice(len(prices), max_final_samples, replace=False)
+                    final_indices.sort()  # Keep temporal order
+                    final_data = prices[final_indices]
+                else:
+                    final_data = prices
+
+            # Create DataFrame and generate targets
+            import polars as pl
+            final_df = pl.DataFrame({
+                'mid_price': final_data,
+                'ts_event': range(len(final_data))
+            })
+
+            final_targets = final_generator.generate_targets(final_df)
+            target_info = final_generator.get_target_info()
+            final_labels = final_targets[target_info['target_names'][0]].to_numpy()
+
+            # Calculate final metrics
+            unique_labels, counts = np.unique(final_labels[~np.isnan(final_labels)], return_counts=True)
+            total_final = len(final_labels[~np.isnan(final_labels)])
+
+            if len(unique_labels) > 1:
+                percentages = counts / total_final * 100
+                balance_score = min(percentages) / max(percentages) * 100
+                int_percentages = [f"{p:.0f}%" for p in percentages]
+
+                if self.verbose:
+                    print(f"📊 FINAL DATASET METRICS ({len(final_data):,} samples):")
+                    print(f"   ⚖️  Class balance: {balance_score:.1f}% ({len(unique_labels)} classes)")
+                    print(f"   📈 Label distribution: {dict(zip(unique_labels, int_percentages, strict=True))}")
+
+                    # Signal frequency
+                    non_zero_signals = np.count_nonzero(final_labels[~np.isnan(final_labels)])
+                    signal_freq = non_zero_signals / total_final * 100
+                    print(f"   📊 Signal frequency: {signal_freq:.1f}% ({non_zero_signals:,}/{total_final:,})")
+
+        except Exception as e:
+            if self.verbose:
+                print(f"   ⚠️  Final evaluation failed: {e}")
 
         return {
             'method': method_name,

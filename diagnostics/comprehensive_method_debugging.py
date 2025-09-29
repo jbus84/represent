@@ -67,7 +67,7 @@ def get_all_optimization_methods():
         {
             "name": "Triple Barrier",
             "method": "triple_barrier",
-            "params": {"lookforward_window": 7598, "barrier_width": 0.000527},  # CURRENT: Latest optimization results average
+            "params": {},  # NO FALLBACKS - Must use optimized parameters only
             "color_map": {-1: "red", 0: "gray", 1: "green"},
             "label_names": {-1: "Short", 0: "Timeout", 1: "Long"},
             "has_barriers": True
@@ -75,7 +75,7 @@ def get_all_optimization_methods():
         {
             "name": "Triple Barrier Adaptive",
             "method": "triple_barrier_adaptive",
-            "params": {"lookforward_window": 2935, "lookback_window": 3803, "barrier_width": 1.51},  # CURRENT: Latest optimization results average
+            "params": {},  # NO FALLBACKS - Must use optimized parameters only
             "color_map": {-1: "red", 0: "gray", 1: "green"},
             "label_names": {-1: "Short", 0: "Timeout", 1: "Long"},
             "has_barriers": True
@@ -83,7 +83,7 @@ def get_all_optimization_methods():
         {
             "name": "Triple Exceedance (Long)",
             "method": "triple_exceedance",
-            "params": {"lookforward_window": 2900, "scaling_factor": 2.97},  # CURRENT: Latest optimization results average
+            "params": {},  # NO FALLBACKS - Must use optimized parameters only
             "color_map": {0: "red", 1: "green"},
             "label_names": {0: "Wrong Direction", 1: "Right Direction"},
             "has_barriers": True,  # FIXED: Triple exceedance also has time barriers
@@ -93,7 +93,7 @@ def get_all_optimization_methods():
         {
             "name": "Triple Exceedance (Short)",
             "method": "triple_exceedance",
-            "params": {"lookforward_window": 2900, "scaling_factor": 2.97},  # CURRENT: Latest optimization results average
+            "params": {},  # NO FALLBACKS - Must use optimized parameters only
             "color_map": {0: "red", 1: "green"},
             "label_names": {0: "Wrong Direction", 1: "Right Direction"},
             "has_barriers": True,  # FIXED: Triple exceedance also has time barriers
@@ -103,7 +103,7 @@ def get_all_optimization_methods():
         {
             "name": "GA Labeling (Long)",
             "method": "ga_labeling",
-            "params": {"population_size": 50, "max_generations": 75, "lookforward_window": 250, "transaction_cost": 0.00007},
+            "params": {},  # NO FALLBACKS - Must use optimized parameters only
             "color_map": {0: "gray", 1: "green"},
             "label_names": {0: "Hold", 1: "Buy Long"},
             "has_barriers": False,
@@ -113,7 +113,7 @@ def get_all_optimization_methods():
         {
             "name": "GA Labeling (Short)",
             "method": "ga_labeling",
-            "params": {"population_size": 50, "max_generations": 75, "lookforward_window": 250, "transaction_cost": 0.00007},
+            "params": {},  # NO FALLBACKS - Must use optimized parameters only
             "color_map": {0: "gray", 1: "red"},
             "label_names": {0: "Hold", 1: "Sell Short"},
             "has_barriers": False,
