@@ -221,22 +221,18 @@ class ModularDatasetBuilder:
             lookback_window = getattr(generator, 'lookback_window', 0)
             lookforward_window = getattr(generator, 'lookforward_window', 0)
 
-            # CRITICAL FIX: Use memory-efficient two-pass processing for adaptive methods
-            # Two-pass processing avoids boundary corruption while maintaining memory efficiency
-            if lookback_window > 0 or lookforward_window > 0:
-                if self.verbose:
-                    print(f"      🔄 Using memory-efficient two-pass processing (lookback: {lookback_window:,}, lookforward: {lookforward_window:,})")
-
-                generator_targets = self._process_with_two_pass_method(
-                    generator, parquet_path, symbol, price_column, chunk_size
-                )
-            else:
-                if self.verbose:
+            # TEMPORARY FIX: Always use standard processing to ensure generator delegation
+            # This ensures our metadata implementation is used
+            if self.verbose:
+                if lookback_window > 0 or lookforward_window > 0:
+                    print(f"      🔄 Using standard processing with generator delegation (lookback: {lookback_window:,}, lookforward: {lookforward_window:,})")
+                else:
                     print(f"      🔄 Using standard chunking")
-                generator_targets = self._process_with_standard_chunks(
-                    generator, parquet_path, symbol, price_column,
-                    chunk_size, total_rows
-                )
+
+            generator_targets = self._process_with_standard_chunks(
+                generator, parquet_path, symbol, price_column,
+                chunk_size, total_rows
+            )
 
             # Remove duplicates after chunk concatenation
             generator_targets = self._remove_duplicates(
@@ -601,14 +597,10 @@ class ModularDatasetBuilder:
                 if price_column == 'price':
                     chunk_df = chunk_df.rename({'price': 'mid_price'})
 
+                # Use existing mid_price column instead of calculating from bid/ask
                 chunk_clean = chunk_df.filter(
-                    pl.col('bid_px_00').is_not_null() &
-                    pl.col('ask_px_00').is_not_null()
-                ).with_columns(
-                    ((pl.col('bid_px_00') + pl.col('ask_px_00')) / 2).alias('mid_price')
-                ).filter(
-                    pl.col('mid_price').is_not_null() &
-                    pl.col('mid_price').is_finite()
+                    pl.col(price_column).is_not_null() &
+                    pl.col(price_column).is_finite()
                 )
 
                 if len(chunk_clean) == 0:
@@ -655,14 +647,10 @@ class ModularDatasetBuilder:
                 if price_column == 'price':
                     chunk_df = chunk_df.rename({'price': 'mid_price'})
 
+                # Use existing price column instead of calculating from bid/ask
                 chunk_clean = chunk_df.filter(
-                    pl.col('bid_px_00').is_not_null() &
-                    pl.col('ask_px_00').is_not_null()
-                ).with_columns(
-                    ((pl.col('bid_px_00') + pl.col('ask_px_00')) / 2).alias('mid_price')
-                ).filter(
-                    pl.col('mid_price').is_not_null() &
-                    pl.col('mid_price').is_finite()
+                    pl.col(price_column).is_not_null() &
+                    pl.col(price_column).is_finite()
                 )
 
                 if len(chunk_clean) == 0:
