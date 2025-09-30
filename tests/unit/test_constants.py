@@ -79,5 +79,12 @@ class TestConstants:
         # Single feature vs multiple features
         single_shape = get_output_shape(["volume"], time_bins=processor_config.time_bins)
         multi_shape = get_output_shape(["volume", "variance"], time_bins=processor_config.time_bins)
-        assert single_shape == (PRICE_LEVELS, processor_config.time_bins)  # 2D for single feature: (402, 500)
-        assert multi_shape == (2, PRICE_LEVELS, processor_config.time_bins)  # 3D for multiple features: (2, 402, 500)
+        assert single_shape == (
+            PRICE_LEVELS,
+            processor_config.time_bins,
+        )  # 2D for single feature: (402, 500)
+        assert multi_shape == (
+            2,
+            PRICE_LEVELS,
+            processor_config.time_bins,
+        )  # 3D for multiple features: (2, 402, 500)

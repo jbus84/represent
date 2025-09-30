@@ -26,6 +26,11 @@ dependencies = [
     "scipy>=1.16.1",
     "torch>=2.0.0",
     "zstandard>=0.22.0",
+    "plotly>=5.17.0",
+    "tstrends",
+    "scikit-optimize==0.9.0",
+    "tabulate>=0.9.0",
+    "optuna>=4.5.0",
 ]
 [project.optional-dependencies]
 visualization = [
@@ -73,12 +78,13 @@ pythonVersion = "3.12"
 include = ["represent"]
 exclude = [
     "tests/**",
-    "examples/**", 
+    "scripts/**",
     "build/**",
     "dist/**",
     ".venv/**",
     "htmlcov/**",
-    "scripts/**"
+    "diagnostics/**",
+    "examples/**"
 ]
 venvPath = "."
 venv = ".venv"
@@ -91,6 +97,7 @@ reportUnknownParameterType = false
 reportMissingParameterType = false
 reportDeprecated = false
 reportUnnecessaryTypeIgnoreComment = true
+reportPrivateImportUsage = false
 
 [tool.commitizen]
 name = "cz_conventional_commits"
@@ -189,3 +196,6 @@ markers = [
     "performance: Performance benchmark tests",
     "slow: Slow tests that take significant time (>5s)",
 ]
+
+[tool.uv.sources]
+tstrends = { git = "https://github.com/agpenas/tstrends.git" }

@@ -14,7 +14,7 @@ class TestPriceLookupTable:
         """Test PriceLookupTable can be created."""
         mid_price = 1.25000
         table = PriceLookupTable(mid_price=mid_price)
-        assert hasattr(table, '_mid_price_int')
+        assert hasattr(table, "_mid_price_int")
         assert table._mid_price_int == int(mid_price)
 
     def test_price_lookup_table_operations(self):
@@ -23,8 +23,8 @@ class TestPriceLookupTable:
         table = PriceLookupTable(mid_price=mid_price)
 
         # Test that the table has lookup arrays
-        assert hasattr(table, '_bid_indices')
-        assert hasattr(table, '_price_range')
+        assert hasattr(table, "_bid_indices")
+        assert hasattr(table, "_price_range")
         assert table._price_range == 200  # Default range
 
 
@@ -35,7 +35,7 @@ class TestVolumeGrid:
         """Test VolumeGrid can be created with default and custom time_bins."""
         # Test default time_bins (500 for backward compatibility)
         grid = VolumeGrid()
-        assert hasattr(grid, '_grid')
+        assert hasattr(grid, "_grid")
         assert grid._grid.shape == (402, 500)  # PRICE_LEVELS, default TIME_BINS
         assert grid.time_bins == 500
 
@@ -69,7 +69,7 @@ class TestOutputBuffer:
         """Test OutputBuffer can be created with default and custom time_bins."""
         # Test default time_bins (500 for backward compatibility)
         buffer = OutputBuffer()
-        assert hasattr(buffer, '_buffer')
+        assert hasattr(buffer, "_buffer")
         assert buffer._buffer.shape == (402, 500)
         assert buffer.time_bins == 500
 
@@ -83,11 +83,11 @@ class TestOutputBuffer:
         buffer = OutputBuffer()
 
         # Test buffer has temp arrays
-        assert hasattr(buffer, '_temp_combined')
-        assert hasattr(buffer, '_temp_abs')
+        assert hasattr(buffer, "_temp_combined")
+        assert hasattr(buffer, "_temp_abs")
 
         # Test prepare_output method exists
-        assert hasattr(buffer, 'prepare_output')
+        assert hasattr(buffer, "prepare_output")
 
         # Create dummy grids for testing
         ask_grid = np.random.random((402, 500))
@@ -113,7 +113,7 @@ class TestOutputBuffer:
 
         # Test Case 1: Ask dominance (ask > bid) should produce positive values
         ask_grid = np.ones((402, 500)) * 100  # High ask volume
-        bid_grid = np.ones((402, 500)) * 50   # Lower bid volume
+        bid_grid = np.ones((402, 500)) * 50  # Lower bid volume
 
         result = buffer.prepare_output(ask_grid, bid_grid)
 
@@ -122,7 +122,7 @@ class TestOutputBuffer:
         assert np.max(result) == 1.0, "Maximum should be normalized to 1.0"
 
         # Test Case 2: Bid dominance (bid > ask) should produce negative values
-        ask_grid = np.ones((402, 500)) * 50   # Lower ask volume
+        ask_grid = np.ones((402, 500)) * 50  # Lower ask volume
         bid_grid = np.ones((402, 500)) * 100  # High bid volume
 
         result = buffer.prepare_output(ask_grid, bid_grid)
@@ -140,7 +140,9 @@ class TestOutputBuffer:
         # Should have signed range
         assert result.min() >= -1.0, "Values should not go below -1.0"
         assert result.max() <= 1.0, "Values should not go above 1.0"
-        assert (result.min() < 0 and result.max() > 0), "Should have both negative and positive values"
+        assert result.min() < 0 and result.max() > 0, (
+            "Should have both negative and positive values"
+        )
 
         # Test Case 4: Zero difference should produce zero
         ask_grid = np.ones((402, 500)) * 50
@@ -181,7 +183,9 @@ class TestOutputBuffer:
         assert np.all(right_half <= 0), "Bid-dominant region should have non-positive values"
 
         # Values should be symmetric
-        assert np.allclose(left_half, -right_half), "Symmetric inputs should produce symmetric outputs"
+        assert np.allclose(left_half, -right_half), (
+            "Symmetric inputs should produce symmetric outputs"
+        )
 
     def test_normalization_range_bounds(self):
         """
@@ -194,7 +198,10 @@ class TestOutputBuffer:
         test_cases = [
             (np.ones((402, 500)) * 1000, np.zeros((402, 500))),  # Max ask, no bid
             (np.zeros((402, 500)), np.ones((402, 500)) * 1000),  # No ask, max bid
-            (np.random.random((402, 500)) * 1e6, np.random.random((402, 500)) * 1e6),  # Very large values
+            (
+                np.random.random((402, 500)) * 1e6,
+                np.random.random((402, 500)) * 1e6,
+            ),  # Very large values
             (np.ones((402, 500)) * 0.001, np.ones((402, 500)) * 0.002),  # Very small values
         ]
 
@@ -216,4 +223,6 @@ class TestOutputBuffer:
         result1 = buffer.prepare_output(ask_grid, bid_grid)
         result2 = buffer.compute_normalized_difference(ask_grid, bid_grid)
 
-        assert np.array_equal(result1, result2), "compute_normalized_difference should be identical to prepare_output"
+        assert np.array_equal(result1, result2), (
+            "compute_normalized_difference should be identical to prepare_output"
+        )

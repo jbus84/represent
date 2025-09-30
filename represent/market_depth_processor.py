@@ -3,7 +3,6 @@ High-performance market depth processing pipeline.
 Optimized for <10ms array generation and zero-copy operations.
 """
 
-
 import numpy as np
 import polars as pl
 
@@ -40,7 +39,7 @@ class MarketDepthProcessor:
         config: MarketDepthProcessorConfig | None = None,
         features: list[str] | list[FeatureType] | None = None,
         # Legacy support
-        legacy_config = None,
+        legacy_config=None,
     ):
         """Initialize processor with pre-allocated structures.
 
@@ -105,7 +104,9 @@ class MarketDepthProcessor:
         self._ask_grids = {feature: VolumeGrid(time_bins=time_bins) for feature in self.features}
         self._bid_grids = {feature: VolumeGrid(time_bins=time_bins) for feature in self.features}
         # One output buffer per feature to avoid sharing
-        self._output_buffers = {feature: OutputBuffer(time_bins=time_bins) for feature in self.features}
+        self._output_buffers = {
+            feature: OutputBuffer(time_bins=time_bins) for feature in self.features
+        }
 
         # Pre-allocate temporary arrays for processing (per feature)
         self._temp_ask_volumes: dict[str, np.ndarray] = {}
@@ -145,7 +146,9 @@ class MarketDepthProcessor:
 
         # Pre-compile time bin expression using config values
         expected_samples = self.config.samples * 2  # Use 2x config samples as the "standard" size
-        self._time_bin_expression = (pl.int_range(0, expected_samples) // self.config.ticks_per_bin).alias("tick_bin")
+        self._time_bin_expression = (
+            pl.int_range(0, expected_samples) // self.config.ticks_per_bin
+        ).alias("tick_bin")
 
         self._compiled_expressions_ready = True
 
@@ -165,7 +168,9 @@ class MarketDepthProcessor:
             return df.with_columns(self._time_bin_expression)
 
         # For other sizes, create dynamic time bins
-        time_bins = getattr(self.config, 'time_bins', self.config.samples // self.config.ticks_per_bin)
+        time_bins = getattr(
+            self.config, "time_bins", self.config.samples // self.config.ticks_per_bin
+        )
         ticks_per_bin = max(1, input_length // time_bins)  # Ensure at least 1 tick per bin
         time_bin_expr = (pl.int_range(0, input_length) // ticks_per_bin).alias("tick_bin")
         return df.with_columns(time_bin_expr)
@@ -367,7 +372,7 @@ def create_processor(
     config: MarketDepthProcessorConfig | None = None,
     features: list[str] | list[FeatureType] | None = None,
     # Legacy support
-    legacy_config = None,
+    legacy_config=None,
 ) -> MarketDepthProcessor:
     """Create a new market depth processor instance.
 
@@ -390,7 +395,7 @@ def process_market_data(
     config: MarketDepthProcessorConfig | None = None,
     features: list[str] | list[FeatureType] | None = None,
     # Legacy support
-    legacy_config = None,
+    legacy_config=None,
 ) -> np.ndarray:
     """
     Process market data and return normalized depth representation.

@@ -15,27 +15,21 @@ class DatasetBuilderConfig(BaseModel):
     Focused on creating comprehensive symbol datasets from multiple DBN files
     using the symbol-split-merge architecture.
     """
+
     # Core parameters
     currency: str = Field(
-        default="AUDUSD",
-        description="Currency pair identifier (e.g., 'AUDUSD', 'EURUSD')"
+        default="AUDUSD", description="Currency pair identifier (e.g., 'AUDUSD', 'EURUSD')"
     )
 
     # Price movement calculation parameters
     lookback_rows: int = Field(
-        default=5000,
-        gt=0,
-        description="Number of historical rows for baseline calculation"
+        default=5000, gt=0, description="Number of historical rows for baseline calculation"
     )
     lookforward_input: int = Field(
-        default=5000,
-        gt=0,
-        description="Size of lookforward window for classification"
+        default=5000, gt=0, description="Size of lookforward window for classification"
     )
     lookforward_offset: int = Field(
-        default=500,
-        ge=0,
-        description="Offset before starting lookforward window"
+        default=500, ge=0, description="Offset before starting lookforward window"
     )
 
     @field_validator("currency")
@@ -58,49 +52,44 @@ class GlobalThresholdConfig(BaseModel):
     Focused on calculating consistent classification thresholds across
     multiple files for uniform distribution.
     """
+
     # Core parameters
     currency: str = Field(
-        default="AUDUSD",
-        description="Currency pair identifier (e.g., 'AUDUSD', 'EURUSD')"
+        default="AUDUSD", description="Currency pair identifier (e.g., 'AUDUSD', 'EURUSD')"
     )
-    nbins: int = Field(
-        default=13,
-        ge=3, le=20,
-        description="Number of classification bins"
-    )
+    nbins: int = Field(default=13, ge=3, le=20, description="Number of classification bins")
 
     # Price movement calculation parameters (same as DatasetBuilder)
     lookback_rows: int = Field(
-        default=5000,
-        gt=0,
-        description="Number of historical rows for baseline calculation"
+        default=5000, gt=0, description="Number of historical rows for baseline calculation"
     )
     lookforward_input: int = Field(
-        default=5000,
-        gt=0,
-        description="Size of lookforward window for classification"
+        default=5000, gt=0, description="Size of lookforward window for classification"
     )
     lookforward_offset: int = Field(
-        default=500,
-        ge=0,
-        description="Offset before starting lookforward window"
+        default=500, ge=0, description="Offset before starting lookforward window"
     )
 
     # Performance parameters
     max_samples_per_file: int = Field(
         default=10000,
         gt=0,
-        description="Maximum samples to extract per file for performance optimization"
+        description="Maximum samples to extract per file for performance optimization",
     )
     sample_fraction: float = Field(
         default=0.5,
-        gt=0.0, le=1.0,
-        description="Fraction of files to use for threshold calculation"
+        gt=0.0,
+        le=1.0,
+        description="Fraction of files to use for threshold calculation",
     )
     jump_size: int = Field(
         default=100,
         gt=0,
-        description="Step size for sampling positions in price movement calculation (performance optimization)"
+        description="Step size for sampling positions in price movement calculation (performance optimization)",
+    )
+    use_heavy_tailed: bool = Field(
+        default=True,
+        description="Use heavy-tailed distribution (Student's t) for better class balance instead of quantiles",
     )
 
     @field_validator("currency")
@@ -125,29 +114,24 @@ class MarketDepthProcessorConfig(BaseModel):
     Focused on converting market data into normalized tensor representations
     for machine learning applications.
     """
+
     # Feature parameters
     features: list[str] = Field(
         default=["volume"],
-        description="Features to extract: ['volume', 'variance', 'trade_counts']"
+        description="Features to extract: ['volume', 'variance', 'trade_counts']",
     )
 
     # Tensor dimension parameters
     samples: int = Field(
         default=50000,
-        ge=25000,
-        description="Number of samples to process (affects tensor time dimension)"
+        ge=1000,
+        description="Number of samples to process (affects tensor time dimension)",
     )
-    ticks_per_bin: int = Field(
-        default=100,
-        gt=0,
-        description="Number of ticks per time bin"
-    )
+    ticks_per_bin: int = Field(default=100, gt=0, description="Number of ticks per time bin")
 
     # Price precision parameters
     micro_pip_size: float = Field(
-        default=0.00001,
-        gt=0.0,
-        description="Micro pip size for price precision"
+        default=0.00001, gt=0.0, description="Micro pip size for price precision"
     )
 
     @field_validator("features")
@@ -175,6 +159,7 @@ class MarketDepthProcessorConfig(BaseModel):
 
 
 # Convenience factory functions for common configurations
+
 
 def create_dataset_builder_config(
     currency: str = "AUDUSD",
@@ -292,7 +277,7 @@ def create_represent_config(
     nbins: int = 13,
     samples: int = 25000,
     features: list[str] | None = None,
-    **kwargs
+    **kwargs,
 ) -> tuple[DatasetBuilderConfig, GlobalThresholdConfig, MarketDepthProcessorConfig]:
     """
     Create compatible configurations for all three modules (legacy compatibility).
@@ -337,7 +322,9 @@ def create_represent_config(
             nbins = 9  # Fewer bins for JPY pairs
 
     # Remove parameters we've already handled from kwargs
-    filtered_kwargs = {k: v for k, v in kwargs.items() if k not in ['lookforward_input', 'micro_pip_size', 'nbins']}
+    filtered_kwargs = {
+        k: v for k, v in kwargs.items() if k not in ["lookforward_input", "micro_pip_size", "nbins"]
+    }
 
     return create_compatible_configs(
         currency=currency,
@@ -346,7 +333,7 @@ def create_represent_config(
         samples=samples,
         micro_pip_size=micro_pip_size,
         lookforward_input=lookforward_input,
-        **filtered_kwargs
+        **filtered_kwargs,
     )
 
 

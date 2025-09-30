@@ -30,7 +30,7 @@ class TestGlobalThresholds:
             nbins=5,
             sample_size=10000,
             files_analyzed=5,
-            price_movement_stats=stats
+            price_movement_stats=stats,
         )
 
         assert thresholds.nbins == 5
@@ -49,7 +49,7 @@ class TestGlobalThresholds:
             nbins=5,
             sample_size=10000,
             files_analyzed=3,
-            price_movement_stats=stats
+            price_movement_stats=stats,
         )
 
         assert isinstance(thresholds.quantile_boundaries, np.ndarray)
@@ -73,16 +73,12 @@ class TestGlobalThresholdCalculator:
             lookforward_offset=500,
             max_samples_per_file=10000,
             sample_fraction=0.5,
-            jump_size=100
+            jump_size=100,
         )
 
     def test_calculator_initialization(self):
         """Test calculator initializes with correct configuration."""
-        calc = GlobalThresholdCalculator(
-            config=self.config,
-            sample_fraction=0.3,
-            verbose=False
-        )
+        calc = GlobalThresholdCalculator(config=self.config, sample_fraction=0.3, verbose=False)
 
         assert calc.currency == "AUDUSD"
         assert calc.sample_fraction == 0.3
@@ -107,17 +103,13 @@ class TestGlobalThresholdCalculator:
             currency_config = create_represent_config(currency)
             calc = GlobalThresholdCalculator(legacy_config=currency_config, verbose=False)
             assert calc.currency == currency
-            assert hasattr(calc, 'config')
+            assert hasattr(calc, "config")
             assert calc.config.nbins > 0
 
     def test_calculator_parameter_validation(self):
         """Test calculator parameter validation."""
         # Test with valid parameters
-        calc = GlobalThresholdCalculator(
-            config=self.config,
-            sample_fraction=0.5,
-            verbose=True
-        )
+        calc = GlobalThresholdCalculator(config=self.config, sample_fraction=0.5, verbose=True)
 
         assert calc.sample_fraction == 0.5
         assert calc.max_samples_per_file == self.config.max_samples_per_file
@@ -128,7 +120,7 @@ class TestGlobalThresholdCalculator:
         calc = GlobalThresholdCalculator(legacy_config=self.config, verbose=False)
 
         # Should have valid config
-        assert hasattr(calc, 'config')
+        assert hasattr(calc, "config")
         # GlobalThresholdConfig has these specific fields (micro_pip_size is in MarketDepthProcessorConfig)
         assert calc.config.nbins > 0
         assert calc.config.lookback_rows > 0
@@ -148,20 +140,18 @@ class TestGlobalThresholdCalculatorAPI:
         assert callable(calculate_global_thresholds)
 
         # Test with mock to avoid actual file processing
-        with patch.object(GlobalThresholdCalculator, 'calculate_global_thresholds') as mock_calc:
+        with patch.object(GlobalThresholdCalculator, "calculate_global_thresholds") as mock_calc:
             mock_thresholds = GlobalThresholds(
                 quantile_boundaries=np.array([-5, 0, 5]),
                 nbins=3,
                 sample_size=1000,
                 files_analyzed=2,
-                price_movement_stats={"mean": 0.0, "std": 3.0}
+                price_movement_stats={"mean": 0.0, "std": 3.0},
             )
             mock_calc.return_value = mock_thresholds
 
             calculate_global_thresholds(
-                config=self.config,
-                data_directory="dummy_path",
-                sample_fraction=0.3
+                config=self.config, data_directory="dummy_path", sample_fraction=0.3
             )
 
             # Should call the calculator method
@@ -169,24 +159,23 @@ class TestGlobalThresholdCalculatorAPI:
 
     def test_calculate_global_thresholds_parameters(self):
         """Test parameter passing to GlobalThresholdCalculator."""
-        with patch.object(GlobalThresholdCalculator, '__init__', return_value=None) as mock_init:
-            with patch.object(GlobalThresholdCalculator, 'calculate_global_thresholds') as mock_calc:
+        with patch.object(GlobalThresholdCalculator, "__init__", return_value=None) as mock_init:
+            with patch.object(
+                GlobalThresholdCalculator, "calculate_global_thresholds"
+            ) as mock_calc:
                 mock_calc.return_value = MagicMock()
 
                 calculate_global_thresholds(
                     config=self.config,
                     data_directory="test_dir",
                     sample_fraction=0.2,
-                    verbose=False
+                    verbose=False,
                 )
 
                 # Verify correct parameters passed to constructor
                 # The tuple from create_represent_config is passed as legacy_config
                 mock_init.assert_called_once_with(
-                    config=None,
-                    sample_fraction=0.2,
-                    verbose=False,
-                    legacy_config=self.config
+                    config=None, sample_fraction=0.2, verbose=False, legacy_config=self.config
                 )
 
 
@@ -204,17 +193,21 @@ class TestGlobalThresholdCalculatorErrorHandling:
         calc = GlobalThresholdCalculator(legacy_config=nzdusd_config, verbose=False)
         assert calc.currency == "NZDUSD"
         # Config should still be created with defaults
-        assert hasattr(calc, 'config')
+        assert hasattr(calc, "config")
         assert calc.config.nbins > 0
 
     def test_edge_case_parameters(self):
         """Test behavior with edge case parameters."""
         # Test with extreme but valid sample fraction
-        calc = GlobalThresholdCalculator(legacy_config=self.config, sample_fraction=0.99, verbose=False)
+        calc = GlobalThresholdCalculator(
+            legacy_config=self.config, sample_fraction=0.99, verbose=False
+        )
         assert calc.sample_fraction == 0.99  # Should accept it
 
         # Test with very small sample fraction
-        calc = GlobalThresholdCalculator(legacy_config=self.config, sample_fraction=0.01, verbose=False)
+        calc = GlobalThresholdCalculator(
+            legacy_config=self.config, sample_fraction=0.01, verbose=False
+        )
         assert calc.sample_fraction == 0.01
 
         # Test with zero max samples
@@ -261,12 +254,14 @@ class TestGlobalThresholdCalculatorConfiguration:
 
         for currency in currencies:
             currency_config = create_represent_config(currency)
-            calculators[currency] = GlobalThresholdCalculator(legacy_config=currency_config, verbose=False)
+            calculators[currency] = GlobalThresholdCalculator(
+                legacy_config=currency_config, verbose=False
+            )
 
         # All should have valid configurations
         for currency, calc in calculators.items():
             assert calc.currency == currency
-            assert hasattr(calc, 'config')
+            assert hasattr(calc, "config")
             assert calc.config.nbins > 0
             assert calc.config.nbins > 0
 
@@ -294,7 +289,9 @@ class TestGlobalThresholdCalculatorConfiguration:
         initial_memory = process.memory_info().rss / 1024 / 1024  # MB
 
         # Create multiple calculators
-        calcs = [GlobalThresholdCalculator(legacy_config=self.config, verbose=False) for _ in range(10)]
+        calcs = [
+            GlobalThresholdCalculator(legacy_config=self.config, verbose=False) for _ in range(10)
+        ]
 
         final_memory = process.memory_info().rss / 1024 / 1024  # MB
         memory_increase = final_memory - initial_memory
@@ -322,7 +319,7 @@ class TestGlobalThresholdCalculatorFileProcessing:
         calc = GlobalThresholdCalculator(legacy_config=self.config, verbose=False)
 
         # Test that method exists and is callable
-        assert hasattr(calc, 'load_dbn_file_sample')
+        assert hasattr(calc, "load_dbn_file_sample")
         assert callable(calc.load_dbn_file_sample)
 
     def test_calculate_global_thresholds_method_exists(self):
@@ -330,7 +327,7 @@ class TestGlobalThresholdCalculatorFileProcessing:
         calc = GlobalThresholdCalculator(legacy_config=self.config, verbose=False)
 
         # Test that method exists and is callable
-        assert hasattr(calc, 'calculate_global_thresholds')
+        assert hasattr(calc, "calculate_global_thresholds")
         assert callable(calc.calculate_global_thresholds)
 
     def test_calculator_config_integration(self):
@@ -377,10 +374,11 @@ class TestGlobalThresholdCalculatorVerboseOutput:
         # Create data with very little variance (will create duplicate quantiles)
         mock_movements = np.array([0.0] * 500 + [0.0001] * 500)  # Mostly zeros
 
-        with patch.object(calc, 'load_dbn_file_sample', return_value=mock_movements), \
-             patch('pathlib.Path.exists', return_value=True), \
-             patch('pathlib.Path.glob') as mock_glob:
-
+        with (
+            patch.object(calc, "load_dbn_file_sample", return_value=mock_movements),
+            patch("pathlib.Path.exists", return_value=True),
+            patch("pathlib.Path.glob") as mock_glob,
+        ):
             mock_files = [Path("file1.dbn")]
             mock_glob.return_value = mock_files
 
@@ -397,19 +395,18 @@ class TestGlobalThresholdCalculatorVerboseOutput:
             # Use legacy config tuple from create_represent_config
             legacy_config = create_represent_config("AUDUSD")
             calc = GlobalThresholdCalculator(
-                legacy_config=legacy_config,
-                sample_fraction=fraction,
-                verbose=False
+                legacy_config=legacy_config, sample_fraction=fraction, verbose=False
             )
             assert calc.sample_fraction == fraction
 
             # Test that the fraction is used in file selection logic
             mock_movements = np.random.normal(0, 0.001, 1000)
 
-            with patch.object(calc, 'load_dbn_file_sample', return_value=mock_movements), \
-                 patch('pathlib.Path.exists', return_value=True), \
-                 patch('pathlib.Path.glob') as mock_glob:
-
+            with (
+                patch.object(calc, "load_dbn_file_sample", return_value=mock_movements),
+                patch("pathlib.Path.exists", return_value=True),
+                patch("pathlib.Path.glob") as mock_glob,
+            ):
                 # Mock 10 files
                 mock_files = [Path(f"file{i}.dbn") for i in range(10)]
                 mock_glob.return_value = mock_files

@@ -1,0 +1,86 @@
+# Academic Research Label Set Configuration
+# Designed for comprehensive financial research and academic analysis
+
+name: "Academic Research Suite"
+description: "Comprehensive label set for academic research in financial markets and algorithmic trading"
+
+generators:
+  # Multi-horizon MFE analysis for research
+  - type: "directional_mfe"
+    lookforward_horizon: 500
+    expected_fee_pips: 0.5
+    winsorize_percentiles: [0.5, 99.5]
+    target_names: ["mfe_buy_short", "mfe_sell_short"]
+  
+  - type: "directional_mfe" 
+    lookforward_horizon: 1500
+    expected_fee_pips: 0.5
+    winsorize_percentiles: [0.5, 99.5]
+    target_names: ["mfe_buy_medium", "mfe_sell_medium"]
+    
+  - type: "directional_mfe"
+    lookforward_horizon: 4000
+    expected_fee_pips: 0.5
+    winsorize_percentiles: [0.5, 99.5] 
+    target_names: ["mfe_buy_long", "mfe_sell_long"]
+
+  # Trend analysis with different sensitivities
+  - type: "remaining_value_tuner"
+    lookback_rows: 500
+    lookforward_input: 2000
+    lookforward_offset: 100
+    trend_threshold_bps: 15.0
+    neutral_factor: 0.5
+    target_name: "trend_sensitive"
+    
+  - type: "remaining_value_tuner"
+    lookback_rows: 1000
+    lookforward_input: 3000
+    lookforward_offset: 200
+    trend_threshold_bps: 35.0
+    neutral_factor: 0.7
+    target_name: "trend_conservative"
+
+  # Volatility regimes
+  - type: "volatility"
+    window_size: 500
+    target_name: "vol_short"
+    
+  - type: "volatility"
+    window_size: 1500
+    target_name: "vol_medium"
+    
+  - type: "volatility"
+    window_size: 3000
+    target_name: "vol_long"
+
+  # Returns analysis
+  - type: "cumulative_returns"
+    lookforward_samples: 750
+    target_name: "cumret_intraday"
+    
+  - type: "cumulative_returns"
+    lookforward_samples: 2000
+    target_name: "cumret_daily"
+    
+  - type: "price_movement"
+    lookforward_window: 1000
+    lookback_window: 1000
+    target_name: "price_movement_research"
+
+  # Classification schemes
+  - type: "quantile_classification"
+    nbins: 5
+    lookforward_window: 1500
+    target_name: "quintile_classification"
+    
+  - type: "quantile_classification"
+    nbins: 13
+    lookforward_window: 2500
+    target_name: "quantile_13_classification"
+
+visualization: true
+
+output:
+  base_name: "academic_research_labels"
+  include_timestamp: true

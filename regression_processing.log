@@ -1,0 +1,744 @@
+🚀 PROCESSING ALL SYMBOLS WITH REGRESSION TARGETS
+================================================================================
+Using RECOMMENDED methods for FX microstructure prediction:
+  1. log_return_horizons (50-1000 ticks) with mean returns
+  2. directional_mfe (profit potential)
+
+WHY THESE ARE BETTER THAN TRIPLE BARRIER:
+  ✓ Continuous targets (not balanced classes)
+  ✓ Shorter horizons (50-500 ticks, not 600+)
+  ✓ No 32% timeout class wasting data
+  ✓ Mean returns 50-100x smoother than endpoints
+  ✓ Expected R² = 0.01-0.05 (vs 34% random accuracy)
+
+Output: Target-only files with 12 total regression targets per sample
+================================================================================
+
+📊 Found 6 symbol files to process
+
+Processing symbols:   0%|          | 0/6 [00:00<?, ?file/s]Processing symbols:   0%|          | 0/6 [00:00<?, ?file/s, symbol=M6AZ4]
+================================================================================
+📈 PROCESSING SYMBOL: M6AZ4
+================================================================================
+
+🔄 Processing symbol: M6AZ4
+   📁 Input: /Users/danielfisher/data/databento/symbol_datasets/inputs/M6AZ4_inputs_only_dataset_20250927_201331.parquet
+   📊 Configured 2 regression generators:
+      • Log returns across 5 horizon windows (50-1000 ticks) with endpoint and mean returns
+        Targets: 10 - ['log_return_50t', 'log_return_100t', 'log_return_250t']...
+      • Directional MFE targets over 500 tick horizon
+        Targets: 2 - ['mfe_buy_bps', 'mfe_sell_bps']...
+   🔨 Building targets with 2 generators...
+📂 Processing file: M6AZ4_inputs_only_dataset_20250927_201331.parquet
+   📊 Dataset has 26,177,836 samples
+   🔄 Processing in chunks of 500,000
+   🎯 Generator 1/2: LogReturnHorizonsGenerator
+      🔄 Using standard processing with generator delegation (lookback: 1,000, lookforward: 0)
+
+      Processing samples:   0%|          | 0/26177836 [00:00<?, ?samples/s][A
+      Processing samples:   2%|▏         | 500000/26177836 [00:18<16:11, 26430.04samples/s][A
+      Processing samples:   2%|▏         | 500000/26177836 [00:29<16:11, 26430.04samples/s][A
+      Processing samples:   4%|▍         | 1000000/26177836 [00:37<15:53, 26394.68samples/s][A
+      Processing samples:   4%|▍         | 1000000/26177836 [00:50<15:53, 26394.68samples/s][A
+      Processing samples:   6%|▌         | 1500000/26177836 [00:57<15:46, 26061.91samples/s][A
+      Processing samples:   6%|▌         | 1500000/26177836 [01:10<15:46, 26061.91samples/s][A
+      Processing samples:   8%|▊         | 2000000/26177836 [01:16<15:23, 26178.20samples/s][A
+      Processing samples:   8%|▊         | 2000000/26177836 [01:30<15:23, 26178.20samples/s][A
+      Processing samples:  10%|▉         | 2500000/26177836 [01:35<15:01, 26256.58samples/s][A
+      Processing samples:  10%|▉         | 2500000/26177836 [01:50<15:01, 26256.58samples/s][A
+      Processing samples:  11%|█▏        | 3000000/26177836 [01:54<14:44, 26192.60samples/s][A
+      Processing samples:  11%|█▏        | 3000000/26177836 [02:10<14:44, 26192.60samples/s][A
+      Processing samples:  13%|█▎        | 3500000/26177836 [02:13<14:23, 26273.48samples/s][A
+      Processing samples:  13%|█▎        | 3500000/26177836 [02:30<14:23, 26273.48samples/s][A
+      Processing samples:  15%|█▌        | 4000000/26177836 [02:32<14:06, 26213.09samples/s][A
+      Processing samples:  15%|█▌        | 4000000/26177836 [02:50<14:06, 26213.09samples/s][A
+      Processing samples:  17%|█▋        | 4500000/26177836 [02:51<13:49, 26140.93samples/s][A
+      Processing samples:  17%|█▋        | 4500000/26177836 [03:10<13:49, 26140.93samples/s][A
+      Processing samples:  19%|█▉        | 5000000/26177836 [03:10<13:28, 26190.76samples/s][A
+      Processing samples:  21%|██        | 5500000/26177836 [03:29<13:05, 26315.31samples/s][A
+      Processing samples:  21%|██        | 5500000/26177836 [03:40<13:05, 26315.31samples/s][A
+      Processing samples:  23%|██▎       | 6000000/26177836 [03:48<12:44, 26390.54samples/s][A
+      Processing samples:  23%|██▎       | 6000000/26177836 [04:00<12:44, 26390.54samples/s][A
+      Processing samples:  25%|██▍       | 6500000/26177836 [04:07<12:23, 26449.00samples/s][A
+      Processing samples:  25%|██▍       | 6500000/26177836 [04:20<12:23, 26449.00samples/s][A
+      Processing samples:  27%|██▋       | 7000000/26177836 [04:25<12:03, 26499.37samples/s][A
+      Processing samples:  27%|██▋       | 7000000/26177836 [04:40<12:03, 26499.37samples/s][A
+      Processing samples:  29%|██▊       | 7500000/26177836 [04:44<11:44, 26527.27samples/s][A
+      Processing samples:  29%|██▊       | 7500000/26177836 [05:00<11:44, 26527.27samples/s][A
+      Processing samples:  31%|███       | 8000000/26177836 [05:03<11:24, 26546.63samples/s][A
+      Processing samples:  31%|███       | 8000000/26177836 [05:20<11:24, 26546.63samples/s][A
+      Processing samples:  32%|███▏      | 8500000/26177836 [05:22<11:07, 26490.78samples/s][A
+      Processing samples:  32%|███▏      | 8500000/26177836 [05:40<11:07, 26490.78samples/s][A
+      Processing samples:  34%|███▍      | 9000000/26177836 [05:41<10:52, 26324.81samples/s][A
+      Processing samples:  34%|███▍      | 9000000/26177836 [06:00<10:52, 26324.81samples/s][A
+      Processing samples:  36%|███▋      | 9500000/26177836 [06:01<10:37, 26156.09samples/s][A
+      Processing samples:  38%|███▊      | 10000000/26177836 [06:20<10:15, 26289.77samples/s][A
+      Processing samples:  38%|███▊      | 10000000/26177836 [06:30<10:15, 26289.77samples/s][A
+      Processing samples:  40%|████      | 10500000/26177836 [06:38<09:53, 26397.48samples/s][A
+      Processing samples:  40%|████      | 10500000/26177836 [06:50<09:53, 26397.48samples/s][A
+      Processing samples:  42%|████▏     | 11000000/26177836 [06:57<09:36, 26340.36samples/s][A
+      Processing samples:  42%|████▏     | 11000000/26177836 [07:10<09:36, 26340.36samples/s][A
+      Processing samples:  44%|████▍     | 11500000/26177836 [07:16<09:17, 26323.25samples/s][A
+      Processing samples:  44%|████▍     | 11500000/26177836 [07:30<09:17, 26323.25samples/s][A
+      Processing samples:  46%|████▌     | 12000000/26177836 [07:35<08:56, 26402.03samples/s][A
+      Processing samples:  46%|████▌     | 12000000/26177836 [07:50<08:56, 26402.03samples/s][A
+      Processing samples:  48%|████▊     | 12500000/26177836 [07:54<08:37, 26450.72samples/s][A
+      Processing samples:  48%|████▊     | 12500000/26177836 [08:10<08:37, 26450.72samples/s][A
+      Processing samples:  50%|████▉     | 13000000/26177836 [08:13<08:17, 26506.86samples/s][A
+      Processing samples:  50%|████▉     | 13000000/26177836 [08:30<08:17, 26506.86samples/s][A
+      Processing samples:  52%|█████▏    | 13500000/26177836 [08:32<07:57, 26546.64samples/s][A
+      Processing samples:  52%|█████▏    | 13500000/26177836 [08:50<07:57, 26546.64samples/s][A
+      Processing samples:  53%|█████▎    | 14000000/26177836 [08:50<07:38, 26543.89samples/s][A
+      Processing samples:  55%|█████▌    | 14500000/26177836 [09:09<07:19, 26564.05samples/s][A
+      Processing samples:  55%|█████▌    | 14500000/26177836 [09:20<07:19, 26564.05samples/s][A
+      Processing samples:  57%|█████▋    | 15000000/26177836 [09:28<07:00, 26583.38samples/s][A
+      Processing samples:  57%|█████▋    | 15000000/26177836 [09:40<07:00, 26583.38samples/s][A
+      Processing samples:  59%|█████▉    | 15500000/26177836 [09:47<06:41, 26605.77samples/s][A
+      Processing samples:  59%|█████▉    | 15500000/26177836 [10:00<06:41, 26605.77samples/s][A
+      Processing samples:  61%|██████    | 16000000/26177836 [10:05<06:22, 26616.85samples/s][A
+      Processing samples:  61%|██████    | 16000000/26177836 [10:20<06:22, 26616.85samples/s][A
+      Processing samples:  63%|██████▎   | 16500000/26177836 [10:24<06:03, 26623.05samples/s][A
+      Processing samples:  63%|██████▎   | 16500000/26177836 [10:40<06:03, 26623.05samples/s][A
+      Processing samples:  65%|██████▍   | 17000000/26177836 [10:43<05:44, 26615.92samples/s][A
+      Processing samples:  65%|██████▍   | 17000000/26177836 [11:00<05:44, 26615.92samples/s][A
+      Processing samples:  67%|██████▋   | 17500000/26177836 [11:02<05:26, 26611.15samples/s][A
+      Processing samples:  67%|██████▋   | 17500000/26177836 [11:20<05:26, 26611.15samples/s][A
+      Processing samples:  69%|██████▉   | 18000000/26177836 [11:21<05:07, 26575.41samples/s][A
+      Processing samples:  69%|██████▉   | 18000000/26177836 [11:40<05:07, 26575.41samples/s][A
+      Processing samples:  71%|███████   | 18500000/26177836 [11:40<04:52, 26252.27samples/s][A
+      Processing samples:  73%|███████▎  | 19000000/26177836 [12:00<04:34, 26131.58samples/s][A
+      Processing samples:  73%|███████▎  | 19000000/26177836 [12:10<04:34, 26131.58samples/s][A
+      Processing samples:  74%|███████▍  | 19500000/26177836 [12:19<04:16, 26022.94samples/s][A
+      Processing samples:  74%|███████▍  | 19500000/26177836 [12:30<04:16, 26022.94samples/s][A
+      Processing samples:  76%|███████▋  | 20000000/26177836 [12:38<03:57, 25996.33samples/s][A
+      Processing samples:  76%|███████▋  | 20000000/26177836 [12:50<03:57, 25996.33samples/s][A
+      Processing samples:  78%|███████▊  | 20500000/26177836 [12:58<03:38, 25970.43samples/s][A
+      Processing samples:  78%|███████▊  | 20500000/26177836 [13:10<03:38, 25970.43samples/s][A
+      Processing samples:  80%|████████  | 21000000/26177836 [13:17<03:19, 25959.84samples/s][A
+      Processing samples:  80%|████████  | 21000000/26177836 [13:30<03:19, 25959.84samples/s][A
+      Processing samples:  82%|████████▏ | 21500000/26177836 [13:36<03:00, 25971.33samples/s][A
+      Processing samples:  82%|████████▏ | 21500000/26177836 [13:50<03:00, 25971.33samples/s][A
+      Processing samples:  84%|████████▍ | 22000000/26177836 [13:55<02:40, 25975.21samples/s][A
+      Processing samples:  84%|████████▍ | 22000000/26177836 [14:10<02:40, 25975.21samples/s][A
+      Processing samples:  86%|████████▌ | 22500000/26177836 [14:15<02:21, 25961.72samples/s][A
+      Processing samples:  86%|████████▌ | 22500000/26177836 [14:30<02:21, 25961.72samples/s][A
+      Processing samples:  88%|████████▊ | 23000000/26177836 [14:34<02:02, 25964.02samples/s][A
+      Processing samples:  88%|████████▊ | 23000000/26177836 [14:50<02:02, 25964.02samples/s][A
+      Processing samples:  90%|████████▉ | 23500000/26177836 [14:53<01:43, 25960.98samples/s][A
+      Processing samples:  90%|████████▉ | 23500000/26177836 [15:10<01:43, 25960.98samples/s][A
+      Processing samples:  92%|█████████▏| 24000000/26177836 [15:12<01:23, 25960.72samples/s][A
+      Processing samples:  92%|█████████▏| 24000000/26177836 [15:30<01:23, 25960.72samples/s][A
+      Processing samples:  94%|█████████▎| 24500000/26177836 [15:32<01:04, 25959.01samples/s][A
+      Processing samples:  94%|█████████▎| 24500000/26177836 [15:50<01:04, 25959.01samples/s][A
+      Processing samples:  96%|█████████▌| 25000000/26177836 [15:51<00:45, 25947.31samples/s][A
+      Processing samples:  97%|█████████▋| 25500000/26177836 [16:10<00:26, 25933.18samples/s][A
+      Processing samples:  97%|█████████▋| 25500000/26177836 [16:20<00:26, 25933.18samples/s][A
+      Processing samples:  99%|█████████▉| 26000000/26177836 [16:30<00:06, 25950.27samples/s][A
+      Processing samples: 100%|██████████| 26177836/26177836 [16:36<00:00, 25971.26samples/s][A
+                                                                                             [A   🎯 Generator 2/2: DirectionalMFEGenerator
+      🔄 Using standard processing with generator delegation (lookback: 200, lookforward: 0)
+
+      Processing samples:   0%|          | 0/26177836 [00:00<?, ?samples/s][A
+      Processing samples:   2%|▏         | 500000/26177836 [00:02<01:44, 244938.45samples/s][A
+      Processing samples:   4%|▍         | 1000000/26177836 [00:04<01:40, 250332.11samples/s][A
+      Processing samples:   6%|▌         | 1500000/26177836 [00:06<01:39, 248724.88samples/s][A
+      Processing samples:   8%|▊         | 2000000/26177836 [00:08<01:36, 250363.32samples/s][A
+      Processing samples:  10%|▉         | 2500000/26177836 [00:09<01:33, 252196.76samples/s][A
+      Processing samples:  11%|█▏        | 3000000/26177836 [00:11<01:31, 252613.65samples/s][A
+      Processing samples:  13%|█▎        | 3500000/26177836 [00:13<01:29, 253660.58samples/s][A
+      Processing samples:  15%|█▌        | 4000000/26177836 [00:15<01:27, 254540.59samples/s][A
+      Processing samples:  17%|█▋        | 4500000/26177836 [00:17<01:24, 255602.30samples/s][A
+      Processing samples:  19%|█▉        | 5000000/26177836 [00:19<01:22, 255846.95samples/s][A
+      Processing samples:  21%|██        | 5500000/26177836 [00:21<01:20, 256389.90samples/s][A
+      Processing samples:  23%|██▎       | 6000000/26177836 [00:23<01:18, 256602.08samples/s][A
+      Processing samples:  25%|██▍       | 6500000/26177836 [00:25<01:16, 256993.68samples/s][A
+      Processing samples:  27%|██▋       | 7000000/26177836 [00:27<01:14, 257689.84samples/s][A
+      Processing samples:  29%|██▊       | 7500000/26177836 [00:29<01:12, 257916.96samples/s][A
+      Processing samples:  31%|███       | 8000000/26177836 [00:31<01:10, 257865.49samples/s][A
+      Processing samples:  32%|███▏      | 8500000/26177836 [00:33<01:08, 258366.67samples/s][A
+      Processing samples:  34%|███▍      | 9000000/26177836 [00:35<01:06, 258299.49samples/s][A
+      Processing samples:  36%|███▋      | 9500000/26177836 [00:37<01:05, 255582.80samples/s][A
+      Processing samples:  38%|███▊      | 10000000/26177836 [00:39<01:03, 256484.26samples/s][A
+      Processing samples:  40%|████      | 10500000/26177836 [00:41<01:00, 257160.19samples/s][A
+      Processing samples:  42%|████▏     | 11000000/26177836 [00:43<00:58, 257932.78samples/s][A
+      Processing samples:  44%|████▍     | 11500000/26177836 [00:44<00:57, 257502.38samples/s][A
+      Processing samples:  46%|████▌     | 12000000/26177836 [00:46<00:55, 257250.25samples/s][A
+      Processing samples:  48%|████▊     | 12500000/26177836 [00:48<00:53, 256900.85samples/s][A
+      Processing samples:  50%|████▉     | 13000000/26177836 [00:50<00:51, 257134.69samples/s][A
+      Processing samples:  52%|█████▏    | 13500000/26177836 [00:52<00:49, 257396.13samples/s][A
+      Processing samples:  53%|█████▎    | 14000000/26177836 [00:54<00:47, 257277.45samples/s][A
+      Processing samples:  55%|█████▌    | 14500000/26177836 [00:56<00:45, 256542.87samples/s][A
+      Processing samples:  57%|█████▋    | 15000000/26177836 [00:58<00:43, 255968.60samples/s][A
+      Processing samples:  59%|█████▉    | 15500000/26177836 [01:00<00:41, 255902.60samples/s][A
+      Processing samples:  61%|██████    | 16000000/26177836 [01:02<00:39, 255427.36samples/s][A
+      Processing samples:  63%|██████▎   | 16500000/26177836 [01:04<00:37, 254997.31samples/s][A
+      Processing samples:  65%|██████▍   | 17000000/26177836 [01:06<00:35, 255282.19samples/s][A
+      Processing samples:  67%|██████▋   | 17500000/26177836 [01:08<00:33, 255476.35samples/s][A
+      Processing samples:  69%|██████▉   | 18000000/26177836 [01:10<00:32, 255491.91samples/s][A
+      Processing samples:  71%|███████   | 18500000/26177836 [01:12<00:30, 254381.29samples/s][A
+      Processing samples:  73%|███████▎  | 19000000/26177836 [01:14<00:28, 254142.94samples/s][A
+      Processing samples:  74%|███████▍  | 19500000/26177836 [01:16<00:26, 254110.58samples/s][A
+      Processing samples:  76%|███████▋  | 20000000/26177836 [01:18<00:24, 253502.96samples/s][A
+      Processing samples:  78%|███████▊  | 20500000/26177836 [01:20<00:22, 253986.84samples/s][A
+      Processing samples:  80%|████████  | 21000000/26177836 [01:22<00:20, 250319.90samples/s][A
+      Processing samples:  82%|████████▏ | 21500000/26177836 [01:24<00:18, 251245.66samples/s][A
+      Processing samples:  84%|████████▍ | 22000000/26177836 [01:26<00:16, 251261.96samples/s][A
+      Processing samples:  86%|████████▌ | 22500000/26177836 [01:28<00:14, 252547.81samples/s][A
+      Processing samples:  88%|████████▊ | 23000000/26177836 [01:30<00:12, 252608.11samples/s][A
+      Processing samples:  90%|████████▉ | 23500000/26177836 [01:32<00:10, 253578.97samples/s][A
+      Processing samples:  92%|█████████▏| 24000000/26177836 [01:34<00:08, 253856.84samples/s][A
+      Processing samples:  94%|█████████▎| 24500000/26177836 [01:36<00:06, 253886.78samples/s][A
+      Processing samples:  96%|█████████▌| 25000000/26177836 [01:38<00:04, 254585.00samples/s][A
+      Processing samples:  97%|█████████▋| 25500000/26177836 [01:39<00:02, 254759.87samples/s][A
+      Processing samples:  99%|█████████▉| 26000000/26177836 [01:41<00:00, 255071.80samples/s][A
+      Processing samples: 100%|██████████| 26177836/26177836 [01:42<00:00, 254139.91samples/s][A
+                                                                                              [AProcessing symbols:  17%|█▋        | 1/6 [18:40<1:33:22, 1120.53s/file, symbol=M6AZ4]Processing symbols:  17%|█▋        | 1/6 [18:40<1:33:22, 1120.53s/file, symbol=M6AH5]   ✅ Generated 26,177,836 target rows with 17 columns
+   ✅ Processing complete - 26177836 samples generated
+   💾 Saved to: /Users/danielfisher/data/databento/symbol_datasets/regression_targets/M6AZ4_regression_targets.parquet
+   🏷️  Total targets: 12
+      - log_return_horizons: 10 targets (5 endpoint + 5 mean)
+      - directional_mfe: 2 targets (buy_mfe, sell_mfe)
+   📋 Output columns: ['row_idx', 'symbol', 'timestamp', 'log_return_50t', 'log_return_100t', 'log_return_250t', 'log_return_500t', 'log_return_1000t', 'log_return_mean_50t', 'log_return_mean_100t', 'log_return_mean_250t', 'log_return_mean_500t', 'log_return_mean_1000t', 'symbol_right', 'timestamp_right', 'mfe_buy_bps', 'mfe_sell_bps']
+   🎉 Symbol complete: 26,177,836 samples with 12 targets each
+
+================================================================================
+📈 PROCESSING SYMBOL: M6AH5
+================================================================================
+
+🔄 Processing symbol: M6AH5
+   📁 Input: /Users/danielfisher/data/databento/symbol_datasets/inputs/M6AH5_inputs_only_dataset_20250927_201138.parquet
+   📊 Configured 2 regression generators:
+      • Log returns across 5 horizon windows (50-1000 ticks) with endpoint and mean returns
+        Targets: 10 - ['log_return_50t', 'log_return_100t', 'log_return_250t']...
+      • Directional MFE targets over 500 tick horizon
+        Targets: 2 - ['mfe_buy_bps', 'mfe_sell_bps']...
+   🔨 Building targets with 2 generators...
+📂 Processing file: M6AH5_inputs_only_dataset_20250927_201138.parquet
+   📊 Dataset has 18,732,909 samples
+   🔄 Processing in chunks of 500,000
+   🎯 Generator 1/2: LogReturnHorizonsGenerator
+      🔄 Using standard processing with generator delegation (lookback: 1,000, lookforward: 0)
+
+      Processing samples:   0%|          | 0/18732909 [00:00<?, ?samples/s][A
+      Processing samples:   3%|▎         | 500000/18732909 [00:19<11:40, 26010.05samples/s][A
+      Processing samples:   3%|▎         | 500000/18732909 [00:30<11:40, 26010.05samples/s][A
+      Processing samples:   5%|▌         | 1000000/18732909 [00:38<11:21, 26027.60samples/s][A
+      Processing samples:   5%|▌         | 1000000/18732909 [00:50<11:21, 26027.60samples/s][A
+      Processing samples:   8%|▊         | 1500000/18732909 [00:57<11:01, 26058.33samples/s][A
+      Processing samples:   8%|▊         | 1500000/18732909 [01:10<11:01, 26058.33samples/s][A
+      Processing samples:  11%|█         | 2000000/18732909 [01:16<10:42, 26042.34samples/s][A
+      Processing samples:  11%|█         | 2000000/18732909 [01:30<10:42, 26042.34samples/s][A
+      Processing samples:  13%|█▎        | 2500000/18732909 [01:36<10:23, 26024.66samples/s][A
+      Processing samples:  13%|█▎        | 2500000/18732909 [01:50<10:23, 26024.66samples/s][A
+      Processing samples:  16%|█▌        | 3000000/18732909 [01:55<10:05, 25996.23samples/s][A
+      Processing samples:  16%|█▌        | 3000000/18732909 [02:10<10:05, 25996.23samples/s][A
+      Processing samples:  19%|█▊        | 3500000/18732909 [02:14<09:46, 25981.14samples/s][A
+      Processing samples:  19%|█▊        | 3500000/18732909 [02:30<09:46, 25981.14samples/s][A
+      Processing samples:  21%|██▏       | 4000000/18732909 [02:34<09:28, 25893.49samples/s][A
+      Processing samples:  21%|██▏       | 4000000/18732909 [02:50<09:28, 25893.49samples/s][A
+      Processing samples:  24%|██▍       | 4500000/18732909 [02:53<09:13, 25715.18samples/s][A
+      Processing samples:  24%|██▍       | 4500000/18732909 [03:10<09:13, 25715.18samples/s][A
+      Processing samples:  27%|██▋       | 5000000/18732909 [03:13<08:54, 25712.33samples/s][A
+      Processing samples:  27%|██▋       | 5000000/18732909 [03:30<08:54, 25712.33samples/s][A
+      Processing samples:  29%|██▉       | 5500000/18732909 [03:32<08:33, 25752.47samples/s][A
+      Processing samples:  29%|██▉       | 5500000/18732909 [03:50<08:33, 25752.47samples/s][A
+      Processing samples:  32%|███▏      | 6000000/18732909 [03:52<08:17, 25618.95samples/s][A
+      Processing samples:  32%|███▏      | 6000000/18732909 [04:10<08:17, 25618.95samples/s][A
+      Processing samples:  35%|███▍      | 6500000/18732909 [04:12<08:01, 25431.34samples/s][A
+      Processing samples:  35%|███▍      | 6500000/18732909 [04:30<08:01, 25431.34samples/s][A
+      Processing samples:  37%|███▋      | 7000000/18732909 [04:31<07:38, 25593.87samples/s][A
+      Processing samples:  37%|███▋      | 7000000/18732909 [04:50<07:38, 25593.87samples/s][A
+      Processing samples:  40%|████      | 7500000/18732909 [04:50<07:17, 25685.14samples/s][A
+      Processing samples:  43%|████▎     | 8000000/18732909 [05:10<06:58, 25620.86samples/s][A
+      Processing samples:  43%|████▎     | 8000000/18732909 [05:20<06:58, 25620.86samples/s][A
+      Processing samples:  45%|████▌     | 8500000/18732909 [05:29<06:37, 25724.72samples/s][A
+      Processing samples:  45%|████▌     | 8500000/18732909 [05:40<06:37, 25724.72samples/s][A
+      Processing samples:  48%|████▊     | 9000000/18732909 [05:49<06:17, 25795.14samples/s][A
+      Processing samples:  48%|████▊     | 9000000/18732909 [06:00<06:17, 25795.14samples/s][A
+      Processing samples:  51%|█████     | 9500000/18732909 [06:08<05:57, 25847.61samples/s][A
+      Processing samples:  51%|█████     | 9500000/18732909 [06:20<05:57, 25847.61samples/s][A
+      Processing samples:  53%|█████▎    | 10000000/18732909 [06:27<05:37, 25877.11samples/s][A
+      Processing samples:  53%|█████▎    | 10000000/18732909 [06:40<05:37, 25877.11samples/s][A
+      Processing samples:  56%|█████▌    | 10500000/18732909 [06:46<05:17, 25918.80samples/s][A
+      Processing samples:  56%|█████▌    | 10500000/18732909 [07:01<05:17, 25918.80samples/s][A
+      Processing samples:  59%|█████▊    | 11000000/18732909 [07:05<04:58, 25936.74samples/s][A
+      Processing samples:  59%|█████▊    | 11000000/18732909 [07:21<04:58, 25936.74samples/s][A
+      Processing samples:  61%|██████▏   | 11500000/18732909 [07:25<04:38, 25927.47samples/s][A
+      Processing samples:  61%|██████▏   | 11500000/18732909 [07:41<04:38, 25927.47samples/s][A
+      Processing samples:  64%|██████▍   | 12000000/18732909 [07:50<04:42, 23835.22samples/s][A
+      Processing samples:  64%|██████▍   | 12000000/18732909 [08:01<04:42, 23835.22samples/s][A
+      Processing samples:  67%|██████▋   | 12500000/18732909 [08:09<04:15, 24382.81samples/s][A
+      Processing samples:  67%|██████▋   | 12500000/18732909 [08:21<04:15, 24382.81samples/s][A
+      Processing samples:  69%|██████▉   | 13000000/18732909 [08:29<03:51, 24775.33samples/s][A
+      Processing samples:  69%|██████▉   | 13000000/18732909 [08:41<03:51, 24775.33samples/s][A
+      Processing samples:  72%|███████▏  | 13500000/18732909 [08:48<03:28, 25107.24samples/s][A
+      Processing samples:  72%|███████▏  | 13500000/18732909 [09:01<03:28, 25107.24samples/s][A
+      Processing samples:  75%|███████▍  | 14000000/18732909 [09:07<03:07, 25282.39samples/s][A
+      Processing samples:  75%|███████▍  | 14000000/18732909 [09:21<03:07, 25282.39samples/s][A
+      Processing samples:  77%|███████▋  | 14500000/18732909 [09:30<02:53, 24351.75samples/s][A
+      Processing samples:  77%|███████▋  | 14500000/18732909 [09:41<02:53, 24351.75samples/s][A
+      Processing samples:  80%|████████  | 15000000/18732909 [09:49<02:30, 24822.39samples/s][A
+      Processing samples:  80%|████████  | 15000000/18732909 [10:01<02:30, 24822.39samples/s][A
+      Processing samples:  83%|████████▎ | 15500000/18732909 [10:08<02:08, 25134.80samples/s][A
+      Processing samples:  83%|████████▎ | 15500000/18732909 [10:21<02:08, 25134.80samples/s][A
+      Processing samples:  85%|████████▌ | 16000000/18732909 [10:27<01:47, 25372.72samples/s][A
+      Processing samples:  85%|████████▌ | 16000000/18732909 [10:41<01:47, 25372.72samples/s][A
+      Processing samples:  88%|████████▊ | 16500000/18732909 [10:47<01:27, 25560.44samples/s][A
+      Processing samples:  88%|████████▊ | 16500000/18732909 [11:01<01:27, 25560.44samples/s][A
+      Processing samples:  91%|█████████ | 17000000/18732909 [11:06<01:07, 25692.27samples/s][A
+      Processing samples:  91%|█████████ | 17000000/18732909 [11:21<01:07, 25692.27samples/s][A
+      Processing samples:  93%|█████████▎| 17500000/18732909 [11:25<00:47, 25752.58samples/s][A
+      Processing samples:  93%|█████████▎| 17500000/18732909 [11:41<00:47, 25752.58samples/s][A
+      Processing samples:  96%|█████████▌| 18000000/18732909 [11:44<00:28, 25829.01samples/s][A
+      Processing samples:  96%|█████████▌| 18000000/18732909 [12:01<00:28, 25829.01samples/s][A
+      Processing samples:  99%|█████████▉| 18500000/18732909 [12:04<00:09, 25864.87samples/s][A
+      Processing samples: 100%|██████████| 18732909/18732909 [12:13<00:00, 25906.51samples/s][A
+                                                                                             [A   🎯 Generator 2/2: DirectionalMFEGenerator
+      🔄 Using standard processing with generator delegation (lookback: 200, lookforward: 0)
+
+      Processing samples:   0%|          | 0/18732909 [00:00<?, ?samples/s][A
+      Processing samples:   3%|▎         | 500000/18732909 [00:02<01:13, 248199.82samples/s][A
+      Processing samples:   5%|▌         | 1000000/18732909 [00:04<01:12, 243889.00samples/s][A
+      Processing samples:   8%|▊         | 1500000/18732909 [00:06<01:09, 247010.58samples/s][A
+      Processing samples:  11%|█         | 2000000/18732909 [00:08<01:06, 250246.98samples/s][A
+      Processing samples:  13%|█▎        | 2500000/18732909 [00:09<01:04, 252515.83samples/s][A
+      Processing samples:  16%|█▌        | 3000000/18732909 [00:11<01:01, 253955.02samples/s][A
+      Processing samples:  19%|█▊        | 3500000/18732909 [00:13<00:59, 255144.14samples/s][A
+      Processing samples:  21%|██▏       | 4000000/18732909 [00:15<00:57, 256065.02samples/s][A
+      Processing samples:  24%|██▍       | 4500000/18732909 [00:17<00:55, 256082.48samples/s][A
+      Processing samples:  27%|██▋       | 5000000/18732909 [00:19<00:53, 256628.40samples/s][A
+      Processing samples:  29%|██▉       | 5500000/18732909 [00:21<00:51, 257175.37samples/s][A
+      Processing samples:  32%|███▏      | 6000000/18732909 [00:23<00:49, 257454.78samples/s][A
+      Processing samples:  35%|███▍      | 6500000/18732909 [00:25<00:47, 257867.81samples/s][A
+      Processing samples:  37%|███▋      | 7000000/18732909 [00:27<00:45, 257895.52samples/s][A
+      Processing samples:  40%|████      | 7500000/18732909 [00:29<00:43, 258443.17samples/s][A
+      Processing samples:  43%|████▎     | 8000000/18732909 [00:31<00:41, 257430.62samples/s][A
+      Processing samples:  45%|████▌     | 8500000/18732909 [00:33<00:39, 256911.09samples/s][A
+      Processing samples:  48%|████▊     | 9000000/18732909 [00:35<00:37, 256165.17samples/s][A
+      Processing samples:  51%|█████     | 9500000/18732909 [00:37<00:36, 255780.97samples/s][A
+      Processing samples:  53%|█████▎    | 10000000/18732909 [00:39<00:34, 255986.23samples/s][A
+      Processing samples:  56%|█████▌    | 10500000/18732909 [00:41<00:32, 256530.05samples/s][A
+      Processing samples:  59%|█████▊    | 11000000/18732909 [00:43<00:30, 253992.25samples/s][A
+      Processing samples:  61%|██████▏   | 11500000/18732909 [00:45<00:28, 253437.29samples/s][A
+      Processing samples:  64%|██████▍   | 12000000/18732909 [00:47<00:26, 254186.69samples/s][A
+      Processing samples:  67%|██████▋   | 12500000/18732909 [00:49<00:24, 253571.02samples/s][A
+      Processing samples:  69%|██████▉   | 13000000/18732909 [00:51<00:22, 252438.89samples/s][A
+      Processing samples:  72%|███████▏  | 13500000/18732909 [00:52<00:20, 253483.65samples/s][A
+      Processing samples:  75%|███████▍  | 14000000/18732909 [00:54<00:18, 253739.99samples/s][A
+      Processing samples:  77%|███████▋  | 14500000/18732909 [00:56<00:16, 254124.38samples/s][A
+      Processing samples:  80%|████████  | 15000000/18732909 [00:58<00:14, 254803.54samples/s][A
+      Processing samples:  83%|████████▎ | 15500000/18732909 [01:00<00:12, 255269.18samples/s][A
+      Processing samples:  85%|████████▌ | 16000000/18732909 [01:02<00:10, 255280.26samples/s][A
+      Processing samples:  88%|████████▊ | 16500000/18732909 [01:04<00:08, 253970.24samples/s][A
+      Processing samples:  91%|█████████ | 17000000/18732909 [01:06<00:06, 254459.10samples/s][A
+      Processing samples:  93%|█████████▎| 17500000/18732909 [01:08<00:04, 254527.42samples/s][A
+      Processing samples:  96%|█████████▌| 18000000/18732909 [01:10<00:02, 254772.00samples/s][A
+      Processing samples:  99%|█████████▉| 18500000/18732909 [01:12<00:00, 255009.48samples/s][A
+      Processing samples: 100%|██████████| 18732909/18732909 [01:13<00:00, 254355.90samples/s][A
+                                                                                              [AProcessing symbols:  33%|███▎      | 2/6 [32:21<1:02:57, 944.35s/file, symbol=M6AH5] Processing symbols:  33%|███▎      | 2/6 [32:21<1:02:57, 944.35s/file, symbol=M6AU4]   ✅ Generated 18,732,909 target rows with 17 columns
+   ✅ Processing complete - 18732909 samples generated
+   💾 Saved to: /Users/danielfisher/data/databento/symbol_datasets/regression_targets/M6AH5_regression_targets.parquet
+   🏷️  Total targets: 12
+      - log_return_horizons: 10 targets (5 endpoint + 5 mean)
+      - directional_mfe: 2 targets (buy_mfe, sell_mfe)
+   📋 Output columns: ['row_idx', 'symbol', 'timestamp', 'log_return_50t', 'log_return_100t', 'log_return_250t', 'log_return_500t', 'log_return_1000t', 'log_return_mean_50t', 'log_return_mean_100t', 'log_return_mean_250t', 'log_return_mean_500t', 'log_return_mean_1000t', 'symbol_right', 'timestamp_right', 'mfe_buy_bps', 'mfe_sell_bps']
+   🎉 Symbol complete: 18,732,909 samples with 12 targets each
+
+================================================================================
+📈 PROCESSING SYMBOL: M6AU4
+================================================================================
+
+🔄 Processing symbol: M6AU4
+   📁 Input: /Users/danielfisher/data/databento/symbol_datasets/inputs/M6AU4_inputs_only_dataset_20250927_201217.parquet
+   📊 Configured 2 regression generators:
+      • Log returns across 5 horizon windows (50-1000 ticks) with endpoint and mean returns
+        Targets: 10 - ['log_return_50t', 'log_return_100t', 'log_return_250t']...
+      • Directional MFE targets over 500 tick horizon
+        Targets: 2 - ['mfe_buy_bps', 'mfe_sell_bps']...
+   🔨 Building targets with 2 generators...
+📂 Processing file: M6AU4_inputs_only_dataset_20250927_201217.parquet
+   📊 Dataset has 21,604,469 samples
+   🔄 Processing in chunks of 500,000
+   🎯 Generator 1/2: LogReturnHorizonsGenerator
+      🔄 Using standard processing with generator delegation (lookback: 1,000, lookforward: 0)
+
+      Processing samples:   0%|          | 0/21604469 [00:00<?, ?samples/s][A
+      Processing samples:   2%|▏         | 500000/21604469 [00:19<13:34, 25907.08samples/s][A
+      Processing samples:   2%|▏         | 500000/21604469 [00:30<13:34, 25907.08samples/s][A
+      Processing samples:   5%|▍         | 1000000/21604469 [00:38<13:16, 25878.05samples/s][A
+      Processing samples:   5%|▍         | 1000000/21604469 [00:50<13:16, 25878.05samples/s][A
+      Processing samples:   7%|▋         | 1500000/21604469 [00:57<12:56, 25875.76samples/s][A
+      Processing samples:   7%|▋         | 1500000/21604469 [01:10<12:56, 25875.76samples/s][A
+      Processing samples:   9%|▉         | 2000000/21604469 [01:17<12:37, 25887.33samples/s][A
+      Processing samples:   9%|▉         | 2000000/21604469 [01:30<12:37, 25887.33samples/s][A
+      Processing samples:  12%|█▏        | 2500000/21604469 [01:36<12:18, 25872.03samples/s][A
+      Processing samples:  12%|█▏        | 2500000/21604469 [01:50<12:18, 25872.03samples/s][A
+      Processing samples:  14%|█▍        | 3000000/21604469 [01:55<11:59, 25851.23samples/s][A
+      Processing samples:  14%|█▍        | 3000000/21604469 [02:10<11:59, 25851.23samples/s][A
+      Processing samples:  16%|█▌        | 3500000/21604469 [02:15<11:40, 25845.44samples/s][A
+      Processing samples:  16%|█▌        | 3500000/21604469 [02:30<11:40, 25845.44samples/s][A
+      Processing samples:  19%|█▊        | 4000000/21604469 [02:34<11:21, 25829.57samples/s][A
+      Processing samples:  19%|█▊        | 4000000/21604469 [02:50<11:21, 25829.57samples/s][A
+      Processing samples:  21%|██        | 4500000/21604469 [02:54<11:01, 25838.17samples/s][A
+      Processing samples:  21%|██        | 4500000/21604469 [03:10<11:01, 25838.17samples/s][A
+      Processing samples:  23%|██▎       | 5000000/21604469 [03:13<10:42, 25841.49samples/s][A
+      Processing samples:  23%|██▎       | 5000000/21604469 [03:30<10:42, 25841.49samples/s][A
+      Processing samples:  25%|██▌       | 5500000/21604469 [03:32<10:22, 25854.42samples/s][A
+      Processing samples:  25%|██▌       | 5500000/21604469 [03:50<10:22, 25854.42samples/s][A
+      Processing samples:  28%|██▊       | 6000000/21604469 [03:52<10:03, 25866.89samples/s][A
+      Processing samples:  28%|██▊       | 6000000/21604469 [04:11<10:03, 25866.89samples/s][A
+      Processing samples:  30%|███       | 6500000/21604469 [04:11<09:43, 25885.11samples/s][A
+      Processing samples:  32%|███▏      | 7000000/21604469 [04:30<09:23, 25905.15samples/s][A
+      Processing samples:  32%|███▏      | 7000000/21604469 [04:41<09:23, 25905.15samples/s][A
+      Processing samples:  35%|███▍      | 7500000/21604469 [04:49<09:04, 25885.89samples/s][A
+      Processing samples:  35%|███▍      | 7500000/21604469 [05:01<09:04, 25885.89samples/s][A
+      Processing samples:  37%|███▋      | 8000000/21604469 [05:09<08:45, 25899.48samples/s][A
+      Processing samples:  37%|███▋      | 8000000/21604469 [05:21<08:45, 25899.48samples/s][A
+      Processing samples:  39%|███▉      | 8500000/21604469 [05:28<08:26, 25887.10samples/s][A
+      Processing samples:  39%|███▉      | 8500000/21604469 [05:41<08:26, 25887.10samples/s][A
+      Processing samples:  42%|████▏     | 9000000/21604469 [05:47<08:07, 25875.48samples/s][A
+      Processing samples:  42%|████▏     | 9000000/21604469 [06:01<08:07, 25875.48samples/s][A
+      Processing samples:  44%|████▍     | 9500000/21604469 [06:07<07:48, 25859.97samples/s][A
+      Processing samples:  44%|████▍     | 9500000/21604469 [06:21<07:48, 25859.97samples/s][A
+      Processing samples:  46%|████▋     | 10000000/21604469 [06:28<07:40, 25199.82samples/s][A
+      Processing samples:  46%|████▋     | 10000000/21604469 [06:41<07:40, 25199.82samples/s][A
+      Processing samples:  49%|████▊     | 10500000/21604469 [06:47<07:18, 25351.11samples/s][A
+      Processing samples:  49%|████▊     | 10500000/21604469 [07:01<07:18, 25351.11samples/s][A
+      Processing samples:  51%|█████     | 11000000/21604469 [07:07<06:56, 25487.30samples/s][A
+      Processing samples:  51%|█████     | 11000000/21604469 [07:21<06:56, 25487.30samples/s][A
+      Processing samples:  53%|█████▎    | 11500000/21604469 [07:26<06:35, 25546.65samples/s][A
+      Processing samples:  53%|█████▎    | 11500000/21604469 [07:41<06:35, 25546.65samples/s][A
+      Processing samples:  56%|█████▌    | 12000000/21604469 [07:47<06:22, 25113.87samples/s][A
+      Processing samples:  56%|█████▌    | 12000000/21604469 [08:01<06:22, 25113.87samples/s][A
+      Processing samples:  58%|█████▊    | 12500000/21604469 [08:06<05:59, 25332.29samples/s][A
+      Processing samples:  58%|█████▊    | 12500000/21604469 [08:21<05:59, 25332.29samples/s][A
+      Processing samples:  60%|██████    | 13000000/21604469 [08:25<05:37, 25496.98samples/s][A
+      Processing samples:  60%|██████    | 13000000/21604469 [08:41<05:37, 25496.98samples/s][A
+      Processing samples:  62%|██████▏   | 13500000/21604469 [08:45<05:16, 25599.45samples/s][A
+      Processing samples:  62%|██████▏   | 13500000/21604469 [09:01<05:16, 25599.45samples/s][A
+      Processing samples:  65%|██████▍   | 14000000/21604469 [09:04<04:55, 25692.13samples/s][A
+      Processing samples:  65%|██████▍   | 14000000/21604469 [09:21<04:55, 25692.13samples/s][A
+      Processing samples:  67%|██████▋   | 14500000/21604469 [09:23<04:35, 25757.17samples/s][A
+      Processing samples:  67%|██████▋   | 14500000/21604469 [09:41<04:35, 25757.17samples/s][A
+      Processing samples:  69%|██████▉   | 15000000/21604469 [09:43<04:16, 25775.83samples/s][A
+      Processing samples:  69%|██████▉   | 15000000/21604469 [10:01<04:16, 25775.83samples/s][A
+      Processing samples:  72%|███████▏  | 15500000/21604469 [10:02<03:56, 25814.51samples/s][A
+      Processing samples:  72%|███████▏  | 15500000/21604469 [10:21<03:56, 25814.51samples/s][A
+      Processing samples:  74%|███████▍  | 16000000/21604469 [10:21<03:36, 25847.19samples/s][A
+      Processing samples:  76%|███████▋  | 16500000/21604469 [10:41<03:17, 25859.14samples/s][A
+      Processing samples:  76%|███████▋  | 16500000/21604469 [10:51<03:17, 25859.14samples/s][A
+      Processing samples:  79%|███████▊  | 17000000/21604469 [11:00<02:57, 25880.69samples/s][A
+      Processing samples:  79%|███████▊  | 17000000/21604469 [11:11<02:57, 25880.69samples/s][A
+      Processing samples:  81%|████████  | 17500000/21604469 [11:19<02:38, 25888.11samples/s][A
+      Processing samples:  81%|████████  | 17500000/21604469 [11:31<02:38, 25888.11samples/s][A
+      Processing samples:  83%|████████▎ | 18000000/21604469 [11:38<02:19, 25897.05samples/s][A
+      Processing samples:  83%|████████▎ | 18000000/21604469 [11:51<02:19, 25897.05samples/s][A
+      Processing samples:  86%|████████▌ | 18500000/21604469 [11:58<02:00, 25866.85samples/s][A
+      Processing samples:  86%|████████▌ | 18500000/21604469 [12:11<02:00, 25866.85samples/s][A
+      Processing samples:  88%|████████▊ | 19000000/21604469 [12:17<01:40, 25874.42samples/s][A
+      Processing samples:  88%|████████▊ | 19000000/21604469 [12:31<01:40, 25874.42samples/s][A
+      Processing samples:  90%|█████████ | 19500000/21604469 [12:36<01:21, 25888.02samples/s][A
+      Processing samples:  90%|█████████ | 19500000/21604469 [12:51<01:21, 25888.02samples/s][A
+      Processing samples:  93%|█████████▎| 20000000/21604469 [12:56<01:01, 25885.46samples/s][A
+      Processing samples:  93%|█████████▎| 20000000/21604469 [13:11<01:01, 25885.46samples/s][A
+      Processing samples:  95%|█████████▍| 20500000/21604469 [13:15<00:42, 25891.90samples/s][A
+      Processing samples:  95%|█████████▍| 20500000/21604469 [13:31<00:42, 25891.90samples/s][A
+      Processing samples:  97%|█████████▋| 21000000/21604469 [13:34<00:23, 25901.84samples/s][A
+      Processing samples:  97%|█████████▋| 21000000/21604469 [13:51<00:23, 25901.84samples/s][A
+      Processing samples: 100%|█████████▉| 21500000/21604469 [13:54<00:04, 25898.13samples/s][A
+      Processing samples: 100%|██████████| 21604469/21604469 [13:58<00:00, 25915.57samples/s][A
+                                                                                             [A   🎯 Generator 2/2: DirectionalMFEGenerator
+      🔄 Using standard processing with generator delegation (lookback: 200, lookforward: 0)
+
+      Processing samples:   0%|          | 0/21604469 [00:00<?, ?samples/s][A
+      Processing samples:   2%|▏         | 500000/21604469 [00:01<01:23, 251775.99samples/s][A
+      Processing samples:   5%|▍         | 1000000/21604469 [00:03<01:21, 252913.74samples/s][A
+      Processing samples:   7%|▋         | 1500000/21604469 [00:05<01:18, 254699.04samples/s][A
+      Processing samples:   9%|▉         | 2000000/21604469 [00:07<01:16, 255885.93samples/s][A
+      Processing samples:  12%|█▏        | 2500000/21604469 [00:09<01:14, 255428.71samples/s][A
+      Processing samples:  14%|█▍        | 3000000/21604469 [00:11<01:12, 255509.07samples/s][A
+      Processing samples:  16%|█▌        | 3500000/21604469 [00:13<01:10, 255770.73samples/s][A
+      Processing samples:  19%|█▊        | 4000000/21604469 [00:15<01:08, 256636.09samples/s][A
+      Processing samples:  21%|██        | 4500000/21604469 [00:17<01:06, 256544.63samples/s][A
+      Processing samples:  23%|██▎       | 5000000/21604469 [00:19<01:04, 257193.76samples/s][A
+      Processing samples:  25%|██▌       | 5500000/21604469 [00:21<01:02, 256977.44samples/s][A
+      Processing samples:  28%|██▊       | 6000000/21604469 [00:23<01:00, 257288.00samples/s][A
+      Processing samples:  30%|███       | 6500000/21604469 [00:25<00:58, 257828.58samples/s][A
+      Processing samples:  32%|███▏      | 7000000/21604469 [00:27<00:56, 257394.85samples/s][A
+      Processing samples:  35%|███▍      | 7500000/21604469 [00:29<00:54, 258003.05samples/s][A
+      Processing samples:  37%|███▋      | 8000000/21604469 [00:31<00:52, 258563.10samples/s][A
+      Processing samples:  39%|███▉      | 8500000/21604469 [00:33<00:50, 258436.64samples/s][A
+      Processing samples:  42%|████▏     | 9000000/21604469 [00:35<00:48, 258461.25samples/s][A
+      Processing samples:  44%|████▍     | 9500000/21604469 [00:36<00:46, 258368.55samples/s][A
+      Processing samples:  46%|████▋     | 10000000/21604469 [00:38<00:45, 256410.97samples/s][A
+      Processing samples:  49%|████▊     | 10500000/21604469 [00:40<00:43, 257032.53samples/s][A
+      Processing samples:  51%|█████     | 11000000/21604469 [00:42<00:41, 257315.98samples/s][A
+      Processing samples:  53%|█████▎    | 11500000/21604469 [00:44<00:39, 257898.78samples/s][A
+      Processing samples:  56%|█████▌    | 12000000/21604469 [00:46<00:37, 258492.13samples/s][A
+      Processing samples:  58%|█████▊    | 12500000/21604469 [00:48<00:35, 259180.37samples/s][A
+      Processing samples:  60%|██████    | 13000000/21604469 [00:50<00:33, 259872.15samples/s][A
+      Processing samples:  62%|██████▏   | 13500000/21604469 [00:52<00:31, 259091.15samples/s][A
+      Processing samples:  65%|██████▍   | 14000000/21604469 [00:54<00:29, 258615.00samples/s][A
+      Processing samples:  67%|██████▋   | 14500000/21604469 [00:56<00:27, 257608.38samples/s][A
+      Processing samples:  69%|██████▉   | 15000000/21604469 [00:58<00:25, 257454.63samples/s][A
+      Processing samples:  72%|███████▏  | 15500000/21604469 [01:00<00:23, 257961.26samples/s][A
+      Processing samples:  74%|███████▍  | 16000000/21604469 [01:02<00:21, 258003.65samples/s][A
+      Processing samples:  76%|███████▋  | 16500000/21604469 [01:04<00:19, 257542.14samples/s][A
+      Processing samples:  79%|███████▊  | 17000000/21604469 [01:06<00:17, 257300.27samples/s][A
+      Processing samples:  81%|████████  | 17500000/21604469 [01:07<00:15, 257054.58samples/s][A
+      Processing samples:  83%|████████▎ | 18000000/21604469 [01:09<00:14, 256737.10samples/s][A
+      Processing samples:  86%|████████▌ | 18500000/21604469 [01:11<00:12, 258092.85samples/s][A
+      Processing samples:  88%|████████▊ | 19000000/21604469 [01:13<00:10, 257629.55samples/s][A
+      Processing samples:  90%|█████████ | 19500000/21604469 [01:15<00:08, 257186.17samples/s][A
+      Processing samples:  93%|█████████▎| 20000000/21604469 [01:17<00:06, 257106.97samples/s][A
+      Processing samples:  95%|█████████▍| 20500000/21604469 [01:19<00:04, 256382.53samples/s][A
+      Processing samples:  97%|█████████▋| 21000000/21604469 [01:21<00:02, 256812.73samples/s][A
+      Processing samples: 100%|█████████▉| 21500000/21604469 [01:23<00:00, 257419.32samples/s][A
+      Processing samples: 100%|██████████| 21604469/21604469 [01:23<00:00, 256576.79samples/s][A
+                                                                                              [AProcessing symbols:  50%|█████     | 3/6 [47:59<47:04, 941.51s/file, symbol=M6AU4]  Processing symbols:  50%|█████     | 3/6 [47:59<47:04, 941.51s/file, symbol=M6AM4]   ✅ Generated 21,604,469 target rows with 17 columns
+   ✅ Processing complete - 21604469 samples generated
+   💾 Saved to: /Users/danielfisher/data/databento/symbol_datasets/regression_targets/M6AU4_regression_targets.parquet
+   🏷️  Total targets: 12
+      - log_return_horizons: 10 targets (5 endpoint + 5 mean)
+      - directional_mfe: 2 targets (buy_mfe, sell_mfe)
+   📋 Output columns: ['row_idx', 'symbol', 'timestamp', 'log_return_50t', 'log_return_100t', 'log_return_250t', 'log_return_500t', 'log_return_1000t', 'log_return_mean_50t', 'log_return_mean_100t', 'log_return_mean_250t', 'log_return_mean_500t', 'log_return_mean_1000t', 'symbol_right', 'timestamp_right', 'mfe_buy_bps', 'mfe_sell_bps']
+   🎉 Symbol complete: 21,604,469 samples with 12 targets each
+
+================================================================================
+📈 PROCESSING SYMBOL: M6AM4
+================================================================================
+
+🔄 Processing symbol: M6AM4
+   📁 Input: /Users/danielfisher/data/databento/symbol_datasets/inputs/M6AM4_inputs_only_dataset_20250927_201251.parquet
+   📊 Configured 2 regression generators:
+      • Log returns across 5 horizon windows (50-1000 ticks) with endpoint and mean returns
+        Targets: 10 - ['log_return_50t', 'log_return_100t', 'log_return_250t']...
+      • Directional MFE targets over 500 tick horizon
+        Targets: 2 - ['mfe_buy_bps', 'mfe_sell_bps']...
+   🔨 Building targets with 2 generators...
+📂 Processing file: M6AM4_inputs_only_dataset_20250927_201251.parquet
+   📊 Dataset has 14,880,655 samples
+   🔄 Processing in chunks of 500,000
+   🎯 Generator 1/2: LogReturnHorizonsGenerator
+      🔄 Using standard processing with generator delegation (lookback: 1,000, lookforward: 0)
+
+      Processing samples:   0%|          | 0/14880655 [00:00<?, ?samples/s][A
+      Processing samples:   3%|▎         | 500000/14880655 [00:19<09:13, 25974.53samples/s][A
+      Processing samples:   3%|▎         | 500000/14880655 [00:34<09:13, 25974.53samples/s][A
+      Processing samples:   7%|▋         | 1000000/14880655 [00:38<08:54, 25988.23samples/s][A
+      Processing samples:   7%|▋         | 1000000/14880655 [00:54<08:54, 25988.23samples/s][A
+      Processing samples:  10%|█         | 1500000/14880655 [00:57<08:34, 26022.48samples/s][A
+      Processing samples:  10%|█         | 1500000/14880655 [01:14<08:34, 26022.48samples/s][A
+      Processing samples:  13%|█▎        | 2000000/14880655 [01:16<08:15, 25992.13samples/s][A
+      Processing samples:  13%|█▎        | 2000000/14880655 [01:34<08:15, 25992.13samples/s][A
+      Processing samples:  17%|█▋        | 2500000/14880655 [01:36<07:56, 25988.86samples/s][A
+      Processing samples:  17%|█▋        | 2500000/14880655 [01:54<07:56, 25988.86samples/s][A
+      Processing samples:  20%|██        | 3000000/14880655 [01:55<07:38, 25925.24samples/s][A
+      Processing samples:  20%|██        | 3000000/14880655 [02:14<07:38, 25925.24samples/s][A
+      Processing samples:  24%|██▎       | 3500000/14880655 [02:14<07:19, 25912.99samples/s][A
+      Processing samples:  27%|██▋       | 4000000/14880655 [02:34<07:00, 25899.92samples/s][A
+      Processing samples:  27%|██▋       | 4000000/14880655 [02:44<07:00, 25899.92samples/s][A
+      Processing samples:  30%|███       | 4500000/14880655 [02:53<06:40, 25890.58samples/s][A
+      Processing samples:  30%|███       | 4500000/14880655 [03:04<06:40, 25890.58samples/s][A
+      Processing samples:  34%|███▎      | 5000000/14880655 [03:12<06:22, 25858.18samples/s][A
+      Processing samples:  34%|███▎      | 5000000/14880655 [03:24<06:22, 25858.18samples/s][A
+      Processing samples:  37%|███▋      | 5500000/14880655 [03:32<06:02, 25874.92samples/s][A
+      Processing samples:  37%|███▋      | 5500000/14880655 [03:44<06:02, 25874.92samples/s][A
+      Processing samples:  40%|████      | 6000000/14880655 [03:51<05:43, 25888.83samples/s][A
+      Processing samples:  40%|████      | 6000000/14880655 [04:04<05:43, 25888.83samples/s][A
+      Processing samples:  44%|████▎     | 6500000/14880655 [04:11<05:25, 25743.53samples/s][A
+      Processing samples:  44%|████▎     | 6500000/14880655 [04:24<05:25, 25743.53samples/s][A
+      Processing samples:  47%|████▋     | 7000000/14880655 [04:31<05:12, 25213.96samples/s][A
+      Processing samples:  47%|████▋     | 7000000/14880655 [04:44<05:12, 25213.96samples/s][A
+      Processing samples:  50%|█████     | 7500000/14880655 [04:51<04:50, 25409.07samples/s][A
+      Processing samples:  50%|█████     | 7500000/14880655 [05:04<04:50, 25409.07samples/s][A
+      Processing samples:  54%|█████▍    | 8000000/14880655 [05:10<04:29, 25522.26samples/s][A
+      Processing samples:  54%|█████▍    | 8000000/14880655 [05:24<04:29, 25522.26samples/s][A
+      Processing samples:  57%|█████▋    | 8500000/14880655 [05:31<04:16, 24904.72samples/s][A
+      Processing samples:  57%|█████▋    | 8500000/14880655 [05:44<04:16, 24904.72samples/s][A
+      Processing samples:  60%|██████    | 9000000/14880655 [05:51<03:53, 25176.09samples/s][A
+      Processing samples:  60%|██████    | 9000000/14880655 [06:04<03:53, 25176.09samples/s][A
+      Processing samples:  64%|██████▍   | 9500000/14880655 [06:10<03:32, 25355.06samples/s][A
+      Processing samples:  64%|██████▍   | 9500000/14880655 [06:24<03:32, 25355.06samples/s][A
+      Processing samples:  67%|██████▋   | 10000000/14880655 [06:29<03:11, 25518.24samples/s][A
+      Processing samples:  67%|██████▋   | 10000000/14880655 [06:44<03:11, 25518.24samples/s][A
+      Processing samples:  71%|███████   | 10500000/14880655 [06:49<02:50, 25648.67samples/s][A
+      Processing samples:  71%|███████   | 10500000/14880655 [07:04<02:50, 25648.67samples/s][A
+      Processing samples:  74%|███████▍  | 11000000/14880655 [07:08<02:31, 25695.65samples/s][A
+      Processing samples:  74%|███████▍  | 11000000/14880655 [07:24<02:31, 25695.65samples/s][A
+      Processing samples:  77%|███████▋  | 11500000/14880655 [07:27<02:11, 25763.85samples/s][A
+      Processing samples:  77%|███████▋  | 11500000/14880655 [07:44<02:11, 25763.85samples/s][A
+      Processing samples:  81%|████████  | 12000000/14880655 [07:47<01:51, 25831.37samples/s][A
+      Processing samples:  81%|████████  | 12000000/14880655 [08:04<01:51, 25831.37samples/s][A
+      Processing samples:  84%|████████▍ | 12500000/14880655 [08:06<01:32, 25814.15samples/s][A
+      Processing samples:  84%|████████▍ | 12500000/14880655 [08:24<01:32, 25814.15samples/s][A
+      Processing samples:  87%|████████▋ | 13000000/14880655 [08:25<01:12, 25833.15samples/s][A
+      Processing samples:  87%|████████▋ | 13000000/14880655 [08:44<01:12, 25833.15samples/s][A
+      Processing samples:  91%|█████████ | 13500000/14880655 [08:45<00:53, 25846.87samples/s][A
+      Processing samples:  94%|█████████▍| 14000000/14880655 [09:04<00:34, 25879.75samples/s][A
+      Processing samples:  94%|█████████▍| 14000000/14880655 [09:15<00:34, 25879.75samples/s][A
+      Processing samples:  97%|█████████▋| 14500000/14880655 [09:23<00:14, 25890.65samples/s][A
+      Processing samples:  97%|█████████▋| 14500000/14880655 [09:35<00:14, 25890.65samples/s][A
+      Processing samples: 100%|██████████| 14880655/14880655 [09:38<00:00, 25898.06samples/s][A
+                                                                                             [A   🎯 Generator 2/2: DirectionalMFEGenerator
+      🔄 Using standard processing with generator delegation (lookback: 200, lookforward: 0)
+
+      Processing samples:   0%|          | 0/14880655 [00:00<?, ?samples/s][A
+      Processing samples:   3%|▎         | 500000/14880655 [00:01<00:56, 255458.52samples/s][A
+      Processing samples:   7%|▋         | 1000000/14880655 [00:03<00:53, 257313.27samples/s][A
+      Processing samples:  10%|█         | 1500000/14880655 [00:05<00:51, 257354.20samples/s][A
+      Processing samples:  13%|█▎        | 2000000/14880655 [00:07<00:49, 257745.46samples/s][A
+      Processing samples:  17%|█▋        | 2500000/14880655 [00:09<00:47, 258129.35samples/s][A
+      Processing samples:  20%|██        | 3000000/14880655 [00:11<00:45, 258440.19samples/s][A
+      Processing samples:  24%|██▎       | 3500000/14880655 [00:13<00:44, 258621.32samples/s][A
+      Processing samples:  27%|██▋       | 4000000/14880655 [00:15<00:42, 258060.86samples/s][A
+      Processing samples:  30%|███       | 4500000/14880655 [00:17<00:40, 257795.58samples/s][A
+      Processing samples:  34%|███▎      | 5000000/14880655 [00:19<00:38, 258101.41samples/s][A
+      Processing samples:  37%|███▋      | 5500000/14880655 [00:21<00:36, 258195.44samples/s][A
+      Processing samples:  40%|████      | 6000000/14880655 [00:23<00:34, 257699.62samples/s][A
+      Processing samples:  44%|████▎     | 6500000/14880655 [00:25<00:32, 257949.75samples/s][A
+      Processing samples:  47%|████▋     | 7000000/14880655 [00:27<00:30, 258552.48samples/s][A
+      Processing samples:  50%|█████     | 7500000/14880655 [00:29<00:28, 258138.78samples/s][A
+      Processing samples:  54%|█████▍    | 8000000/14880655 [00:30<00:26, 258906.63samples/s][A
+      Processing samples:  57%|█████▋    | 8500000/14880655 [00:32<00:24, 258702.93samples/s][A
+      Processing samples:  60%|██████    | 9000000/14880655 [00:34<00:22, 258845.50samples/s][A
+      Processing samples:  64%|██████▍   | 9500000/14880655 [00:36<00:20, 258277.48samples/s][A
+      Processing samples:  67%|██████▋   | 10000000/14880655 [00:38<00:18, 258336.39samples/s][A
+      Processing samples:  71%|███████   | 10500000/14880655 [00:40<00:16, 258257.97samples/s][A
+      Processing samples:  74%|███████▍  | 11000000/14880655 [00:42<00:14, 258767.52samples/s][A
+      Processing samples:  77%|███████▋  | 11500000/14880655 [00:44<00:13, 259065.78samples/s][A
+      Processing samples:  81%|████████  | 12000000/14880655 [00:46<00:11, 259082.62samples/s][A
+      Processing samples:  84%|████████▍ | 12500000/14880655 [00:48<00:09, 259279.10samples/s][A
+      Processing samples:  87%|████████▋ | 13000000/14880655 [00:50<00:07, 259027.98samples/s][A
+      Processing samples:  91%|█████████ | 13500000/14880655 [00:52<00:05, 258086.80samples/s][A
+      Processing samples:  94%|█████████▍| 14000000/14880655 [00:54<00:03, 257480.96samples/s][A
+      Processing samples:  97%|█████████▋| 14500000/14880655 [00:56<00:01, 257634.28samples/s][A
+      Processing samples: 100%|██████████| 14880655/14880655 [00:57<00:00, 256729.21samples/s][A
+                                                                                              [AProcessing symbols:  67%|██████▋   | 4/6 [58:44<27:28, 824.47s/file, symbol=M6AM4]Processing symbols:  67%|██████▋   | 4/6 [58:44<27:28, 824.47s/file, symbol=M6AU5]   ✅ Generated 14,880,655 target rows with 17 columns
+   ✅ Processing complete - 14880655 samples generated
+   💾 Saved to: /Users/danielfisher/data/databento/symbol_datasets/regression_targets/M6AM4_regression_targets.parquet
+   🏷️  Total targets: 12
+      - log_return_horizons: 10 targets (5 endpoint + 5 mean)
+      - directional_mfe: 2 targets (buy_mfe, sell_mfe)
+   📋 Output columns: ['row_idx', 'symbol', 'timestamp', 'log_return_50t', 'log_return_100t', 'log_return_250t', 'log_return_500t', 'log_return_1000t', 'log_return_mean_50t', 'log_return_mean_100t', 'log_return_mean_250t', 'log_return_mean_500t', 'log_return_mean_1000t', 'symbol_right', 'timestamp_right', 'mfe_buy_bps', 'mfe_sell_bps']
+   🎉 Symbol complete: 14,880,655 samples with 12 targets each
+
+================================================================================
+📈 PROCESSING SYMBOL: M6AU5
+================================================================================
+
+🔄 Processing symbol: M6AU5
+   📁 Input: /Users/danielfisher/data/databento/symbol_datasets/inputs/M6AU5_inputs_only_dataset_20250927_201258.parquet
+   📊 Configured 2 regression generators:
+      • Log returns across 5 horizon windows (50-1000 ticks) with endpoint and mean returns
+        Targets: 10 - ['log_return_50t', 'log_return_100t', 'log_return_250t']...
+      • Directional MFE targets over 500 tick horizon
+        Targets: 2 - ['mfe_buy_bps', 'mfe_sell_bps']...
+   🔨 Building targets with 2 generators...
+📂 Processing file: M6AU5_inputs_only_dataset_20250927_201258.parquet
+   📊 Dataset has 99,935 samples
+   🔄 Processing in chunks of 500,000
+   🎯 Generator 1/2: LogReturnHorizonsGenerator
+      🔄 Using standard processing with generator delegation (lookback: 1,000, lookforward: 0)
+
+      Processing samples:   0%|          | 0/99935 [00:00<?, ?samples/s][A
+      Processing samples: 100%|██████████| 99935/99935 [00:03<00:00, 26433.67samples/s][A
+                                                                                       [A   🎯 Generator 2/2: DirectionalMFEGenerator
+      🔄 Using standard processing with generator delegation (lookback: 200, lookforward: 0)
+
+      Processing samples:   0%|          | 0/99935 [00:00<?, ?samples/s][A
+      Processing samples: 100%|██████████| 99935/99935 [00:00<00:00, 253303.81samples/s][A
+                                                                                        [AProcessing symbols:  83%|████████▎ | 5/6 [58:48<08:48, 528.69s/file, symbol=M6AU5]Processing symbols:  83%|████████▎ | 5/6 [58:48<08:48, 528.69s/file, symbol=M6AM5]   ✅ Generated 99,935 target rows with 17 columns
+   ✅ Processing complete - 99935 samples generated
+   💾 Saved to: /Users/danielfisher/data/databento/symbol_datasets/regression_targets/M6AU5_regression_targets.parquet
+   🏷️  Total targets: 12
+      - log_return_horizons: 10 targets (5 endpoint + 5 mean)
+      - directional_mfe: 2 targets (buy_mfe, sell_mfe)
+   📋 Output columns: ['row_idx', 'symbol', 'timestamp', 'log_return_50t', 'log_return_100t', 'log_return_250t', 'log_return_500t', 'log_return_1000t', 'log_return_mean_50t', 'log_return_mean_100t', 'log_return_mean_250t', 'log_return_mean_500t', 'log_return_mean_1000t', 'symbol_right', 'timestamp_right', 'mfe_buy_bps', 'mfe_sell_bps']
+   🎉 Symbol complete: 99,935 samples with 12 targets each
+
+================================================================================
+📈 PROCESSING SYMBOL: M6AM5
+================================================================================
+
+🔄 Processing symbol: M6AM5
+   📁 Input: /Users/danielfisher/data/databento/symbol_datasets/inputs/M6AM5_inputs_only_dataset_20250927_201119.parquet
+   📊 Configured 2 regression generators:
+      • Log returns across 5 horizon windows (50-1000 ticks) with endpoint and mean returns
+        Targets: 10 - ['log_return_50t', 'log_return_100t', 'log_return_250t']...
+      • Directional MFE targets over 500 tick horizon
+        Targets: 2 - ['mfe_buy_bps', 'mfe_sell_bps']...
+   🔨 Building targets with 2 generators...
+📂 Processing file: M6AM5_inputs_only_dataset_20250927_201119.parquet
+   📊 Dataset has 3,416,633 samples
+   🔄 Processing in chunks of 500,000
+   🎯 Generator 1/2: LogReturnHorizonsGenerator
+      🔄 Using standard processing with generator delegation (lookback: 1,000, lookforward: 0)
+
+      Processing samples:   0%|          | 0/3416633 [00:00<?, ?samples/s][A
+      Processing samples:  15%|█▍        | 500000/3416633 [00:19<01:52, 25939.49samples/s][A
+      Processing samples:  15%|█▍        | 500000/3416633 [00:35<01:52, 25939.49samples/s][A
+      Processing samples:  29%|██▉       | 1000000/3416633 [00:38<01:33, 25967.46samples/s][A
+      Processing samples:  29%|██▉       | 1000000/3416633 [00:55<01:33, 25967.46samples/s][A
+      Processing samples:  44%|████▍     | 1500000/3416633 [00:57<01:13, 25999.35samples/s][A
+      Processing samples:  44%|████▍     | 1500000/3416633 [01:15<01:13, 25999.35samples/s][A
+      Processing samples:  59%|█████▊    | 2000000/3416633 [01:17<00:54, 25955.84samples/s][A
+      Processing samples:  59%|█████▊    | 2000000/3416633 [01:35<00:54, 25955.84samples/s][A
+      Processing samples:  73%|███████▎  | 2500000/3416633 [01:36<00:35, 25916.83samples/s][A
+      Processing samples:  88%|████████▊ | 3000000/3416633 [01:55<00:16, 25910.72samples/s][A
+      Processing samples:  88%|████████▊ | 3000000/3416633 [02:06<00:16, 25910.72samples/s][A
+      Processing samples: 100%|██████████| 3416633/3416633 [02:11<00:00, 25910.09samples/s][A
+                                                                                           [A   🎯 Generator 2/2: DirectionalMFEGenerator
+      🔄 Using standard processing with generator delegation (lookback: 200, lookforward: 0)
+
+      Processing samples:   0%|          | 0/3416633 [00:00<?, ?samples/s][A
+      Processing samples:  15%|█▍        | 500000/3416633 [00:02<00:11, 245335.05samples/s][A
+      Processing samples:  29%|██▉       | 1000000/3416633 [00:04<00:09, 247870.40samples/s][A
+      Processing samples:  44%|████▍     | 1500000/3416633 [00:05<00:07, 251610.77samples/s][A
+      Processing samples:  59%|█████▊    | 2000000/3416633 [00:07<00:05, 253055.90samples/s][A
+      Processing samples:  73%|███████▎  | 2500000/3416633 [00:09<00:03, 254744.68samples/s][A
+      Processing samples:  88%|████████▊ | 3000000/3416633 [00:11<00:01, 255132.43samples/s][A
+      Processing samples: 100%|██████████| 3416633/3416633 [00:13<00:00, 255870.76samples/s][A
+                                                                                            [AProcessing symbols: 100%|██████████| 6/6 [1:01:16<00:00, 398.94s/file, symbol=M6AM5]Processing symbols: 100%|██████████| 6/6 [1:01:16<00:00, 612.67s/file, symbol=M6AM5]
+   ✅ Generated 3,416,633 target rows with 17 columns
+   ✅ Processing complete - 3416633 samples generated
+   💾 Saved to: /Users/danielfisher/data/databento/symbol_datasets/regression_targets/M6AM5_regression_targets.parquet
+   🏷️  Total targets: 12
+      - log_return_horizons: 10 targets (5 endpoint + 5 mean)
+      - directional_mfe: 2 targets (buy_mfe, sell_mfe)
+   📋 Output columns: ['row_idx', 'symbol', 'timestamp', 'log_return_50t', 'log_return_100t', 'log_return_250t', 'log_return_500t', 'log_return_1000t', 'log_return_mean_50t', 'log_return_mean_100t', 'log_return_mean_250t', 'log_return_mean_500t', 'log_return_mean_1000t', 'symbol_right', 'timestamp_right', 'mfe_buy_bps', 'mfe_sell_bps']
+   🎉 Symbol complete: 3,416,633 samples with 12 targets each
+
+🎉 PROCESSING COMPLETE!
+================================================================================
+   Successfully processed: 6/6 symbols
+   Total samples generated: 84,912,437
+   Total targets per sample: 12
+      • 10 log return targets (5 endpoint + 5 mean)
+      • 2 MFE targets (buy + sell)
+   Output directory: /Users/danielfisher/data/databento/symbol_datasets/regression_targets
+
+📁 Generated 6 target files:
+   • M6AH5_regression_targets.parquet (367.2 MB)
+   • M6AM4_regression_targets.parquet (250.0 MB)
+   • M6AM5_regression_targets.parquet (81.5 MB)
+   • M6AU4_regression_targets.parquet (409.7 MB)
+   • M6AU5_regression_targets.parquet (4.0 MB)
+   • M6AZ4_regression_targets.parquet (488.8 MB)
+
+📋 Processing summary saved to: /Users/danielfisher/data/databento/symbol_datasets/regression_targets/processing_summary.txt
+
+================================================================================
+NEXT STEPS FOR ML TRAINING:
+================================================================================
+1. Load regression targets from output directory
+2. Train models (LightGBM recommended for tabular data)
+3. Expected performance: R² = 0.01-0.05 (GOOD for FX!)
+4. Combine endpoint + mean predictions for stronger signals
+5. Apply thresholds: only trade when prediction > 2-3 bps
+
+Example:
+  endpoint_pred = model_endpoint.predict(features)  # Final P&L
+  mean_pred = model_mean.predict(features)          # Trend
+  long_signal = (endpoint_pred > 2) & (mean_pred > 0)  # Both positive
+================================================================================

@@ -47,13 +47,9 @@ from .constants import (
     FeatureType,
     get_output_shape,
 )
-from .dataset_builder import (
-    DatasetBuildConfig,
-    DatasetBuilder,
-    batch_build_datasets_from_directory,
-    build_datasets_from_dbn_files,
-)
 
+# Legacy dataset builder removed - use ModularDatasetBuilder instead
+# Legacy directional MFE system removed - use modular target generators instead
 # Global Threshold Calculation
 from .global_threshold_calculator import (
     GlobalThresholdCalculator,
@@ -63,31 +59,61 @@ from .global_threshold_calculator import (
 
 # Core processing and configuration
 from .market_depth_processor import MarketDepthProcessor, create_processor, process_market_data
+from .modular_dataset_builder import ModularDatasetBuilder, create_modular_builder
+
+# Target-Only Generation API
+from .target_api import (
+    batch_generate_targets,
+    create_target_config_template,
+    generate_targets_from_dataframe,
+    generate_targets_from_parquet,
+    load_targets_and_join,
+)
+
+# Parameter Optimization (optional)
+try:
+    from .parameter_optimization import ParameterOptimizer, optimize_all_methods
+    OPTIMIZATION_AVAILABLE = True
+except ImportError:
+    OPTIMIZATION_AVAILABLE = False
+
+# Modular Target Generation System
+from .target_generators import (
+    CumulativeReturnsGenerator,
+    DirectionalMFEGenerator,
+    GALabelingGenerator,
+    GlobalThresholdClassificationGenerator,
+    LogReturnHorizonsGenerator,
+    PriceMovementGenerator,
+    QuantileClassificationGenerator,
+    RemainingValueTunerGenerator,
+    TargetGenerator,
+    TargetGeneratorFactory,
+    VolatilityGenerator,
+    VolatilityScaledReturnsGenerator,
+)
 
 # Public API
 __all__ = [
-    # Symbol-Split-Merge Dataset Building (Primary Approach)
-    "DatasetBuilder",
-    "DatasetBuildConfig",
-    "build_datasets_from_dbn_files",
-    "batch_build_datasets_from_directory",
+    # Legacy dataset building removed - use ModularDatasetBuilder instead
     # Global Threshold Calculation
     "GlobalThresholds",
     "GlobalThresholdCalculator",
     "calculate_global_thresholds",
+    # Legacy directional MFE system removed - use modular target generators instead
     # Core processing
     "process_market_data",
     "create_processor",
     "MarketDepthProcessor",
-    # New focused configurations
+    # Focused configurations
     "DatasetBuilderConfig",
     "GlobalThresholdConfig",
     "MarketDepthProcessorConfig",
+    "create_compatible_configs",
     "create_dataset_builder_config",
     "create_threshold_config",
     "create_processor_config",
-    "create_compatible_configs",
-    # Legacy compatibility functions
+    # Legacy compatibility functions (deprecated - use modular system)
     "create_represent_config",
     "list_available_currencies",
     # Constants (TIME_BINS moved to RepresentConfig.time_bins)
@@ -102,12 +128,36 @@ __all__ = [
     "FEATURE_INDEX_MAP",
     "MAX_FEATURES",
     "get_output_shape",
-    # Dynamic classification functionality moved to global_threshold_calculator
-    # High-level convenience API removed - use direct function imports instead
+    # Legacy functionality moved to modular target generation system
+    # Modular Target Generation System
+    "TargetGenerator",
+    "TargetGeneratorFactory",
+    "QuantileClassificationGenerator",
+    "GlobalThresholdClassificationGenerator",
+    "DirectionalMFEGenerator",
+    "GALabelingGenerator",
+    "LogReturnHorizonsGenerator",
+    "PriceMovementGenerator",
+    "VolatilityGenerator",
+    "CumulativeReturnsGenerator",
+    "VolatilityScaledReturnsGenerator",
+    "RemainingValueTunerGenerator",
+    "ModularDatasetBuilder",
+    "create_modular_builder",
+    # Target-Only Generation API
+    "generate_targets_from_parquet",
+    "generate_targets_from_dataframe",
+    "batch_generate_targets",
+    "create_target_config_template",
+    "load_targets_and_join",
+    # Parameter Optimization (if available)
+    "ParameterOptimizer",
+    "optimize_all_methods",
+    "OPTIMIZATION_AVAILABLE",
 ]
 
 
-# Removed redundant high-level API wrapper - use direct imports instead:
-# - build_datasets_from_dbn_files() for symbol dataset building
-# - DatasetBuilder() for advanced processing
+# Use modular target generation system instead:
+# - ModularDatasetBuilder() for dataset building with pluggable targets
+# - TargetGeneratorFactory.create() for creating target generators
 # - calculate_global_thresholds() for threshold calculation

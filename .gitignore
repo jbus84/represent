@@ -13,8 +13,8 @@ wheels/
 *.parquet*
 .coverage
 
-# Test conversion outputs
-test_conversion/
+# outputs
+*outputs*
 
 .DS_Store
 DBN*

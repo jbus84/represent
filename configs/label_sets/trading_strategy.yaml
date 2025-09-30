@@ -1,0 +1,58 @@
+# Trading Strategy Label Set Configuration
+# Optimized for algorithmic trading strategy development
+
+name: "Trading Strategy Analysis"
+description: "Multi-horizon analysis for systematic trading strategies with risk management"
+
+generators:
+  # Directional MFE for entry/exit timing
+  - type: "directional_mfe"
+    lookforward_horizon: 1000
+    expected_fee_pips: 0.7
+    winsorize_percentiles: [0.1, 99.9]
+    target_names: ["mfe_buy_1k", "mfe_sell_1k"]
+  
+  # Extended MFE for position management  
+  - type: "directional_mfe"
+    lookforward_horizon: 2500
+    expected_fee_pips: 0.7
+    winsorize_percentiles: [0.1, 99.9]
+    target_names: ["mfe_buy_2.5k", "mfe_sell_2.5k"]
+  
+  # Volatility-scaled returns for adaptive position sizing
+  - type: "volatility_scaled_returns"
+    volatility_window: 500
+    vol_multiplier: 2.0
+    horizon_ticks: 1500
+    min_barrier_bps: 3.0
+    target_name: "vol_scaled_conservative"
+    
+  # Aggressive volatility scaling for breakout strategies
+  - type: "volatility_scaled_returns"
+    volatility_window: 300
+    vol_multiplier: 3.5
+    horizon_ticks: 1000
+    min_barrier_bps: 5.0
+    target_name: "vol_scaled_breakout"
+  
+  # Trend continuation analysis
+  - type: "remaining_value_tuner"
+    lookback_rows: 750
+    lookforward_input: 2500
+    lookforward_offset: 150
+    trend_threshold_bps: 25.0
+    neutral_factor: 0.6
+    target_name: "trend_continuation"
+  
+  # Classification for regime detection
+  - type: "quantile_classification"
+    nbins: 13
+    lookforward_window: 2000
+    lookback_window: 2000
+    target_name: "regime_classification"
+
+visualization: true
+
+output:
+  base_name: "trading_strategy_labels"
+  include_timestamp: true

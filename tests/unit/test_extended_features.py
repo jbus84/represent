@@ -28,10 +28,7 @@ class TestExtendedFeatures:
     def setup_method(self):
         """Setup config for each test."""
         self.config = MarketDepthProcessorConfig(
-            features=["volume"],
-            samples=50000,
-            ticks_per_bin=100,
-            micro_pip_size=0.00001
+            features=["volume"], samples=50000, ticks_per_bin=100, micro_pip_size=0.00001
         )
 
     def test_single_feature_volume(self):
@@ -101,7 +98,9 @@ class TestExtendedFeatures:
 
         # Variance feature calculated dynamically from volume data - no separate column needed
 
-        processor = MarketDepthProcessor(config=self.config, features=["volume", "variance", "trade_counts"])
+        processor = MarketDepthProcessor(
+            config=self.config, features=["volume", "variance", "trade_counts"]
+        )
         result = processor.process(data)
 
         # Multiple features should return 3D array
@@ -120,8 +119,12 @@ class TestExtendedFeatures:
         # Variance feature calculated dynamically from volume data - no separate column needed
 
         # Test with different feature order inputs
-        processor1 = MarketDepthProcessor(config=self.config, features=["trade_counts", "volume", "variance"])
-        processor2 = MarketDepthProcessor(config=self.config, features=["variance", "volume", "trade_counts"])
+        processor1 = MarketDepthProcessor(
+            config=self.config, features=["trade_counts", "volume", "variance"]
+        )
+        processor2 = MarketDepthProcessor(
+            config=self.config, features=["variance", "volume", "trade_counts"]
+        )
 
         result1 = processor1.process(data)
         result2 = processor2.process(data)
@@ -155,8 +158,7 @@ class TestExtendedFeatures:
         # Test too many valid features
         with pytest.raises(ValueError, match="Too many features"):
             MarketDepthProcessor(
-                config=self.config,
-                features=["volume", "variance", "trade_counts", "volume"]
+                config=self.config, features=["volume", "variance", "trade_counts", "volume"]
             )  # 4 features
 
     def test_process_market_data_api_with_features(self):
@@ -172,7 +174,9 @@ class TestExtendedFeatures:
             if col not in data.columns:
                 data = data.with_columns(pl.lit(1.0).alias(col))
 
-        result_multi = process_market_data(data, config=self.config, features=["volume", "trade_counts"])
+        result_multi = process_market_data(
+            data, config=self.config, features=["volume", "trade_counts"]
+        )
         assert result_multi.shape == (2, PRICE_LEVELS, self.config.time_bins)
 
         # Test default behavior (backward compatibility)
@@ -242,10 +246,7 @@ class TestFeaturePerformance:
     def setup_method(self):
         """Setup config for each test."""
         self.config = MarketDepthProcessorConfig(
-            features=["volume"],
-            samples=50000,
-            ticks_per_bin=100,
-            micro_pip_size=0.00001
+            features=["volume"], samples=50000, ticks_per_bin=100, micro_pip_size=0.00001
         )
 
     def test_single_vs_multiple_feature_performance(self):
@@ -266,7 +267,9 @@ class TestFeaturePerformance:
         single_time = time.perf_counter() - start_time
 
         # Test multiple features
-        processor_multi = MarketDepthProcessor(config=self.config, features=["volume", "trade_counts"])
+        processor_multi = MarketDepthProcessor(
+            config=self.config, features=["volume", "trade_counts"]
+        )
         start_time = time.perf_counter()
         result_multi = processor_multi.process(data)
         multi_time = time.perf_counter() - start_time
@@ -294,7 +297,9 @@ class TestFeaturePerformance:
 
         # Variance feature calculated dynamically from volume data - no separate column needed
 
-        processor = MarketDepthProcessor(config=self.config, features=["volume", "variance", "trade_counts"])
+        processor = MarketDepthProcessor(
+            config=self.config, features=["volume", "variance", "trade_counts"]
+        )
 
         # Run multiple times to get stable measurement
         times = []
@@ -317,10 +322,7 @@ class TestBackwardCompatibility:
     def setup_method(self):
         """Setup config for each test."""
         self.config = MarketDepthProcessorConfig(
-            features=["volume"],
-            samples=50000,
-            ticks_per_bin=100,
-            micro_pip_size=0.00001
+            features=["volume"], samples=50000, ticks_per_bin=100, micro_pip_size=0.00001
         )
 
     def test_existing_api_unchanged(self):
@@ -350,7 +352,9 @@ class TestBackwardCompatibility:
         result_explicit = processor_explicit.process(data)
 
         assert np.allclose(result_default, result_explicit)
-        assert result_default.shape == result_explicit.shape == (PRICE_LEVELS, self.config.time_bins)
+        assert (
+            result_default.shape == result_explicit.shape == (PRICE_LEVELS, self.config.time_bins)
+        )
 
     def test_processor_initialization_edge_cases(self):
         """Test processor initialization edge cases and validation."""
