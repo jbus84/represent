@@ -2,6 +2,98 @@
 
 <!-- version list -->
 
+## v1.15.0 (2025-09-30)
+
+### Bug Fixes
+
+- Now productin adaptive triple barrier outputs
+  ([`042d081`](https://github.com/jbus84/represent/commit/042d081c57f7c6e0c6b259fe2411d280b7c12104))
+
+- Removing junk
+  ([`f5b1e09`](https://github.com/jbus84/represent/commit/f5b1e098c482c967545dde15c1467129dd1f3ae4))
+
+- Removing more junk
+  ([`8892494`](https://github.com/jbus84/represent/commit/8892494134e174dd6d8d10825eb64cbf2175e807))
+
+- **missing**: Add missing code
+  ([`ac030ec`](https://github.com/jbus84/represent/commit/ac030eccc9279597935200b080bfe2939c80584f))
+
+- **plots**: Plotting now resolved
+  ([`69ad000`](https://github.com/jbus84/represent/commit/69ad0009b35c9a1396b46b7d459a90dda52119bb))
+
+### Features
+
+- Add labelling logic
+  ([`627fd12`](https://github.com/jbus84/represent/commit/627fd12bc96b7ffd664999d3b1b0abcb151ec9ec))
+
+- Add new modular logic to repo
+  ([`0bc1826`](https://github.com/jbus84/represent/commit/0bc1826586f173887428547f58ace91c7ccfc9bb))
+
+- Focus on triple barrier
+  ([`9b86741`](https://github.com/jbus84/represent/commit/9b867412db8fee2d5d32249c49a0b893909aaa66))
+
+- Just push everything
+  ([`676279f`](https://github.com/jbus84/represent/commit/676279fb7e46112edf0b38983ce5e8daab0ff08a))
+
+- Loadsa fixes and labelling pretty muc there
+  ([`7ff364d`](https://github.com/jbus84/represent/commit/7ff364d60d730a88e7506198dbf5016d23efda70))
+
+- Product adaptive triple barrier targets
+  ([`e5adaa3`](https://github.com/jbus84/represent/commit/e5adaa3006baa7029eae8376d7dd126b3ab4fb1d))
+
+- **distributions**: Add comprehensive distribution analysis for classification
+  ([`ce22ab3`](https://github.com/jbus84/represent/commit/ce22ab3fea8045f032870deac398353004615390))
+
+- **distributions**: Organize research files into scripts and html folders
+  ([`50b25c8`](https://github.com/jbus84/represent/commit/50b25c8c72d3ef6ba164cfebad83f63888215038))
+
+- **division**: Separate out targets from inputs
+  ([`e1eff84`](https://github.com/jbus84/represent/commit/e1eff84e7511c28674f6eff268f7acf5cfb3e07c))
+
+- **GA**: Add back in GA logic
+  ([`b9133d0`](https://github.com/jbus84/represent/commit/b9133d02e730051bcbd8a9a5c1e5ec6e08790e22))
+
+- **horizons**: Add log horizon dataset producer
+  ([`8b90225`](https://github.com/jbus84/represent/commit/8b90225e30cb053734f5e0d4fc52354553069b87))
+
+- **labels**: Loadsa new labels
+  ([`2135c7a`](https://github.com/jbus84/represent/commit/2135c7a7bd71c041b7ce8f0bfe77131dabcf2331))
+
+- **linting**: Esnure all linting passes
+  ([`be329ce`](https://github.com/jbus84/represent/commit/be329cea61a74b3bd878da77e6cd10f7be2dc2b0))
+
+- **merton**: Implement Merton Jump Diffusion dataset creation and comparison system
+  ([`b5b0ddc`](https://github.com/jbus84/represent/commit/b5b0ddcc78db584efd27e683f38a65738c2391cd))
+
+- **regression**: Add new regression tooling and reduce max symbol dataneeds
+  ([`c13f047`](https://github.com/jbus84/represent/commit/c13f047008c7e55d2cdcaeb9ebaee6e92cea8bfd))
+
+- **streaming**: Add missing streaming files
+  ([`9762222`](https://github.com/jbus84/represent/commit/9762222f28bf1f5d97de4e199e873015003cf815))
+
+- **streaming**: Now streaming the outputs
+  ([`856612f`](https://github.com/jbus84/represent/commit/856612fd0334dfa744e2fe95c7c1366dd80d02ce))
+
+- **trends**: Fix trend labelling
+  ([`1080ae1`](https://github.com/jbus84/represent/commit/1080ae1e10e6491b39cb82a2f427bd0bf20726e3))
+
+### Refactoring
+
+- More reorg
+  ([`f292fa6`](https://github.com/jbus84/represent/commit/f292fa621c27c29cd82fb822d0971c3cb018a017))
+
+- **optimisations**: Clean up
+  ([`fcec0ba`](https://github.com/jbus84/represent/commit/fcec0bab27187d560845f0a87ddf9e822813b436))
+
+- **outputs**: Don't track anything in outputs
+  ([`9e5bbfe`](https://github.com/jbus84/represent/commit/9e5bbfea25bd55a6bedd20df0f5c7172504023cf))
+
+### Testing
+
+- Fixup
+  ([`1e425e6`](https://github.com/jbus84/represent/commit/1e425e6b7132b7b3723b3e3deea0b4e1b42bd8c5))
+
+
 ## v1.14.0 (2025-08-13)
 
 ### Documentation
