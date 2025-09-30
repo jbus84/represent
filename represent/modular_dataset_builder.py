@@ -10,7 +10,6 @@ from typing import Any
 
 import numpy as np
 import polars as pl
-from tqdm import tqdm
 
 from .target_generators.base import TargetGenerator
 from .target_generators.factory import TargetGeneratorFactory
@@ -227,7 +226,7 @@ class ModularDatasetBuilder:
                 if lookback_window > 0 or lookforward_window > 0:
                     print(f"      🔄 Using standard processing with generator delegation (lookback: {lookback_window:,}, lookforward: {lookforward_window:,})")
                 else:
-                    print(f"      🔄 Using standard chunking")
+                    print("      🔄 Using standard chunking")
 
             generator_targets = self._process_with_standard_chunks(
                 generator, parquet_path, symbol, price_column,
@@ -237,7 +236,7 @@ class ModularDatasetBuilder:
             # Remove duplicates after chunk concatenation
             generator_targets = self._remove_duplicates(
                 generator_targets,
-                verbose_prefix=f"      "
+                verbose_prefix="      "
             )
 
             all_target_chunks.append(generator_targets)
@@ -450,7 +449,7 @@ class ModularDatasetBuilder:
         generator_chunks = []
 
         # Process in chunks with progress bar
-        with tqdm(total=total_rows, desc=f"      Processing samples", unit="samples", leave=False) as pbar:
+        with tqdm(total=total_rows, desc="      Processing samples", unit="samples", leave=False) as pbar:
             for offset in range(0, total_rows, chunk_size):
                 # Read chunk efficiently using Polars slice
                 current_chunk_size = min(chunk_size, total_rows - offset)
@@ -497,7 +496,7 @@ class ModularDatasetBuilder:
         lookforward_window = getattr(generator, 'lookforward_window', 0)
 
         # Process in chunks with overlap for lookback and lookforward data
-        with tqdm(total=total_rows, desc=f"      Processing samples", unit="samples", leave=False) as pbar:
+        with tqdm(total=total_rows, desc="      Processing samples", unit="samples", leave=False) as pbar:
             offset = 0
 
             while offset < total_rows:
@@ -576,7 +575,7 @@ class ModularDatasetBuilder:
 
         # PASS 1: Compute volatility for entire dataset
         if self.verbose:
-            print(f"         📊 Pass 1: Computing volatility stream")
+            print("         📊 Pass 1: Computing volatility stream")
 
         volatilities = np.full(total_rows, np.nan, dtype=np.float32)
 
@@ -625,7 +624,7 @@ class ModularDatasetBuilder:
 
         # PASS 2: Apply triple barrier using pre-computed volatility
         if self.verbose:
-            print(f"         🎯 Pass 2: Applying triple barrier labels")
+            print("         🎯 Pass 2: Applying triple barrier labels")
 
         all_results = []
 

@@ -250,11 +250,11 @@ def load_and_process_dbn_files(
 
             # Final merge of all chunks for this symbol
             merged_df = pl.concat(merged_dfs, how="vertical")
-            
+
             # Sort by event time for determinism
             if "ts_event" in merged_df.columns:
                 merged_df = merged_df.sort("ts_event")
-            
+
             # De-duplicate rows to avoid duplicated index keys when indexing onto inputs
             before_len = len(merged_df)
             dedup_subset = None
@@ -268,13 +268,13 @@ def load_and_process_dbn_files(
                     dedup_subset = ["ts_event", "symbol"]
                 else:
                     dedup_subset = ["ts_event"]
-            
+
             if dedup_subset is not None:
                 merged_df = merged_df.unique(subset=dedup_subset, maintain_order=True)
             else:
                 # Fallback: drop exact duplicate rows
                 merged_df = merged_df.unique(maintain_order=True)
-            
+
             after_len = len(merged_df)
             dropped = before_len - after_len
 
@@ -519,7 +519,7 @@ Examples:
             if dataset["targets"]:
                 print(f"    🎯 Targets: {', '.join(dataset['targets'])}")
             elif dataset['output_type'] == "inputs-only (all DBN columns)":
-                print(f"    📈 All original DBN columns preserved for optimization")
+                print("    📈 All original DBN columns preserved for optimization")
 
         print("\n🚀 Symbol datasets ready for ML training!")
         print("💡 Each dataset contains ALL original DBN columns PLUS the generated target labels")

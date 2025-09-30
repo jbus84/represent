@@ -34,12 +34,13 @@ def generate_label_grouped_plots_for_symbol(
     - outputs/plots/optimization/[SYMBOL]/label_short_examples.png (label = -1)
     """
     from pathlib import Path as _P
-    import polars as pl
-    import numpy as np
+
     import matplotlib.pyplot as plt
-    from represent.target_generators.factory import TargetGeneratorFactory
+    import numpy as np
+    import polars as pl
 
     from diagnostics.comprehensive_method_debugging import simulate_optimization_sampling
+    from represent.target_generators.factory import TargetGeneratorFactory
 
     symbol_name = symbol_info['symbol']
 
@@ -596,11 +597,11 @@ def calculate_additional_metrics(prices: np.ndarray, method: str, optimal_params
     try:
         # Import here to avoid circular imports
         import polars as pl
-        from represent.target_generators.factory import TargetGeneratorFactory
 
         # Use EXACT same windowing parameters and sampling strategy as optimization
         # This ensures metrics match what optimization actually optimized for
         from represent.large_scale_optimization import LargeScaleParameterOptimizer
+        from represent.target_generators.factory import TargetGeneratorFactory
 
         # Create temporary optimizer just to use its sampling method (with SAME parameters as optimization)
         temp_optimizer = LargeScaleParameterOptimizer(

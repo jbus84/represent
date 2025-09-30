@@ -19,7 +19,6 @@ from pathlib import Path
 
 import matplotlib.patches as mpatches
 from matplotlib.lines import Line2D
-import matplotlib.pyplot as plt
 
 try:
     from represent.target_generators.factory import TargetGeneratorFactory
@@ -419,10 +418,10 @@ def create_all_methods_plot(window_df: pl.DataFrame, methods: list, window_num: 
 
                 # Get label distribution and sample positions for each label type
                 unique_labels, label_counts = np.unique(labels_plot, return_counts=True)
-                print(f"    Label distribution (plot samples): {dict(zip(unique_labels, label_counts))}")
+                print(f"    Label distribution (plot samples): {dict(zip(unique_labels, label_counts, strict=False))}")
 
                 # Sample diverse trade positions across the plot data ensuring proper index alignment
-                trade_indices = []
+                trade_indices: list[int] = []
 
                 # Ensure labels_plot and prices_plot are aligned
                 min_length = min(len(labels_plot), len(prices_plot))
@@ -450,7 +449,7 @@ def create_all_methods_plot(window_df: pl.DataFrame, methods: list, window_num: 
                             trade_indices.extend(sampled_positions)
 
                 # Ensure we have some trades and remove duplicates
-                trade_indices = sorted(list(set(trade_indices)))
+                trade_indices = sorted(set(trade_indices))
 
                 # Ensure indices are within bounds and avoid problematic early data points
                 # For adaptive methods, skip early points where volatility calculation is unreliable
@@ -467,7 +466,7 @@ def create_all_methods_plot(window_df: pl.DataFrame, methods: list, window_num: 
                 min_spacing_plot = max(50, min_spacing_ticks // estimated_step)
 
                 # Filter out overlapping trades
-                non_overlapping_indices = []
+                non_overlapping_indices: list[int] = []
                 for idx in trade_indices:
                     # Check if this trade overlaps with any already selected
                     overlaps = False
@@ -709,17 +708,17 @@ def create_all_methods_plot(window_df: pl.DataFrame, methods: list, window_num: 
             # Legend - for barrier methods, this is handled within the barrier visualization
             if not method_config.get("has_barriers", False):
                 # Only add legend for non-barrier methods
-                legend_elements: list = [Line2D([0], [0], color='black', linewidth=0.8, label='Price')]
+                legend_elements_non_barrier: list = [Line2D([0], [0], color='black', linewidth=0.8, label='Price')]
 
                 for label_val, pct in zip(unique_labels, percentages, strict=False):
                     if label_val in method_config["color_map"]:
                         name = method_config["label_names"].get(label_val, str(label_val))
-                        legend_elements.append(
+                        legend_elements_non_barrier.append(
                             mpatches.Patch(color=method_config["color_map"][label_val], alpha=0.3,
                                          label=f'{name} ({pct:.1f}%)')
                         )
 
-                ax.legend(handles=legend_elements, loc='upper left', fontsize=10)
+                ax.legend(handles=legend_elements_non_barrier, loc='upper left', fontsize=10)
 
             # Detailed statistics
             stats_lines = [

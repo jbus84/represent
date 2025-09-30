@@ -9,18 +9,19 @@ actual optimized parameters from JSON files.
 Output: Target-only files with keys (row_idx, timestamp) + adaptive triple barrier target columns
 """
 
-import sys
 import json
-from pathlib import Path
+import sys
 from datetime import datetime
-import polars as pl
+from pathlib import Path
+
 from tqdm import tqdm
 
 # Add represent package to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from represent.target_generators.factory import TargetGeneratorFactory
 from represent.modular_dataset_builder import ModularDatasetBuilder
+from represent.target_generators.factory import TargetGeneratorFactory
+
 
 def load_optimized_parameters(symbol_name: str) -> dict[str, dict]:
     """
@@ -118,7 +119,7 @@ def process_symbol_with_triple_methods_chunked(input_file: Path, output_dir: Pat
             # Get target info for metadata
             target_info = generator.get_target_info()
             target_names = target_info['target_names']
- 
+
             # Save targets file
             output_file = output_dir / f"{symbol_name}_{method}_targets.parquet"
             output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -208,7 +209,7 @@ def main():
     file_progress.close()
 
     # Generate summary
-    print(f"\n🎉 PROCESSING COMPLETE!")
+    print("\n🎉 PROCESSING COMPLETE!")
     print("=" * 80)
     print(f"   Successfully processed: {successful_symbols}/{len(symbol_files)} symbols")
 

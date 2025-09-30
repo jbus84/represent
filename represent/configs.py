@@ -124,7 +124,7 @@ class MarketDepthProcessorConfig(BaseModel):
     # Tensor dimension parameters
     samples: int = Field(
         default=50000,
-        ge=25000,
+        ge=1000,
         description="Number of samples to process (affects tensor time dimension)",
     )
     ticks_per_bin: int = Field(default=100, gt=0, description="Number of ticks per time bin")

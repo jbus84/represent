@@ -998,28 +998,24 @@ class LargeScaleParameterOptimizer:
                 }
 
         # Use Optuna-only optimization
-            pnl = 0.0
-            position = 0  # -1 short, 0 flat, 1 long
-            for t in range(1, len(prices_arr)):
-                ret = (prices_arr[t] - prices_arr[t-1]) / prices_arr[t-1]
-                # Change position cost
-                if labels_arr[t] != position:
-                    if position != 0:  # exiting previous position
-                        pnl -= fee
-                    if labels_arr[t] != 0:  # entering new position
-                        pnl -= fee
-                    position = labels_arr[t]
-                # Accrue returns
-                pnl += ret * position
-            return pnl
-        # Progress tracking handled by manual progress display in Optuna version
+        # Initialize tracking variables
+        evaluation_count = [0]
+        best_return_so_far = [float('-inf')]
+        progress_bar = None
+        result_x = {}  # Will store best parameters
 
-        # Scikit-optimize objective function removed - using Optuna only
-        # def objective(**params):
-        #     """Objective function using adaptive sampled windows."""
-        #     evaluation_count[0] += 1
+        def objective(trial):
+            """Optuna objective function using adaptive sampled windows."""
+            nonlocal evaluation_count, best_return_so_far, progress_bar, result_x
+            evaluation_count[0] += 1
 
-            # Progress tracking handled by Optuna version with manual display
+            # Sample parameters from bounds
+            params = {}
+            for param_name, (low, high) in bounds.items():
+                if isinstance(low, int) and isinstance(high, int):
+                    params[param_name] = trial.suggest_int(param_name, low, high)
+                else:
+                    params[param_name] = trial.suggest_float(param_name, low, high)
 
             try:
                 # Create generator with current parameters + fixed transaction cost (1 pip)
@@ -1239,7 +1235,8 @@ class LargeScaleParameterOptimizer:
 
                             cv_result_df = generator.generate_targets(cv_df)
                             if hasattr(generator, 'target_name'):
-                                cv_labels = cv_result_df[generator.target_name].to_numpy()
+                                target_name = generator.target_name  # type: ignore[attr-defined]
+                                cv_labels = cv_result_df[target_name].to_numpy()
                             else:
                                 # Fallback for generators without target_name
                                 cv_cols = [col for col in cv_result_df.columns if 'label' in col.lower()]
@@ -1295,6 +1292,7 @@ class LargeScaleParameterOptimizer:
                 # Update best return tracking with final score
                 if final_score > best_return_so_far[0]:
                     best_return_so_far[0] = float(final_score)
+                    result_x = params.copy()  # Store best parameters
 
                 # Update progress bar with current status
                 freq_info = ""
@@ -1377,11 +1375,12 @@ class LargeScaleParameterOptimizer:
 
                     # Create a simple result object
                     class EarlyStopResult:
-                        def __init__(self, x, fun):
+                        def __init__(self, x, fun, best_params):
                             self.x = x
                             self.fun = -fun  # Convert back to minimization format
                             self.func_vals = []  # Empty list for compatibility
                             self.x_iters = []    # Empty list for compatibility
+                            self.best_params = best_params  # Store best parameters
 
                         def get(self, key, default=None):
                             """Provide dict-like get method for compatibility."""
@@ -1395,7 +1394,7 @@ class LargeScaleParameterOptimizer:
                             """Allow 'in' operator."""
                             return hasattr(self, key)
 
-                    result = EarlyStopResult(result_x, result_fun)
+                    result = EarlyStopResult(result_x, result_fun, best_params_dict)
                 else:
                     # Fallback if no history exists
                     raise RuntimeError("Early stopping triggered but no parameter history available") from None  # noqa: B904
@@ -1475,7 +1474,6 @@ class LargeScaleParameterOptimizer:
                     final_data = prices
 
             # Create DataFrame and generate targets
-            import polars as pl
             final_df = pl.DataFrame({
                 'mid_price': final_data,
                 'ts_event': range(len(final_data))

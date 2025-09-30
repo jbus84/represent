@@ -78,12 +78,13 @@ pythonVersion = "3.12"
 include = ["represent"]
 exclude = [
     "tests/**",
-    "scripts/**", 
+    "scripts/**",
     "build/**",
     "dist/**",
     ".venv/**",
     "htmlcov/**",
-    "scripts/**"
+    "diagnostics/**",
+    "examples/**"
 ]
 venvPath = "."
 venv = ".venv"
@@ -96,6 +97,7 @@ reportUnknownParameterType = false
 reportMissingParameterType = false
 reportDeprecated = false
 reportUnnecessaryTypeIgnoreComment = true
+reportPrivateImportUsage = false
 
 [tool.commitizen]
 name = "cz_conventional_commits"

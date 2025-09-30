@@ -145,6 +145,7 @@ class LogReturnHorizonsGenerator(TargetGenerator):
         horizons: list[int] | None = None,
         lookback_window: int = 1000,
         target_prefix: str = "log_return",
+        include_mean_returns: bool = True,
     ):
         """
         Initialize log return horizons generator.
@@ -153,13 +154,22 @@ class LogReturnHorizonsGenerator(TargetGenerator):
             horizons: List of horizon windows in ticks (defaults to [1000, 2000, 3000, 4000, 5000])
             lookback_window: Size of lookback window for baseline
             target_prefix: Prefix for target column names
+            include_mean_returns: If True, also calculate mean log return over the horizon period
+                                 (not just endpoint return). Captures path information and provides
+                                 smoother signal less sensitive to exit tick noise.
         """
         self.horizons = horizons or [1000, 2000, 3000, 4000, 5000]
         self.lookback_window = lookback_window
         self.target_prefix = target_prefix
+        self.include_mean_returns = include_mean_returns
 
         # Generate target names for each horizon
         self.target_names = [f"{target_prefix}_{horizon}t" for horizon in self.horizons]
+
+        # Add mean return target names if enabled
+        if self.include_mean_returns:
+            mean_names = [f"{target_prefix}_mean_{horizon}t" for horizon in self.horizons]
+            self.target_names = self.target_names + mean_names
 
     def generate_targets(self, df: pl.DataFrame, symbol: str | None = None) -> pl.DataFrame:
         """Generate log return targets for all horizons."""
@@ -172,10 +182,19 @@ class LogReturnHorizonsGenerator(TargetGenerator):
 
         # Calculate log returns for all horizons
         target_columns = []
-        for i, horizon in enumerate(self.horizons):
-            target_name = self.target_names[i]
+
+        # 1. Endpoint log returns (entry to exit)
+        for horizon in self.horizons:
+            target_name = f"{self.target_prefix}_{horizon}t"
             log_returns = self._calculate_log_returns(mid_prices, horizon)
             target_columns.append(pl.Series(target_name, log_returns))
+
+        # 2. Mean log returns over horizon (path information)
+        if self.include_mean_returns:
+            for horizon in self.horizons:
+                target_name = f"{self.target_prefix}_mean_{horizon}t"
+                mean_log_returns = self._calculate_mean_log_returns(mid_prices, horizon)
+                target_columns.append(pl.Series(target_name, mean_log_returns))
 
         # Add all target columns
         target_df = target_df.with_columns(target_columns)
@@ -203,15 +222,57 @@ class LogReturnHorizonsGenerator(TargetGenerator):
 
         return log_returns
 
+    def _calculate_mean_log_returns(self, mid_prices: np.ndarray, horizon: int) -> np.ndarray:
+        """
+        Calculate mean log return over the horizon period.
+
+        Instead of just measuring entry-to-exit return, this calculates the average
+        of all tick-to-tick log returns over the horizon window. Benefits:
+        - Captures path information (not just endpoints)
+        - Smoother signal (less sensitive to single-tick noise at exit)
+        - Better representation of average drift/trend over the period
+        - More robust for shorter horizons where endpoint can be noisy
+
+        Args:
+            mid_prices: Array of mid prices
+            horizon: Forward horizon in ticks
+
+        Returns:
+            Array of mean log returns in basis points
+        """
+        n = len(mid_prices)
+        mean_log_returns = np.full(n, np.nan)
+
+        max_lookforward = max(self.horizons)
+
+        for i in range(self.lookback_window, n - max_lookforward):
+            # Get prices over the horizon window [i, i+horizon]
+            future_prices = mid_prices[i:i+horizon+1]
+
+            # Compute tick-to-tick log returns: log(P[t+1]/P[t])
+            if len(future_prices) > 1 and np.all(future_prices > 0):
+                tick_returns = np.log(future_prices[1:] / future_prices[:-1])
+
+                # Mean of all tick returns (average per-tick drift)
+                mean_return = np.mean(tick_returns)
+                mean_log_returns[i] = mean_return * 10000  # Convert to basis points
+
+        return mean_log_returns
+
     def get_target_info(self) -> dict[str, Any]:
         """Return metadata about this generator."""
+        desc = f"Log returns across {len(self.horizons)} horizon windows ({min(self.horizons)}-{max(self.horizons)} ticks)"
+        if self.include_mean_returns:
+            desc += " with endpoint and mean returns"
+
         return {
             "target_names": self.target_names,
             "target_type": "regression",
-            "description": f"Log returns across {len(self.horizons)} horizon windows ({min(self.horizons)}-{max(self.horizons)} ticks)",
+            "description": desc,
             "parameters": {
                 "horizons": self.horizons,
                 "lookback_window": self.lookback_window,
+                "include_mean_returns": self.include_mean_returns,
             },
         }
 
