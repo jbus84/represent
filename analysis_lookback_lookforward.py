@@ -2,11 +2,14 @@
 Analysis script for LookbackLookforwardReturnsGenerator.
 
 This script demonstrates the new lookback/lookforward window regression features:
-1. Generates targets for multiple window lengths
-2. Visualizes distributions of all output metrics
-3. Shows relationships between window means and current price
-4. Compares log returns across different window lengths
+1. Loads real market data from processed parquet files
+2. Generates targets for multiple window lengths
+3. Visualizes distributions of all output metrics
+4. Shows relationships between window means and current price
+5. Compares log returns across different window lengths
 """
+
+import glob
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,21 +18,100 @@ import polars as pl
 from represent.target_generators.regression import LookbackLookforwardReturnsGenerator
 
 
-def create_sample_data(n_samples: int = 30000) -> pl.DataFrame:
-    """Create sample market data with various price patterns."""
+def load_real_data(
+    data_dir: str = "/Users/danielfisher/data/databento/symbol_datasets/inputs",
+    max_rows: int = 100000,
+) -> pl.DataFrame:
+    """
+    Load real market data from processed parquet files.
+
+    Args:
+        data_dir: Directory containing processed parquet files
+        max_rows: Maximum number of rows to load (for performance)
+
+    Returns:
+        DataFrame with mid_price and ts_event columns
+    """
+    # Find all parquet files
+    parquet_files = glob.glob(f"{data_dir}/*.parquet")
+
+    if not parquet_files:
+        raise FileNotFoundError(f"No parquet files found in {data_dir}")
+
+    # Load first file (or combine multiple if needed)
+    print(f"   Found {len(parquet_files)} parquet files")
+    print(f"   Loading: {parquet_files[0].split('/')[-1]}")
+
+    df = pl.read_parquet(parquet_files[0])
+
+    # Filter to valid mid_price rows
+    df = df.filter(pl.col("mid_price").is_not_null())
+
+    print(f"   Total valid rows: {len(df):,}")
+
+    # Sample for performance
+    if len(df) > max_rows:
+        # Take contiguous sample from middle of dataset
+        start_idx = (len(df) - max_rows) // 2
+        df = df.slice(start_idx, max_rows)
+        print(f"   Sampled {max_rows:,} contiguous rows for analysis")
+    else:
+        print(f"   Using all {len(df):,} rows")
+
+    # Ensure required columns exist
+    if "mid_price" not in df.columns:
+        raise ValueError("mid_price column not found in data")
+
+    if "ts_event" not in df.columns:
+        # Create sequential index if ts_event missing
+        df = df.with_columns(pl.lit(pl.int_range(len(df))).alias("ts_event"))
+
+    return df.select(["mid_price", "ts_event"])
+
+
+def create_sample_data(n_samples: int = 30000, use_realistic_walk: bool = True) -> pl.DataFrame:
+    """
+    Create sample market data with various price patterns (for testing only).
+
+    Args:
+        n_samples: Number of samples to generate
+        use_realistic_walk: If True, use geometric Brownian motion (GBM) for realistic FX simulation
+    """
     np.random.seed(42)
-    prices = []
-    current_price = 1.2345
 
-    # Generate realistic price series with trends and noise
-    for i in range(n_samples):
-        # Occasional trend changes every 5000 ticks
-        if i % 5000 == 0:
-            trend = np.random.normal(0, 0.00001)
+    if use_realistic_walk:
+        # Geometric Brownian Motion - realistic FX price simulation
+        # dS = μ*S*dt + σ*S*dW
+        prices = []
+        current_price = 1.2345
 
-        # Price evolution with trend and noise
-        current_price += trend + np.random.normal(0, 0.00005)
-        prices.append(current_price)
+        # Realistic FX parameters
+        mu = 0.0  # Drift (zero for mean-reverting FX)
+        sigma = 0.0001  # Volatility (10 bps per tick)
+        dt = 1.0  # Time step
+
+        for _ in range(n_samples):
+            # Geometric Brownian motion step
+            dW = np.random.normal(0, np.sqrt(dt))
+            drift = mu * current_price * dt
+            diffusion = sigma * current_price * dW
+
+            current_price += drift + diffusion
+            prices.append(current_price)
+    else:
+        # Simple random walk with trend changes (original)
+        prices = []
+        current_price = 1.2345
+        trend = 0.0
+
+        for i in range(n_samples):
+            # Occasional trend changes every 5000 ticks
+            if i % 5000 == 0:
+                trend = np.random.normal(0, 0.00001)
+
+            # Price evolution with trend and noise
+            current_price += trend + np.random.normal(0, 0.00005)
+            prices.append(current_price)
 
     return pl.DataFrame({
         "mid_price": prices,
@@ -37,16 +119,25 @@ def create_sample_data(n_samples: int = 30000) -> pl.DataFrame:
     })
 
 
-def analyze_lookback_lookforward_returns():
-    """Analyze lookback/lookforward returns generator outputs."""
+def analyze_lookback_lookforward_returns(use_real_data: bool = True):
+    """
+    Analyze lookback/lookforward returns generator outputs.
+
+    Args:
+        use_real_data: If True, load real market data; if False, use simulated data
+    """
     print("=" * 80)
     print("Lookback/Lookforward Returns Generator Analysis")
     print("=" * 80)
 
-    # Create sample data
-    print("\n1. Creating sample data...")
-    df = create_sample_data(n_samples=30000)
-    print(f"   Generated {len(df)} samples")
+    # Load data
+    if use_real_data:
+        print("\n1. Loading real market data...")
+        df = load_real_data()
+    else:
+        print("\n1. Creating simulated data...")
+        df = create_sample_data(n_samples=30000)
+        print(f"   Generated {len(df)} samples")
 
     # Create generator with all default window lengths
     print("\n2. Generating targets...")
