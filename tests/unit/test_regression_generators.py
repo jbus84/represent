@@ -9,6 +9,7 @@ import polars as pl
 from represent.target_generators.regression import (
     DirectionalMFEGenerator,
     LogReturnHorizonsGenerator,
+    LookbackLookforwardReturnsGenerator,
     RemainingValueTunerGenerator,
 )
 
@@ -340,6 +341,294 @@ class TestLogReturnHorizonsGenerator:
         assert "1000-3000" in info["description"]  # Should mention horizon range
         assert info["parameters"]["horizons"] == [1000, 2000, 3000]
         assert info["parameters"]["lookback_window"] == 500
+
+
+class TestLookbackLookforwardReturnsGenerator:
+    """Test suite for LookbackLookforwardReturnsGenerator."""
+
+    def test_basic_window_calculation(self):
+        """Test basic lookback/lookforward window calculation."""
+        # Create simple upward trend: 1.0000 -> 1.0100 over 10000 ticks
+        prices = np.linspace(1.0000, 1.0100, 12000)
+        df = pl.DataFrame({"mid_price": prices, "ts_event": range(len(prices))})
+
+        generator = LookbackLookforwardReturnsGenerator(
+            window_lengths=[1000],
+            target_prefix="test"
+        )
+
+        targets = generator.generate_targets(df)
+
+        # Should have all expected columns for 1 window length
+        expected_columns = [
+            "test_lookback_mean_1000t",
+            "test_lookforward_mean_1000t",
+            "test_log_return_1000t",
+            "test_current_vs_lookback_mean_1000t",
+            "test_current_vs_lookforward_mean_1000t",
+            "test_current_price_1000t",
+        ]
+
+        for col in expected_columns:
+            assert col in targets, f"Missing column {col}"
+
+        # Test valid range
+        log_return = targets["test_log_return_1000t"]
+        valid_mask = ~log_return.is_nan()
+        assert valid_mask.any(), "Should have some valid log return values"
+
+        # For upward trend, log returns should be positive
+        valid_returns = log_return.filter(valid_mask)
+        assert (valid_returns > 0).all(), "Log returns should be positive in uptrend"
+
+    def test_window_symmetry(self):
+        """Test that lookback and lookforward windows are symmetric."""
+        # Create simple linear trend
+        prices = np.linspace(1.0000, 1.0200, 15000)
+        df = pl.DataFrame({"mid_price": prices, "ts_event": range(len(prices))})
+
+        generator = LookbackLookforwardReturnsGenerator(
+            window_lengths=[2000],
+            target_prefix="symmetry"
+        )
+
+        targets = generator.generate_targets(df)
+
+        # Find a middle index with valid data
+        log_return = targets["symmetry_log_return_2000t"]
+        valid_indices = np.where(~log_return.is_nan().to_numpy())[0]
+
+        if len(valid_indices) > 0:
+            test_idx = int(valid_indices[len(valid_indices) // 2])
+
+            lookback_mean = targets["symmetry_lookback_mean_2000t"][test_idx]
+            lookforward_mean = targets["symmetry_lookforward_mean_2000t"][test_idx]
+            current_price = targets["symmetry_current_price_2000t"][test_idx]
+
+            # Current price should be at the boundary between lookback and lookforward
+            # In uptrend: lookback_mean < current_price < lookforward_mean
+            assert lookback_mean < current_price < lookforward_mean, (
+                f"Window symmetry violated: {lookback_mean} < {current_price} < {lookforward_mean}"
+            )
+
+    def test_multiple_window_lengths(self):
+        """Test generation with multiple window lengths."""
+        # Need larger dataset to accommodate 10000 tick window (need at least 20000 samples)
+        prices = np.linspace(1.0000, 1.0100, 25000)
+        df = pl.DataFrame({"mid_price": prices, "ts_event": range(len(prices))})
+
+        # Test all default window lengths
+        generator = LookbackLookforwardReturnsGenerator(
+            window_lengths=[1000, 2500, 5000, 10000],
+            target_prefix="multi"
+        )
+
+        targets = generator.generate_targets(df)
+
+        # Should have 6 columns per window length (4 windows * 6 columns = 24 columns)
+        # Plus 2 base columns (ts_event, symbol?) = check for target columns
+        window_lengths = [1000, 2500, 5000, 10000]
+        for window_len in window_lengths:
+            expected_columns = [
+                f"multi_lookback_mean_{window_len}t",
+                f"multi_lookforward_mean_{window_len}t",
+                f"multi_log_return_{window_len}t",
+                f"multi_current_vs_lookback_mean_{window_len}t",
+                f"multi_current_vs_lookforward_mean_{window_len}t",
+                f"multi_current_price_{window_len}t",
+            ]
+            for col in expected_columns:
+                assert col in targets, f"Missing column {col}"
+
+        # Verify each window has some valid data
+        for window_len in window_lengths:
+            log_return_col = f"multi_log_return_{window_len}t"
+            valid_count = (~targets[log_return_col].is_nan()).sum()
+            assert valid_count > 0, f"Window {window_len} should have valid data"
+
+    def test_log_return_calculation(self):
+        """Test log return calculation accuracy."""
+        # Create controlled scenario: stable -> 1% increase -> stable
+        prices = []
+        base_price = 1.0000
+
+        # Stable period (5000 ticks)
+        for _ in range(5000):
+            prices.append(base_price)
+
+        # Period with 1% increase (2000 ticks)
+        target_price = base_price * 1.01
+        for i in range(2000):
+            prices.append(base_price + (target_price - base_price) * (i / 2000))
+
+        # Stable period (5000 ticks)
+        for _ in range(5000):
+            prices.append(target_price)
+
+        df = pl.DataFrame({"mid_price": prices, "ts_event": range(len(prices))})
+
+        generator = LookbackLookforwardReturnsGenerator(
+            window_lengths=[1000],
+            target_prefix="controlled"
+        )
+
+        targets = generator.generate_targets(df)
+
+        # Test at position 5000 (transition point)
+        # Lookback: [4000:5000] all at base_price
+        # Lookforward: [5001:6001] transitioning to target_price
+        test_idx = 5000
+
+        log_return = targets["controlled_log_return_1000t"][test_idx]
+
+        if not np.isnan(log_return):
+            # Lookback mean should be ~1.0000
+            # Lookforward mean should be somewhere between 1.0000 and 1.0100
+            # Log return should be positive (in basis points)
+            assert log_return > 0, f"Log return should be positive, got {log_return}"
+
+    def test_current_vs_window_diffs(self):
+        """Test current price vs window mean differences."""
+        # Create downtrend
+        prices = np.linspace(1.0100, 1.0000, 12000)
+        df = pl.DataFrame({"mid_price": prices, "ts_event": range(len(prices))})
+
+        generator = LookbackLookforwardReturnsGenerator(
+            window_lengths=[1000],
+            target_prefix="diff"
+        )
+
+        targets = generator.generate_targets(df)
+
+        # Find valid index
+        log_return = targets["diff_log_return_1000t"]
+        valid_indices = np.where(~log_return.is_nan().to_numpy())[0]
+
+        if len(valid_indices) > 0:
+            test_idx = int(valid_indices[len(valid_indices) // 2])
+
+            current_price = targets["diff_current_price_1000t"][test_idx]
+            lookback_mean = targets["diff_lookback_mean_1000t"][test_idx]
+            lookforward_mean = targets["diff_lookforward_mean_1000t"][test_idx]
+            current_vs_lookback = targets["diff_current_vs_lookback_mean_1000t"][test_idx]
+            current_vs_lookforward = targets["diff_current_vs_lookforward_mean_1000t"][test_idx]
+
+            # In downtrend: lookback_mean > current_price > lookforward_mean
+            assert lookback_mean > current_price > lookforward_mean, (
+                "Downtrend ordering violated"
+            )
+
+            # Current vs lookback should be negative (current < lookback_mean)
+            assert current_vs_lookback < 0, "Current vs lookback should be negative in downtrend"
+
+            # Current vs lookforward should be positive (current > lookforward_mean)
+            assert current_vs_lookforward > 0, "Current vs lookforward should be positive in downtrend"
+
+    def test_flat_prices(self):
+        """Test with flat/constant prices."""
+        prices = np.full(5000, 1.2345)
+        df = pl.DataFrame({"mid_price": prices, "ts_event": range(len(prices))})
+
+        generator = LookbackLookforwardReturnsGenerator(
+            window_lengths=[1000],
+            target_prefix="flat"
+        )
+
+        targets = generator.generate_targets(df)
+
+        # Log returns should be very close to zero
+        log_return = targets["flat_log_return_1000t"]
+        valid_returns = log_return.filter(~log_return.is_nan())
+
+        if len(valid_returns) > 0:
+            assert np.allclose(valid_returns, 0.0, atol=0.1), (
+                "Flat prices should give ~0 log returns"
+            )
+
+        # Current vs window diffs should also be very close to zero
+        current_vs_lookback = targets["flat_current_vs_lookback_mean_1000t"]
+        valid_diffs = current_vs_lookback.filter(~current_vs_lookback.is_nan())
+
+        if len(valid_diffs) > 0:
+            assert np.allclose(valid_diffs, 0.0, atol=0.1), (
+                "Flat prices should give ~0 differences"
+            )
+
+    def test_default_parameters(self):
+        """Test generator with default parameters."""
+        prices = np.linspace(1.0000, 1.0100, 25000)
+        df = pl.DataFrame({"mid_price": prices, "ts_event": range(len(prices))})
+
+        # Use defaults
+        generator = LookbackLookforwardReturnsGenerator()
+
+        targets = generator.generate_targets(df)
+
+        # Should have default window lengths [1000, 2500, 5000, 10000]
+        default_windows = [1000, 2500, 5000, 10000]
+
+        for window_len in default_windows:
+            # Check each expected column exists
+            assert f"lookback_lookforward_lookback_mean_{window_len}t" in targets
+            assert f"lookback_lookforward_lookforward_mean_{window_len}t" in targets
+            assert f"lookback_lookforward_log_return_{window_len}t" in targets
+            assert f"lookback_lookforward_current_vs_lookback_mean_{window_len}t" in targets
+            assert f"lookback_lookforward_current_vs_lookforward_mean_{window_len}t" in targets
+            assert f"lookback_lookforward_current_price_{window_len}t" in targets
+
+    def test_edge_cases(self):
+        """Test edge cases and boundary conditions."""
+        # Very small dataset
+        prices = [1.0000, 1.0001, 1.0002, 1.0003, 1.0004]
+        df = pl.DataFrame({"mid_price": prices, "ts_event": range(len(prices))})
+
+        generator = LookbackLookforwardReturnsGenerator(
+            window_lengths=[1],  # Very small window
+            target_prefix="edge"
+        )
+
+        targets = generator.generate_targets(df)
+
+        # Should handle gracefully (most values will be NaN)
+        assert "edge_log_return_1t" in targets
+        assert len(targets["edge_log_return_1t"]) == len(prices)
+
+    def test_target_info(self):
+        """Test target info metadata."""
+        generator = LookbackLookforwardReturnsGenerator(
+            window_lengths=[1000, 5000],
+            target_prefix="info_test"
+        )
+
+        info = generator.get_target_info()
+
+        # Check required fields
+        assert "target_names" in info
+        assert "target_type" in info
+        assert "description" in info
+        assert "parameters" in info
+
+        # Check values
+        assert info["target_type"] == "regression"
+        assert "2 window lengths" in info["description"]
+        assert info["parameters"]["window_lengths"] == [1000, 5000]
+
+        # Should have all 12 target names (2 windows * 6 columns)
+        assert len(info["target_names"]) == 12
+
+    def test_factory_creation(self):
+        """Test creation via factory."""
+        from represent.target_generators.factory import TargetGeneratorFactory
+
+        generator = TargetGeneratorFactory.create(
+            "lookback_lookforward_returns",
+            window_lengths=[2000, 4000],
+            target_prefix="factory_test"
+        )
+
+        assert isinstance(generator, LookbackLookforwardReturnsGenerator)
+        assert generator.window_lengths == [2000, 4000]
+        assert generator.target_prefix == "factory_test"
 
 
 class TestRemainingValueTunerGenerator:

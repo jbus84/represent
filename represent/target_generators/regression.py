@@ -694,6 +694,189 @@ class VolatilityScaledReturnsGenerator(TargetGenerator):
         return ["mid_price"]
 
 
+class LookbackLookforwardReturnsGenerator(TargetGenerator):
+    """
+    Generates regression targets based on lookback/lookforward window mean comparisons.
+
+    This generator computes the mean price over symmetric lookback and lookforward windows,
+    then calculates the log return between these means. It provides comprehensive outputs
+    including window means, log returns, and price differences for analysis.
+
+    Key outputs per window length:
+    - Lookback window mean (includes current price)
+    - Lookforward window mean (excludes current price)
+    - Log return between window means
+    - Difference: current price vs lookback mean
+    - Difference: current price vs lookforward mean
+    - Current price (last point of lookback window)
+    """
+
+    def __init__(
+        self,
+        window_lengths: list[int] | None = None,
+        target_prefix: str = "lookback_lookforward",
+    ):
+        """
+        Initialize lookback-lookforward returns generator.
+
+        Args:
+            window_lengths: List of window lengths in ticks (defaults to [1000, 2500, 5000, 10000])
+            target_prefix: Prefix for target column names
+        """
+        self.window_lengths = window_lengths or [1000, 2500, 5000, 10000]
+        self.target_prefix = target_prefix
+
+        # Generate all target column names
+        self.target_names = []
+        for window_len in self.window_lengths:
+            self.target_names.extend([
+                f"{target_prefix}_lookback_mean_{window_len}t",
+                f"{target_prefix}_lookforward_mean_{window_len}t",
+                f"{target_prefix}_log_return_{window_len}t",
+                f"{target_prefix}_current_vs_lookback_mean_{window_len}t",
+                f"{target_prefix}_current_vs_lookforward_mean_{window_len}t",
+                f"{target_prefix}_current_price_{window_len}t",
+            ])
+
+    def generate_targets(self, df: pl.DataFrame, symbol: str | None = None) -> pl.DataFrame:
+        """Generate lookback-lookforward regression targets for all window lengths."""
+        self.validate_input(df)
+
+        # Create base target DataFrame with keys
+        target_df = self._create_base_target_df(df, symbol)
+
+        mid_prices = df["mid_price"].to_numpy()
+
+        # Calculate targets for all window lengths
+        target_columns = []
+
+        for window_len in self.window_lengths:
+            # Calculate all metrics for this window length
+            (
+                lookback_means,
+                lookforward_means,
+                log_returns,
+                current_vs_lookback,
+                current_vs_lookforward,
+                current_prices,
+            ) = self._calculate_window_metrics(mid_prices, window_len)
+
+            # Add all columns for this window length
+            target_columns.extend([
+                pl.Series(f"{self.target_prefix}_lookback_mean_{window_len}t", lookback_means),
+                pl.Series(f"{self.target_prefix}_lookforward_mean_{window_len}t", lookforward_means),
+                pl.Series(f"{self.target_prefix}_log_return_{window_len}t", log_returns),
+                pl.Series(f"{self.target_prefix}_current_vs_lookback_mean_{window_len}t", current_vs_lookback),
+                pl.Series(f"{self.target_prefix}_current_vs_lookforward_mean_{window_len}t", current_vs_lookforward),
+                pl.Series(f"{self.target_prefix}_current_price_{window_len}t", current_prices),
+            ])
+
+        # Add all target columns
+        target_df = target_df.with_columns(target_columns)
+
+        return target_df
+
+    def _calculate_window_metrics(
+        self, mid_prices: np.ndarray, window_len: int
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Calculate all metrics for a specific window length.
+
+        Args:
+            mid_prices: Array of mid prices
+            window_len: Length of lookback/lookforward windows
+
+        Returns:
+            Tuple of (lookback_means, lookforward_means, log_returns,
+                     current_vs_lookback, current_vs_lookforward, current_prices)
+        """
+        n = len(mid_prices)
+
+        # Initialize output arrays
+        lookback_means = np.full(n, np.nan)
+        lookforward_means = np.full(n, np.nan)
+        log_returns = np.full(n, np.nan)
+        current_vs_lookback = np.full(n, np.nan)
+        current_vs_lookforward = np.full(n, np.nan)
+        current_prices = np.full(n, np.nan)
+
+        # Need at least window_len before and after current position
+        for i in range(window_len, n - window_len):
+            # Current price (last point of lookback window)
+            current_price = mid_prices[i]
+
+            # Lookback window: [i - window_len + 1, i] (includes current price)
+            lookback_start = i - window_len + 1
+            lookback_window = mid_prices[lookback_start:i + 1]
+
+            # Lookforward window: (i, i + window_len]
+            lookforward_start = i + 1
+            lookforward_end = i + 1 + window_len
+            lookforward_window = mid_prices[lookforward_start:lookforward_end]
+
+            # Validate windows have correct length and valid prices
+            if (
+                len(lookback_window) == window_len
+                and len(lookforward_window) == window_len
+                and np.all(lookback_window > 0)
+                and np.all(lookforward_window > 0)
+                and current_price > 0
+            ):
+                # Compute window means
+                lookback_mean = np.mean(lookback_window)
+                lookforward_mean = np.mean(lookforward_window)
+
+                # Store current price
+                current_prices[i] = current_price
+
+                # Store window means
+                lookback_means[i] = lookback_mean
+                lookforward_means[i] = lookforward_mean
+
+                # Calculate log return between window means (in basis points)
+                if lookback_mean > 0 and lookforward_mean > 0:
+                    log_return = np.log(lookforward_mean / lookback_mean)
+                    log_returns[i] = log_return * 10000  # Convert to basis points
+
+                # Calculate difference: current price vs lookback mean (in basis points)
+                if lookback_mean > 0:
+                    diff_lookback = ((current_price - lookback_mean) / lookback_mean) * 10000
+                    current_vs_lookback[i] = diff_lookback
+
+                # Calculate difference: current price vs lookforward mean (in basis points)
+                if lookforward_mean > 0:
+                    diff_lookforward = ((current_price - lookforward_mean) / lookforward_mean) * 10000
+                    current_vs_lookforward[i] = diff_lookforward
+
+        return (
+            lookback_means,
+            lookforward_means,
+            log_returns,
+            current_vs_lookback,
+            current_vs_lookforward,
+            current_prices,
+        )
+
+    def get_target_info(self) -> dict[str, Any]:
+        """Return metadata about this generator."""
+        return {
+            "target_names": self.target_names,
+            "target_type": "regression",
+            "description": f"Lookback/lookforward window mean comparisons for {len(self.window_lengths)} window lengths",
+            "parameters": {
+                "window_lengths": self.window_lengths,
+            },
+        }
+
+    @property
+    def target_type(self) -> str:
+        return "regression"
+
+    @property
+    def required_columns(self) -> list[str]:
+        return ["mid_price"]
+
+
 class RemainingValueTunerGenerator(TargetGenerator):
     """
     Generates regression targets using remaining value tuning approach.
