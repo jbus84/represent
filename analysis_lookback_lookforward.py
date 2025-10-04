@@ -14,6 +14,7 @@ import glob
 import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
+from scipy import stats
 
 from represent.target_generators.regression import LookbackLookforwardReturnsGenerator
 
@@ -212,7 +213,7 @@ def create_analysis_plots(targets: pl.DataFrame, window_lengths: list[int]):
     """Create comprehensive analysis plots."""
     plt.figure(figsize=(20, 12))
 
-    # Row 1: Log Return Distributions
+    # Row 1: Log Return Distributions with Normal Fit
     for idx, window_len in enumerate(window_lengths):
         ax = plt.subplot(4, 4, idx + 1)
 
@@ -220,15 +221,34 @@ def create_analysis_plots(targets: pl.DataFrame, window_lengths: list[int]):
         valid_data = log_return.filter(~log_return.is_nan()).to_numpy()
 
         if len(valid_data) > 0:
-            ax.hist(valid_data, bins=50, alpha=0.7, color='steelblue', edgecolor='black')
-            ax.axvline(0, color='red', linestyle='--', linewidth=2, label='Zero Return')
+            # Plot histogram
+            n, bins, patches = ax.hist(valid_data, bins=50, alpha=0.7, color='steelblue',
+                                       edgecolor='black', density=True, label='Data')
+
+            # Fit normal distribution
+            mu, sigma = stats.norm.fit(valid_data)
+
+            # Plot fitted normal distribution
+            x = np.linspace(valid_data.min(), valid_data.max(), 100)
+            fitted_normal = stats.norm.pdf(x, mu, sigma)
+            ax.plot(x, fitted_normal, 'r-', linewidth=2, label='Normal Fit')
+
+            # Add vertical line at zero
+            ax.axvline(0, color='green', linestyle='--', linewidth=1.5, alpha=0.7)
+
+            # Add text box with parameters
+            textstr = f'μ = {mu:.2f}\nσ = {sigma:.2f}'
+            props = {"boxstyle": 'round', "facecolor": 'wheat', "alpha": 0.8}
+            ax.text(0.95, 0.95, textstr, transform=ax.transAxes, fontsize=9,
+                   verticalalignment='top', horizontalalignment='right', bbox=props)
+
             ax.set_xlabel('Log Return (bps)', fontsize=10)
-            ax.set_ylabel('Frequency', fontsize=10)
+            ax.set_ylabel('Density', fontsize=10)
             ax.set_title(f'Log Return Distribution\nWindow: {window_len}t', fontsize=11, fontweight='bold')
-            ax.legend(fontsize=8)
+            ax.legend(fontsize=8, loc='upper left')
             ax.grid(True, alpha=0.3)
 
-    # Row 2: Current vs Lookback Mean Distributions
+    # Row 2: Current vs Lookback Mean Distributions with Normal Fit
     for idx, window_len in enumerate(window_lengths):
         ax = plt.subplot(4, 4, idx + 5)
 
@@ -236,15 +256,34 @@ def create_analysis_plots(targets: pl.DataFrame, window_lengths: list[int]):
         valid_data = current_vs_lookback.filter(~current_vs_lookback.is_nan()).to_numpy()
 
         if len(valid_data) > 0:
-            ax.hist(valid_data, bins=50, alpha=0.7, color='forestgreen', edgecolor='black')
-            ax.axvline(0, color='red', linestyle='--', linewidth=2, label='Zero Diff')
+            # Plot histogram
+            n, bins, patches = ax.hist(valid_data, bins=50, alpha=0.7, color='forestgreen',
+                                       edgecolor='black', density=True, label='Data')
+
+            # Fit normal distribution
+            mu, sigma = stats.norm.fit(valid_data)
+
+            # Plot fitted normal distribution
+            x = np.linspace(valid_data.min(), valid_data.max(), 100)
+            fitted_normal = stats.norm.pdf(x, mu, sigma)
+            ax.plot(x, fitted_normal, 'r-', linewidth=2, label='Normal Fit')
+
+            # Add vertical line at zero
+            ax.axvline(0, color='blue', linestyle='--', linewidth=1.5, alpha=0.7)
+
+            # Add text box with parameters
+            textstr = f'μ = {mu:.2f}\nσ = {sigma:.2f}'
+            props = {"boxstyle": 'round', "facecolor": 'wheat', "alpha": 0.8}
+            ax.text(0.95, 0.95, textstr, transform=ax.transAxes, fontsize=9,
+                   verticalalignment='top', horizontalalignment='right', bbox=props)
+
             ax.set_xlabel('Current vs Lookback Mean (bps)', fontsize=10)
-            ax.set_ylabel('Frequency', fontsize=10)
+            ax.set_ylabel('Density', fontsize=10)
             ax.set_title(f'Current vs Lookback Mean\nWindow: {window_len}t', fontsize=11, fontweight='bold')
-            ax.legend(fontsize=8)
+            ax.legend(fontsize=8, loc='upper left')
             ax.grid(True, alpha=0.3)
 
-    # Row 3: Current vs Lookforward Mean Distributions
+    # Row 3: Current vs Lookforward Mean Distributions with Normal Fit
     for idx, window_len in enumerate(window_lengths):
         ax = plt.subplot(4, 4, idx + 9)
 
@@ -252,12 +291,31 @@ def create_analysis_plots(targets: pl.DataFrame, window_lengths: list[int]):
         valid_data = current_vs_lookforward.filter(~current_vs_lookforward.is_nan()).to_numpy()
 
         if len(valid_data) > 0:
-            ax.hist(valid_data, bins=50, alpha=0.7, color='coral', edgecolor='black')
-            ax.axvline(0, color='red', linestyle='--', linewidth=2, label='Zero Diff')
+            # Plot histogram
+            n, bins, patches = ax.hist(valid_data, bins=50, alpha=0.7, color='coral',
+                                       edgecolor='black', density=True, label='Data')
+
+            # Fit normal distribution
+            mu, sigma = stats.norm.fit(valid_data)
+
+            # Plot fitted normal distribution
+            x = np.linspace(valid_data.min(), valid_data.max(), 100)
+            fitted_normal = stats.norm.pdf(x, mu, sigma)
+            ax.plot(x, fitted_normal, 'r-', linewidth=2, label='Normal Fit')
+
+            # Add vertical line at zero
+            ax.axvline(0, color='purple', linestyle='--', linewidth=1.5, alpha=0.7)
+
+            # Add text box with parameters
+            textstr = f'μ = {mu:.2f}\nσ = {sigma:.2f}'
+            props = {"boxstyle": 'round', "facecolor": 'wheat', "alpha": 0.8}
+            ax.text(0.95, 0.95, textstr, transform=ax.transAxes, fontsize=9,
+                   verticalalignment='top', horizontalalignment='right', bbox=props)
+
             ax.set_xlabel('Current vs Lookforward Mean (bps)', fontsize=10)
-            ax.set_ylabel('Frequency', fontsize=10)
+            ax.set_ylabel('Density', fontsize=10)
             ax.set_title(f'Current vs Lookforward Mean\nWindow: {window_len}t', fontsize=11, fontweight='bold')
-            ax.legend(fontsize=8)
+            ax.legend(fontsize=8, loc='upper left')
             ax.grid(True, alpha=0.3)
 
     # Row 4: Comparative Analysis
