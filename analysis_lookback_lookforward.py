@@ -22,28 +22,38 @@ from represent.target_generators.regression import LookbackLookforwardReturnsGen
 def load_real_data(
     data_dir: str = "/Users/danielfisher/data/databento/symbol_datasets/inputs",
     max_rows: int = 100000,
-) -> pl.DataFrame:
+    symbol_file: str | None = None,
+) -> tuple[pl.DataFrame, str]:
     """
     Load real market data from processed parquet files.
 
     Args:
         data_dir: Directory containing processed parquet files
         max_rows: Maximum number of rows to load (for performance)
+        symbol_file: Specific parquet file to load (if None, loads first file)
 
     Returns:
-        DataFrame with mid_price and ts_event columns
+        Tuple of (DataFrame with mid_price and ts_event columns, symbol name)
     """
     # Find all parquet files
-    parquet_files = glob.glob(f"{data_dir}/*.parquet")
+    parquet_files = sorted(glob.glob(f"{data_dir}/*.parquet"))
 
     if not parquet_files:
         raise FileNotFoundError(f"No parquet files found in {data_dir}")
 
-    # Load first file (or combine multiple if needed)
-    print(f"   Found {len(parquet_files)} parquet files")
-    print(f"   Loading: {parquet_files[0].split('/')[-1]}")
+    # Select file to load
+    if symbol_file:
+        file_path = symbol_file
+    else:
+        file_path = parquet_files[0]
 
-    df = pl.read_parquet(parquet_files[0])
+    # Extract symbol name from filename
+    filename = file_path.split('/')[-1]
+    symbol = filename.split('_')[0]  # Extract symbol (e.g., M6AZ4 from M6AZ4_inputs_only...)
+
+    print(f"   Loading: {filename}")
+
+    df = pl.read_parquet(file_path)
 
     # Filter to valid mid_price rows
     df = df.filter(pl.col("mid_price").is_not_null())
@@ -67,7 +77,12 @@ def load_real_data(
         # Create sequential index if ts_event missing
         df = df.with_columns(pl.lit(pl.int_range(len(df))).alias("ts_event"))
 
-    return df.select(["mid_price", "ts_event"])
+    return df.select(["mid_price", "ts_event"]), symbol
+
+
+def get_all_symbol_files(data_dir: str = "/Users/danielfisher/data/databento/symbol_datasets/inputs") -> list[str]:
+    """Get all parquet files for processing."""
+    return sorted(glob.glob(f"{data_dir}/*.parquet"))
 
 
 def create_sample_data(n_samples: int = 30000, use_realistic_walk: bool = True) -> pl.DataFrame:
@@ -120,24 +135,44 @@ def create_sample_data(n_samples: int = 30000, use_realistic_walk: bool = True) 
     })
 
 
-def analyze_lookback_lookforward_returns(use_real_data: bool = True):
+def analyze_lookback_lookforward_returns(use_real_data: bool = True, process_all_symbols: bool = True):
     """
     Analyze lookback/lookforward returns generator outputs.
 
     Args:
         use_real_data: If True, load real market data; if False, use simulated data
+        process_all_symbols: If True, process all symbol files; if False, process only first
     """
     print("=" * 80)
     print("Lookback/Lookforward Returns Generator Analysis")
     print("=" * 80)
 
+    if use_real_data and process_all_symbols:
+        # Process all symbols
+        symbol_files = get_all_symbol_files()
+        print(f"\n1. Found {len(symbol_files)} symbol files to process")
+
+        for idx, symbol_file in enumerate(symbol_files):
+            print(f"\n{'=' * 80}")
+            print(f"Processing symbol {idx + 1}/{len(symbol_files)}")
+            print(f"{'=' * 80}")
+            analyze_single_symbol(symbol_file, use_real_data=True)
+
+    else:
+        # Process single symbol or simulated data
+        analyze_single_symbol(symbol_file=None, use_real_data=use_real_data)
+
+
+def analyze_single_symbol(symbol_file: str | None = None, use_real_data: bool = True):
+    """Analyze a single symbol."""
     # Load data
     if use_real_data:
         print("\n1. Loading real market data...")
-        df = load_real_data()
+        df, symbol = load_real_data(symbol_file=symbol_file)
     else:
         print("\n1. Creating simulated data...")
         df = create_sample_data(n_samples=30000)
+        symbol = "SIMULATED"
         print(f"   Generated {len(df)} samples")
 
     # Create generator with all default window lengths
@@ -202,20 +237,76 @@ def analyze_lookback_lookforward_returns(use_real_data: bool = True):
 
     # Create visualization
     print("\n5. Creating visualizations...")
-    create_analysis_plots(targets, window_lengths)
+    create_analysis_plots(targets, window_lengths, symbol, df)
 
     print("\n" + "=" * 80)
-    print("Analysis complete! Plots saved to 'outputs/lookback_lookforward_analysis.png'")
+    print(f"Analysis complete! Plots saved to 'outputs/lookback_lookforward_analysis_{symbol}.png'")
     print("=" * 80)
 
 
-def create_analysis_plots(targets: pl.DataFrame, window_lengths: list[int]):
-    """Create comprehensive analysis plots."""
-    plt.figure(figsize=(20, 16))  # Increased height for extra row
+def create_analysis_plots(targets: pl.DataFrame, window_lengths: list[int], symbol: str, df: pl.DataFrame):
+    """Create comprehensive analysis plots with summary statistics table."""
+    fig = plt.figure(figsize=(20, 18))  # Increased height for table
 
-    # Row 1: Log Return Distributions with Normal Fit
+    # Add summary statistics table at the top
+    fig.suptitle(f'Lookback/Lookforward Returns Analysis: {symbol}', fontsize=16, fontweight='bold', y=0.98)
+
+    # Calculate summary statistics
+    summary_data = []
+    mid_prices = df["mid_price"].to_numpy()
+    valid_prices = mid_prices[~np.isnan(mid_prices)]
+
+    summary_data.append([
+        "Dataset",
+        f"{len(df):,}",
+        f"{valid_prices.min():.5f}",
+        f"{valid_prices.max():.5f}",
+        f"{valid_prices.mean():.5f}",
+        f"{valid_prices.std():.5f}",
+    ])
+
+    for window_len in window_lengths:
+        log_return = targets[f"lf_log_return_{window_len}t"]
+        valid_data = log_return.filter(~log_return.is_nan()).to_numpy()
+
+        if len(valid_data) > 0:
+            summary_data.append([
+                f"Window {window_len}t",
+                f"{len(valid_data):,}",
+                f"{valid_data.min():.2f}",
+                f"{valid_data.max():.2f}",
+                f"{valid_data.mean():.2f}",
+                f"{valid_data.std():.2f}",
+            ])
+
+    # Create table
+    table_ax = plt.subplot2grid((6, 1), (0, 0), fig=fig)
+    table_ax.axis('tight')
+    table_ax.axis('off')
+
+    table = table_ax.table(
+        cellText=summary_data,
+        colLabels=['Metric', 'Valid Samples', 'Min', 'Max', 'Mean', 'Std Dev'],
+        cellLoc='center',
+        loc='center',
+        bbox=[0.1, 0, 0.8, 1]  # type: ignore[arg-type]
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+    table.scale(1, 2)
+
+    # Style header
+    for (i, _), cell in table.get_celld().items():
+        if i == 0:
+            cell.set_facecolor('#4CAF50')
+            cell.set_text_props(weight='bold', color='white')
+        else:
+            if i % 2 == 0:
+                cell.set_facecolor('#f0f0f0')
+
+    # Row 1: Log Return Distributions with Normal Fit (starting after table)
     for idx, window_len in enumerate(window_lengths):
-        ax = plt.subplot(5, 4, idx + 1)
+        ax = plt.subplot2grid((6, 4), (1, idx), fig=fig)
 
         log_return = targets[f"lf_log_return_{window_len}t"]
         valid_data = log_return.filter(~log_return.is_nan()).to_numpy()
@@ -250,7 +341,7 @@ def create_analysis_plots(targets: pl.DataFrame, window_lengths: list[int]):
 
     # Row 2: Current vs Lookback Mean Distributions with Normal Fit
     for idx, window_len in enumerate(window_lengths):
-        ax = plt.subplot(5, 4, idx + 5)
+        ax = plt.subplot2grid((6, 4), (2, idx), fig=fig)
 
         current_vs_lookback = targets[f"lf_current_vs_lookback_mean_{window_len}t"]
         valid_data = current_vs_lookback.filter(~current_vs_lookback.is_nan()).to_numpy()
@@ -285,7 +376,7 @@ def create_analysis_plots(targets: pl.DataFrame, window_lengths: list[int]):
 
     # Row 3: Current vs Lookforward Mean Distributions with Normal Fit
     for idx, window_len in enumerate(window_lengths):
-        ax = plt.subplot(5, 4, idx + 9)
+        ax = plt.subplot2grid((6, 4), (3, idx), fig=fig)
 
         current_vs_lookforward = targets[f"lf_current_vs_lookforward_mean_{window_len}t"]
         valid_data = current_vs_lookforward.filter(~current_vs_lookforward.is_nan()).to_numpy()
@@ -320,7 +411,7 @@ def create_analysis_plots(targets: pl.DataFrame, window_lengths: list[int]):
 
     # Row 4: Lookforward vs Lookback Mean Scatter Plots with Regression
     for idx, window_len in enumerate(window_lengths):
-        ax = plt.subplot(5, 4, idx + 13)
+        ax = plt.subplot2grid((6, 4), (4, idx), fig=fig)
 
         lookback_mean = targets[f"lf_lookback_mean_{window_len}t"]
         lookforward_mean = targets[f"lf_lookforward_mean_{window_len}t"]
@@ -370,7 +461,7 @@ def create_analysis_plots(targets: pl.DataFrame, window_lengths: list[int]):
     # Row 5: Comparative Analysis
 
     # Plot 5.1: Log Returns across all window lengths (box plot)
-    ax = plt.subplot(5, 4, 17)
+    ax = plt.subplot2grid((6, 4), (5, 0), fig=fig)
     log_returns_data = []
     labels = []
     for window_len in window_lengths:
@@ -389,7 +480,7 @@ def create_analysis_plots(targets: pl.DataFrame, window_lengths: list[int]):
         ax.axhline(0, color='red', linestyle='--', linewidth=1)
 
     # Plot 5.2: Standard deviation vs window length
-    ax = plt.subplot(5, 4, 18)
+    ax = plt.subplot2grid((6, 4), (5, 1), fig=fig)
     stds = []
     window_labels = []
     for window_len in window_lengths:
@@ -407,7 +498,7 @@ def create_analysis_plots(targets: pl.DataFrame, window_lengths: list[int]):
         ax.grid(True, alpha=0.3)
 
     # Plot 5.3: Scatter plot - 1000t vs 10000t log returns
-    ax = plt.subplot(5, 4, 19)
+    ax = plt.subplot2grid((6, 4), (5, 2), fig=fig)
     log_1000 = targets["lf_log_return_1000t"]
     log_10000 = targets["lf_log_return_10000t"]
 
@@ -434,7 +525,7 @@ def create_analysis_plots(targets: pl.DataFrame, window_lengths: list[int]):
         ax.plot([min_val, max_val], [min_val, max_val], 'r--', linewidth=1, alpha=0.5)
 
     # Plot 5.4: Time series sample (last 2000 points)
-    ax = plt.subplot(5, 4, 20)
+    ax = plt.subplot2grid((6, 4), (5, 3), fig=fig)
     sample_len = 2000
     log_2500 = targets["lf_log_return_2500t"]
 
@@ -451,13 +542,15 @@ def create_analysis_plots(targets: pl.DataFrame, window_lengths: list[int]):
         ax.set_title('2500t Log Return Time Series\n(Last 2000 samples)', fontsize=11, fontweight='bold')
         ax.grid(True, alpha=0.3)
 
-    plt.tight_layout()
+    plt.tight_layout(rect=(0, 0, 1, 0.96))  # Leave space for suptitle
 
     # Save plot
     import os
     os.makedirs("outputs", exist_ok=True)
-    plt.savefig("outputs/lookback_lookforward_analysis.png", dpi=150, bbox_inches='tight')
-    print("   Saved plot to outputs/lookback_lookforward_analysis.png")
+    output_path = f"outputs/lookback_lookforward_analysis_{symbol}.png"
+    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    print(f"   Saved plot to {output_path}")
+    plt.close()
 
 
 if __name__ == "__main__":
