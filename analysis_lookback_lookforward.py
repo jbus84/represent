@@ -211,11 +211,11 @@ def analyze_lookback_lookforward_returns(use_real_data: bool = True):
 
 def create_analysis_plots(targets: pl.DataFrame, window_lengths: list[int]):
     """Create comprehensive analysis plots."""
-    plt.figure(figsize=(20, 12))
+    plt.figure(figsize=(20, 16))  # Increased height for extra row
 
     # Row 1: Log Return Distributions with Normal Fit
     for idx, window_len in enumerate(window_lengths):
-        ax = plt.subplot(4, 4, idx + 1)
+        ax = plt.subplot(5, 4, idx + 1)
 
         log_return = targets[f"lf_log_return_{window_len}t"]
         valid_data = log_return.filter(~log_return.is_nan()).to_numpy()
@@ -250,7 +250,7 @@ def create_analysis_plots(targets: pl.DataFrame, window_lengths: list[int]):
 
     # Row 2: Current vs Lookback Mean Distributions with Normal Fit
     for idx, window_len in enumerate(window_lengths):
-        ax = plt.subplot(4, 4, idx + 5)
+        ax = plt.subplot(5, 4, idx + 5)
 
         current_vs_lookback = targets[f"lf_current_vs_lookback_mean_{window_len}t"]
         valid_data = current_vs_lookback.filter(~current_vs_lookback.is_nan()).to_numpy()
@@ -285,7 +285,7 @@ def create_analysis_plots(targets: pl.DataFrame, window_lengths: list[int]):
 
     # Row 3: Current vs Lookforward Mean Distributions with Normal Fit
     for idx, window_len in enumerate(window_lengths):
-        ax = plt.subplot(4, 4, idx + 9)
+        ax = plt.subplot(5, 4, idx + 9)
 
         current_vs_lookforward = targets[f"lf_current_vs_lookforward_mean_{window_len}t"]
         valid_data = current_vs_lookforward.filter(~current_vs_lookforward.is_nan()).to_numpy()
@@ -318,10 +318,59 @@ def create_analysis_plots(targets: pl.DataFrame, window_lengths: list[int]):
             ax.legend(fontsize=8, loc='upper left')
             ax.grid(True, alpha=0.3)
 
-    # Row 4: Comparative Analysis
+    # Row 4: Lookforward vs Lookback Mean Scatter Plots with Regression
+    for idx, window_len in enumerate(window_lengths):
+        ax = plt.subplot(5, 4, idx + 13)
 
-    # Plot 4.1: Log Returns across all window lengths (box plot)
-    ax = plt.subplot(4, 4, 13)
+        lookback_mean = targets[f"lf_lookback_mean_{window_len}t"]
+        lookforward_mean = targets[f"lf_lookforward_mean_{window_len}t"]
+
+        # Get valid data
+        valid_mask = ~lookback_mean.is_nan() & ~lookforward_mean.is_nan()
+        if valid_mask.any():
+            lookback_data = lookback_mean.filter(valid_mask).to_numpy()
+            lookforward_data = lookforward_mean.filter(valid_mask).to_numpy()
+
+            # Sample for visualization (max 5000 points for clarity)
+            if len(lookback_data) > 5000:
+                sample_indices = np.random.choice(len(lookback_data), 5000, replace=False)
+                lookback_data = lookback_data[sample_indices]
+                lookforward_data = lookforward_data[sample_indices]
+
+            # Create scatter plot
+            ax.scatter(lookback_data, lookforward_data, alpha=0.3, s=5, color='navy')
+
+            # Calculate linear regression
+            reg_result = stats.linregress(lookback_data, lookforward_data)
+            slope = float(reg_result.slope)  # type: ignore[attr-defined]
+            intercept = float(reg_result.intercept)  # type: ignore[attr-defined]
+            r_value = float(reg_result.rvalue)  # type: ignore[attr-defined]
+
+            # Plot regression line
+            x_line = np.array([lookback_data.min(), lookback_data.max()])
+            y_line = slope * x_line + intercept
+            ax.plot(x_line, y_line, 'r-', linewidth=2, label=f'y={slope:.3f}x+{intercept:.5f}')
+
+            # Plot diagonal (perfect correlation) for reference
+            ax.plot(x_line, x_line, 'g--', linewidth=1.5, alpha=0.5, label='y=x (perfect)')
+
+            # Add correlation metrics as inset
+            r_squared = r_value ** 2
+            textstr = f'R² = {r_squared:.4f}\nρ = {r_value:.4f}\nslope = {slope:.4f}'
+            props = {"boxstyle": 'round', "facecolor": 'lightblue', "alpha": 0.8}
+            ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=9,
+                   verticalalignment='top', horizontalalignment='left', bbox=props)
+
+            ax.set_xlabel('Lookback Mean', fontsize=10)
+            ax.set_ylabel('Lookforward Mean', fontsize=10)
+            ax.set_title(f'Lookforward vs Lookback\nWindow: {window_len}t', fontsize=11, fontweight='bold')
+            ax.legend(fontsize=7, loc='lower right')
+            ax.grid(True, alpha=0.3)
+
+    # Row 5: Comparative Analysis
+
+    # Plot 5.1: Log Returns across all window lengths (box plot)
+    ax = plt.subplot(5, 4, 17)
     log_returns_data = []
     labels = []
     for window_len in window_lengths:
@@ -339,8 +388,8 @@ def create_analysis_plots(targets: pl.DataFrame, window_lengths: list[int]):
         ax.grid(True, alpha=0.3)
         ax.axhline(0, color='red', linestyle='--', linewidth=1)
 
-    # Plot 4.2: Standard deviation vs window length
-    ax = plt.subplot(4, 4, 14)
+    # Plot 5.2: Standard deviation vs window length
+    ax = plt.subplot(5, 4, 18)
     stds = []
     window_labels = []
     for window_len in window_lengths:
@@ -357,8 +406,8 @@ def create_analysis_plots(targets: pl.DataFrame, window_lengths: list[int]):
         ax.set_title('Volatility vs Window Length', fontsize=11, fontweight='bold')
         ax.grid(True, alpha=0.3)
 
-    # Plot 4.3: Scatter plot - 1000t vs 10000t log returns
-    ax = plt.subplot(4, 4, 15)
+    # Plot 5.3: Scatter plot - 1000t vs 10000t log returns
+    ax = plt.subplot(5, 4, 19)
     log_1000 = targets["lf_log_return_1000t"]
     log_10000 = targets["lf_log_return_10000t"]
 
@@ -384,8 +433,8 @@ def create_analysis_plots(targets: pl.DataFrame, window_lengths: list[int]):
         max_val = max(valid_1000.max(), valid_10000.max())
         ax.plot([min_val, max_val], [min_val, max_val], 'r--', linewidth=1, alpha=0.5)
 
-    # Plot 4.4: Time series sample (last 2000 points)
-    ax = plt.subplot(4, 4, 16)
+    # Plot 5.4: Time series sample (last 2000 points)
+    ax = plt.subplot(5, 4, 20)
     sample_len = 2000
     log_2500 = targets["lf_log_return_2500t"]
 
