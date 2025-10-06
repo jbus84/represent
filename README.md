@@ -14,6 +14,8 @@ Built for quantitative finance ML applications requiring efficient feature extra
 Targets: `make create-symbol-inputs`
 Optmisation: `uv run python scripts/symbol_optimization_runner.py`
 Triple barrier labels: `uv run python scripts/process_symbols_with_triple_methods.py`
+Standrd Regression Targets: `uv run python scripts/process_symbols_with_regression_targets.py`
+Lookback Lookfward log return: `uv run python scripts/process_symbols_with_lookback_lookforward.py`
 
 
 ## 🚀 Key Features
