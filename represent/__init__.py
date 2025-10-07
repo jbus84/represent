@@ -61,6 +61,13 @@ from .global_threshold_calculator import (
 from .market_depth_processor import MarketDepthProcessor, create_processor, process_market_data
 from .modular_dataset_builder import ModularDatasetBuilder, create_modular_builder
 
+# Parameter Optimization (optional stubs)
+from .parameter_optimization import (
+    OPTIMIZATION_AVAILABLE,
+    ParameterOptimizer,
+    optimize_all_methods,
+)
+
 # Target-Only Generation API
 from .target_api import (
     batch_generate_targets,
@@ -69,13 +76,6 @@ from .target_api import (
     generate_targets_from_parquet,
     load_targets_and_join,
 )
-
-# Parameter Optimization (optional)
-try:
-    from .parameter_optimization import ParameterOptimizer, optimize_all_methods
-    OPTIMIZATION_AVAILABLE = True
-except ImportError:
-    OPTIMIZATION_AVAILABLE = False
 
 # Modular Target Generation System
 from .target_generators import (
@@ -155,7 +155,6 @@ __all__ = [
     "optimize_all_methods",
     "OPTIMIZATION_AVAILABLE",
 ]
-
 
 # Use modular target generation system instead:
 # - ModularDatasetBuilder() for dataset building with pluggable targets

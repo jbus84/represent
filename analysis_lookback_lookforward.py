@@ -1,15 +1,16 @@
 """
 Analysis script for LookbackLookforwardReturnsGenerator.
 
-This script demonstrates the new lookback/lookforward window regression features:
+This script demonstrates the lookback/lookforward window return features:
 1. Loads real market data from processed parquet files
 2. Generates targets for multiple window lengths
-3. Visualizes distributions of all output metrics
-4. Shows relationships between window means and current price
-5. Compares log returns across different window lengths
+3. Visualizes distributions of percentage return metrics
+4. Summarizes cross-window statistics and correlations
+5. Highlights behaviour across scaled and current percentage returns
 """
 
 import glob
+from typing import Any, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -18,19 +19,83 @@ from scipy import stats
 
 from represent.target_generators.regression import LookbackLookforwardReturnsGenerator
 
+AUTO_SAMPLE_Z = 1.96  # 95% confidence level
+
+
+def _determine_sample_size(
+    total_rows: int,
+    mean_price: float,
+    std_price: float,
+    max_window: int,
+    target_rel_error: float,
+    min_sample: int,
+    max_sample: int | None,
+) -> int:
+    """Heuristically determine rows needed for representative sampling."""
+    if total_rows <= min_sample:
+        return total_rows
+
+    if mean_price <= 0 or std_price <= 0:
+        base = max(min_sample, max_window * 10)
+        if max_sample is not None:
+            base = min(base, max_sample)
+        return min(total_rows, base)
+
+    coeff_var = std_price / mean_price
+    required = int((AUTO_SAMPLE_Z * coeff_var / target_rel_error) ** 2)
+    required = max(required, max_window * 10, min_sample)
+    if max_sample is not None:
+        required = min(required, max_sample)
+    return min(total_rows, required)
+
+
+def _row_select(df: pl.DataFrame, indices: np.ndarray) -> pl.DataFrame:
+    """Select rows by integer indices with compatibility across Polars versions."""
+    df_any = cast(Any, df)
+
+    if hasattr(df_any, "take"):
+        return cast(pl.DataFrame, df_any.take(indices))
+
+    if hasattr(df_any, "gather"):
+        return cast(pl.DataFrame, df_any.gather(indices.tolist()))
+
+    # Fallback: join on row counts
+    selector = pl.Series("__row_idx", indices)
+    return (
+        df.with_row_count("__row_idx")
+        .join(pl.DataFrame({"__row_idx": selector}), on="__row_idx", how="inner")
+        .sort("__row_idx")
+        .drop("__row_idx")
+    )
+
 
 def load_real_data(
     data_dir: str = "/Users/danielfisher/data/databento/symbol_datasets/inputs",
-    max_rows: int = 100000,
+    max_rows: int | None = None,
     symbol_file: str | None = None,
+    sample_method: str = "strided",
+    random_seed: int | None = 42,
+    max_window: int = 1000,
+    target_rel_error: float = 0.005,
+    min_sample: int = 150_000,
+    max_sample: int | None = 1_500_000,
 ) -> tuple[pl.DataFrame, str]:
     """
     Load real market data from processed parquet files.
 
     Args:
         data_dir: Directory containing processed parquet files
-        max_rows: Maximum number of rows to load (for performance)
+        max_rows: Explicit cap on rows to load. If None, an automatic target is computed.
         symbol_file: Specific parquet file to load (if None, loads first file)
+        sample_method: Sampling approach when truncating the dataset. Options:
+            "strided" (default) picks evenly spaced rows across the file,
+            "random" draws a random subset,
+            "contiguous" takes a single middle slice.
+        random_seed: Optional seed for the random sampler
+        max_window: Longest lookback window used by downstream analysis
+        target_rel_error: Desired relative error for mean estimates (e.g., 0.005 → 0.5%)
+        min_sample: Minimum sample size when subsampling
+        max_sample: Optional hard ceiling for sample size
 
     Returns:
         Tuple of (DataFrame with mid_price and ts_event columns, symbol name)
@@ -60,14 +125,48 @@ def load_real_data(
 
     print(f"   Total valid rows: {len(df):,}")
 
+    total_rows = len(df)
+
+    stats_df = df.select(
+        [
+            pl.col("mid_price").mean().alias("mean"),
+            pl.col("mid_price").std().alias("std"),
+        ]
+    )
+    mean_price, std_price = stats_df.row(0)
+
+    target_rows = max_rows
+    if target_rows is None:
+        target_rows = _determine_sample_size(
+            total_rows,
+            mean_price,
+            std_price,
+            max_window=max_window,
+            target_rel_error=target_rel_error,
+            min_sample=min_sample,
+            max_sample=max_sample,
+        )
+
     # Sample for performance
-    if len(df) > max_rows:
-        # Take contiguous sample from middle of dataset
-        start_idx = (len(df) - max_rows) // 2
-        df = df.slice(start_idx, max_rows)
-        print(f"   Sampled {max_rows:,} contiguous rows for analysis")
+    if target_rows is not None and total_rows > target_rows:
+        if sample_method == "strided":
+            indices = np.linspace(0, total_rows - 1, num=target_rows, dtype=int)
+            df = _row_select(df, indices)
+            stride = max(int(total_rows / target_rows), 1)
+            print(
+                f"   Sampled {target_rows:,} evenly spaced rows (approx. stride {stride:,}) for analysis"
+            )
+        elif sample_method == "random":
+            rng = np.random.default_rng(random_seed)
+            indices = np.sort(rng.choice(total_rows, size=target_rows, replace=False))
+            df = _row_select(df, indices)
+            print(f"   Sampled {target_rows:,} random rows for analysis")
+        else:  # contiguous fallback
+            start_idx = (total_rows - target_rows) // 2
+            df = df.slice(start_idx, target_rows)
+            print(f"   Sampled {target_rows:,} contiguous rows from dataset centre")
     else:
-        print(f"   Using all {len(df):,} rows")
+        print(f"   Using all {total_rows:,} rows")
 
     # Ensure required columns exist
     if "mid_price" not in df.columns:
@@ -135,7 +234,17 @@ def create_sample_data(n_samples: int = 30000, use_realistic_walk: bool = True) 
     })
 
 
-def analyze_lookback_lookforward_returns(use_real_data: bool = True, process_all_symbols: bool = True):
+def analyze_lookback_lookforward_returns(
+    use_real_data: bool = True,
+    process_all_symbols: bool = True,
+    max_rows: int | None = None,
+    sample_method: str = "strided",
+    random_seed: int | None = 42,
+    max_window: int = 1000,
+    target_rel_error: float = 0.005,
+    min_sample: int = 150_000,
+    max_sample: int | None = 1_500_000,
+):
     """
     Analyze lookback/lookforward returns generator outputs.
 
@@ -156,19 +265,58 @@ def analyze_lookback_lookforward_returns(use_real_data: bool = True, process_all
             print(f"\n{'=' * 80}")
             print(f"Processing symbol {idx + 1}/{len(symbol_files)}")
             print(f"{'=' * 80}")
-            analyze_single_symbol(symbol_file, use_real_data=True)
+            analyze_single_symbol(
+                symbol_file,
+                use_real_data=True,
+                max_rows=max_rows,
+                sample_method=sample_method,
+                random_seed=random_seed,
+                max_window=max_window,
+                target_rel_error=target_rel_error,
+                min_sample=min_sample,
+                max_sample=max_sample,
+            )
 
     else:
         # Process single symbol or simulated data
-        analyze_single_symbol(symbol_file=None, use_real_data=use_real_data)
+        analyze_single_symbol(
+            symbol_file=None,
+            use_real_data=use_real_data,
+            max_rows=max_rows,
+            sample_method=sample_method,
+            random_seed=random_seed,
+            max_window=max_window,
+            target_rel_error=target_rel_error,
+            min_sample=min_sample,
+            max_sample=max_sample,
+        )
 
 
-def analyze_single_symbol(symbol_file: str | None = None, use_real_data: bool = True):
+def analyze_single_symbol(
+    symbol_file: str | None = None,
+    use_real_data: bool = True,
+    max_rows: int | None = None,
+    sample_method: str = "strided",
+    random_seed: int | None = 42,
+    max_window: int = 1000,
+    target_rel_error: float = 0.005,
+    min_sample: int = 150_000,
+    max_sample: int | None = 1_500_000,
+):
     """Analyze a single symbol."""
     # Load data
     if use_real_data:
         print("\n1. Loading real market data...")
-        df, symbol = load_real_data(symbol_file=symbol_file)
+        df, symbol = load_real_data(
+            symbol_file=symbol_file,
+            max_rows=max_rows,
+            sample_method=sample_method,
+            random_seed=random_seed,
+            max_window=max_window,
+            target_rel_error=target_rel_error,
+            min_sample=min_sample,
+            max_sample=max_sample,
+        )
     else:
         print("\n1. Creating simulated data...")
         df = create_sample_data(n_samples=30000)
@@ -178,8 +326,9 @@ def analyze_single_symbol(symbol_file: str | None = None, use_real_data: bool = 
     # Create generator with all default window lengths
     print("\n2. Generating targets...")
     generator = LookbackLookforwardReturnsGenerator(
-        window_lengths=[1000, 2500, 5000, 10000],
-        target_prefix="lf"
+        window_lengths=[100, 250, 500, 1000],
+        target_prefix="lf",
+        scale_factor=0.5,
     )
 
     targets = generator.generate_targets(df)
@@ -194,7 +343,7 @@ def analyze_single_symbol(symbol_file: str | None = None, use_real_data: bool = 
     print(f"   Target columns: {len(info['target_names'])}")
 
     # Analyze each window length
-    window_lengths = [1000, 2500, 5000, 10000]
+    window_lengths = generator.window_lengths
 
     print("\n4. Statistical Summary by Window Length:")
     print("-" * 80)
@@ -203,37 +352,36 @@ def analyze_single_symbol(symbol_file: str | None = None, use_real_data: bool = 
         print(f"\n   Window Length: {window_len} ticks")
 
         # Extract columns for this window
-        log_return = targets[f"lf_log_return_{window_len}t"]
-        current_vs_lookback = targets[f"lf_current_vs_lookback_mean_{window_len}t"]
-        current_vs_lookforward = targets[f"lf_current_vs_lookforward_mean_{window_len}t"]
+        base_return = targets[f"lf_return_{window_len}t"]
+        scaled_return = targets[f"lf_scaled_return_{window_len}t"]
+        current_return = targets[f"lf_current_return_{window_len}t"]
 
-        # Get valid data
-        valid_mask = ~log_return.is_nan()
+        # Get valid data for the base return
+        valid_mask = ~base_return.is_nan()
         valid_count = valid_mask.sum()
         valid_pct = (valid_count / len(df)) * 100
 
         print(f"   Valid samples: {valid_count:,} ({valid_pct:.1f}%)")
 
         if valid_count > 0:
-            # Log return statistics
-            valid_log_returns = log_return.filter(valid_mask)
-            print("   Log Return (bps):")
-            print(f"     Mean: {valid_log_returns.mean():.2f}")
-            print(f"     Std:  {valid_log_returns.std():.2f}")
-            print(f"     Min:  {valid_log_returns.min():.2f}")
-            print(f"     Max:  {valid_log_returns.max():.2f}")
+            base_pct = base_return.filter(valid_mask).to_numpy() * 100
+            print("   Return (%):")
+            print(f"     Mean: {base_pct.mean():.3f}")
+            print(f"     Std:  {base_pct.std():.3f}")
+            print(f"     Min:  {base_pct.min():.3f}")
+            print(f"     Max:  {base_pct.max():.3f}")
 
-            # Current vs lookback statistics
-            valid_cvl = current_vs_lookback.filter(valid_mask)
-            print("   Current vs Lookback Mean (bps):")
-            print(f"     Mean: {valid_cvl.mean():.2f}")
-            print(f"     Std:  {valid_cvl.std():.2f}")
+            scaled_valid = scaled_return.filter(~scaled_return.is_nan()).to_numpy() * 100
+            if scaled_valid.size:
+                print("   Scaled Return (%):")
+                print(f"     Mean: {scaled_valid.mean():.3f}")
+                print(f"     Std:  {scaled_valid.std():.3f}")
 
-            # Current vs lookforward statistics
-            valid_cvf = current_vs_lookforward.filter(valid_mask)
-            print("   Current vs Lookforward Mean (bps):")
-            print(f"     Mean: {valid_cvf.mean():.2f}")
-            print(f"     Std:  {valid_cvf.std():.2f}")
+            current_valid = current_return.filter(~current_return.is_nan()).to_numpy() * 100
+            if current_valid.size:
+                print("   Current Return (%):")
+                print(f"     Mean: {current_valid.mean():.3f}")
+                print(f"     Std:  {current_valid.std():.3f}")
 
     # Create visualization
     print("\n5. Creating visualizations...")
@@ -245,306 +393,195 @@ def analyze_single_symbol(symbol_file: str | None = None, use_real_data: bool = 
 
 
 def create_analysis_plots(targets: pl.DataFrame, window_lengths: list[int], symbol: str, df: pl.DataFrame):
-    """Create comprehensive analysis plots with summary statistics table."""
-    fig = plt.figure(figsize=(20, 18))  # Increased height for table
+    """Create analysis plots highlighting percentage return distributions."""
+    fig = plt.figure(figsize=(20, 16))
+    fig.suptitle(f'Lookback/Lookforward Percentage Returns: {symbol}', fontsize=16, fontweight='bold', y=0.97)
 
-    # Add summary statistics table at the top
-    fig.suptitle(f'Lookback/Lookforward Returns Analysis: {symbol}', fontsize=16, fontweight='bold', y=0.98)
+    # Helper for formatting mean ± std strings
+    def _format_stats(data: np.ndarray) -> str:
+        if data.size == 0:
+            return "–"
+        return f"{data.mean():.3f} ± {data.std():.3f}"
 
-    # Calculate summary statistics
-    summary_data = []
-    mid_prices = df["mid_price"].to_numpy()
-    valid_prices = mid_prices[~np.isnan(mid_prices)]
-
-    summary_data.append([
-        "Dataset",
-        f"{len(df):,}",
-        f"{valid_prices.min():.5f}",
-        f"{valid_prices.max():.5f}",
-        f"{valid_prices.mean():.5f}",
-        f"{valid_prices.std():.5f}",
-    ])
+    # Precompute percentage return arrays per window
+    base_returns: dict[int, np.ndarray] = {}
+    scaled_returns: dict[int, np.ndarray] = {}
+    current_returns: dict[int, np.ndarray] = {}
+    summary_rows: list[list[str]] = []
 
     for window_len in window_lengths:
-        log_return = targets[f"lf_log_return_{window_len}t"]
-        valid_data = log_return.filter(~log_return.is_nan()).to_numpy()
+        base_series = targets[f"lf_return_{window_len}t"]
+        scaled_series = targets[f"lf_scaled_return_{window_len}t"]
+        current_series = targets[f"lf_current_return_{window_len}t"]
 
-        if len(valid_data) > 0:
-            summary_data.append([
-                f"Window {window_len}t",
-                f"{len(valid_data):,}",
-                f"{valid_data.min():.2f}",
-                f"{valid_data.max():.2f}",
-                f"{valid_data.mean():.2f}",
-                f"{valid_data.std():.2f}",
-            ])
+        base_data = base_series.filter(~base_series.is_nan()).to_numpy() * 100
+        scaled_data = scaled_series.filter(~scaled_series.is_nan()).to_numpy() * 100
+        current_data = current_series.filter(~current_series.is_nan()).to_numpy() * 100
 
-    # Create table
-    table_ax = plt.subplot2grid((6, 1), (0, 0), fig=fig)
-    table_ax.axis('tight')
+        base_returns[window_len] = base_data
+        scaled_returns[window_len] = scaled_data
+        current_returns[window_len] = current_data
+
+        summary_rows.append([
+            f"{window_len}t",
+            f"{base_data.size:,}",
+            _format_stats(base_data),
+            _format_stats(scaled_data),
+            _format_stats(current_data),
+        ])
+
+    # Summary table spanning the first row
+    table_ax = plt.subplot2grid((5, 4), (0, 0), colspan=4, fig=fig)
     table_ax.axis('off')
-
     table = table_ax.table(
-        cellText=summary_data,
-        colLabels=['Metric', 'Valid Samples', 'Min', 'Max', 'Mean', 'Std Dev'],
+        cellText=summary_rows,
+        colLabels=['Window', 'Valid Samples', 'Return μ±σ (%)', 'Scaled μ±σ (%)', 'Current μ±σ (%)'],
         cellLoc='center',
-        loc='center',
-        bbox=[0.1, 0, 0.8, 1]  # type: ignore[arg-type]
+        loc='center'
     )
     table.auto_set_font_size(False)
     table.set_fontsize(10)
-    table.scale(1, 2)
+    table.scale(1, 1.8)
 
-    # Style header
-    for (i, _), cell in table.get_celld().items():
-        if i == 0:
-            cell.set_facecolor('#4CAF50')
+    for (row_idx, _), cell in table.get_celld().items():
+        if row_idx == 0:
+            cell.set_facecolor('#2E7D32')
             cell.set_text_props(weight='bold', color='white')
-        else:
-            if i % 2 == 0:
-                cell.set_facecolor('#f0f0f0')
+        elif row_idx % 2 == 0:
+            cell.set_facecolor('#f4f6f6')
 
-    # Row 1: Log Return Distributions with Normal Fit (starting after table)
+    # Histogram rows
     for idx, window_len in enumerate(window_lengths):
-        ax = plt.subplot2grid((6, 4), (1, idx), fig=fig)
-
-        log_return = targets[f"lf_log_return_{window_len}t"]
-        valid_data = log_return.filter(~log_return.is_nan()).to_numpy()
-
-        if len(valid_data) > 0:
-            # Plot histogram
-            n, bins, patches = ax.hist(valid_data, bins=50, alpha=0.7, color='steelblue',
-                                       edgecolor='black', density=True, label='Data')
-
-            # Fit normal distribution
-            mu, sigma = stats.norm.fit(valid_data)
-
-            # Plot fitted normal distribution
-            x = np.linspace(valid_data.min(), valid_data.max(), 100)
-            fitted_normal = stats.norm.pdf(x, mu, sigma)
-            ax.plot(x, fitted_normal, 'r-', linewidth=2, label='Normal Fit')
-
-            # Add vertical line at zero
-            ax.axvline(0, color='green', linestyle='--', linewidth=1.5, alpha=0.7)
-
-            # Add text box with parameters
-            textstr = f'μ = {mu:.2f}\nσ = {sigma:.2f}'
-            props = {"boxstyle": 'round', "facecolor": 'wheat', "alpha": 0.8}
-            ax.text(0.95, 0.95, textstr, transform=ax.transAxes, fontsize=9,
-                   verticalalignment='top', horizontalalignment='right', bbox=props)
-
-            ax.set_xlabel('Log Return (bps)', fontsize=10)
+        ax = plt.subplot2grid((5, 4), (1, idx), fig=fig)
+        data = base_returns[window_len]
+        if data.size:
+            ax.hist(data, bins=50, alpha=0.75, color='steelblue', edgecolor='black', density=True)
+            mu, sigma = stats.norm.fit(data)
+            x = np.linspace(data.min(), data.max(), 200)
+            ax.plot(x, stats.norm.pdf(x, mu, sigma), 'r-', linewidth=2)
+            ax.axvline(0, color='black', linestyle='--', linewidth=1)
+            ax.set_title(f'Mean Return\nWindow {window_len}t', fontsize=11, fontweight='bold')
+            ax.set_xlabel('Return (%)', fontsize=10)
             ax.set_ylabel('Density', fontsize=10)
-            ax.set_title(f'Log Return Distribution\nWindow: {window_len}t', fontsize=11, fontweight='bold')
-            ax.legend(fontsize=8, loc='upper left')
             ax.grid(True, alpha=0.3)
+            ax.text(0.95, 0.9, f'μ={mu:.3f}\nσ={sigma:.3f}', transform=ax.transAxes,
+                    fontsize=9, bbox={"boxstyle": 'round', "facecolor": 'white', "alpha": 0.8},
+                    ha='right', va='top')
 
-    # Row 2: Current vs Lookback Mean Distributions with Normal Fit
     for idx, window_len in enumerate(window_lengths):
-        ax = plt.subplot2grid((6, 4), (2, idx), fig=fig)
-
-        current_vs_lookback = targets[f"lf_current_vs_lookback_mean_{window_len}t"]
-        valid_data = current_vs_lookback.filter(~current_vs_lookback.is_nan()).to_numpy()
-
-        if len(valid_data) > 0:
-            # Plot histogram
-            n, bins, patches = ax.hist(valid_data, bins=50, alpha=0.7, color='forestgreen',
-                                       edgecolor='black', density=True, label='Data')
-
-            # Fit normal distribution
-            mu, sigma = stats.norm.fit(valid_data)
-
-            # Plot fitted normal distribution
-            x = np.linspace(valid_data.min(), valid_data.max(), 100)
-            fitted_normal = stats.norm.pdf(x, mu, sigma)
-            ax.plot(x, fitted_normal, 'r-', linewidth=2, label='Normal Fit')
-
-            # Add vertical line at zero
-            ax.axvline(0, color='blue', linestyle='--', linewidth=1.5, alpha=0.7)
-
-            # Add text box with parameters
-            textstr = f'μ = {mu:.2f}\nσ = {sigma:.2f}'
-            props = {"boxstyle": 'round', "facecolor": 'wheat', "alpha": 0.8}
-            ax.text(0.95, 0.95, textstr, transform=ax.transAxes, fontsize=9,
-                   verticalalignment='top', horizontalalignment='right', bbox=props)
-
-            ax.set_xlabel('Current vs Lookback Mean (bps)', fontsize=10)
+        ax = plt.subplot2grid((5, 4), (2, idx), fig=fig)
+        data = scaled_returns[window_len]
+        if data.size:
+            ax.hist(data, bins=50, alpha=0.75, color='mediumseagreen', edgecolor='black', density=True)
+            mu, sigma = stats.norm.fit(data)
+            x = np.linspace(data.min(), data.max(), 200)
+            ax.plot(x, stats.norm.pdf(x, mu, sigma), 'r-', linewidth=2)
+            ax.axvline(0, color='black', linestyle='--', linewidth=1)
+            ax.set_title(f'Scaled Mean Return\nWindow {window_len}t', fontsize=11, fontweight='bold')
+            ax.set_xlabel('Return (%)', fontsize=10)
             ax.set_ylabel('Density', fontsize=10)
-            ax.set_title(f'Current vs Lookback Mean\nWindow: {window_len}t', fontsize=11, fontweight='bold')
-            ax.legend(fontsize=8, loc='upper left')
             ax.grid(True, alpha=0.3)
+            ax.text(0.95, 0.9, f'μ={mu:.3f}\nσ={sigma:.3f}', transform=ax.transAxes,
+                    fontsize=9, bbox={"boxstyle": 'round', "facecolor": 'white', "alpha": 0.8},
+                    ha='right', va='top')
 
-    # Row 3: Current vs Lookforward Mean Distributions with Normal Fit
     for idx, window_len in enumerate(window_lengths):
-        ax = plt.subplot2grid((6, 4), (3, idx), fig=fig)
-
-        current_vs_lookforward = targets[f"lf_current_vs_lookforward_mean_{window_len}t"]
-        valid_data = current_vs_lookforward.filter(~current_vs_lookforward.is_nan()).to_numpy()
-
-        if len(valid_data) > 0:
-            # Plot histogram
-            n, bins, patches = ax.hist(valid_data, bins=50, alpha=0.7, color='coral',
-                                       edgecolor='black', density=True, label='Data')
-
-            # Fit normal distribution
-            mu, sigma = stats.norm.fit(valid_data)
-
-            # Plot fitted normal distribution
-            x = np.linspace(valid_data.min(), valid_data.max(), 100)
-            fitted_normal = stats.norm.pdf(x, mu, sigma)
-            ax.plot(x, fitted_normal, 'r-', linewidth=2, label='Normal Fit')
-
-            # Add vertical line at zero
-            ax.axvline(0, color='purple', linestyle='--', linewidth=1.5, alpha=0.7)
-
-            # Add text box with parameters
-            textstr = f'μ = {mu:.2f}\nσ = {sigma:.2f}'
-            props = {"boxstyle": 'round', "facecolor": 'wheat', "alpha": 0.8}
-            ax.text(0.95, 0.95, textstr, transform=ax.transAxes, fontsize=9,
-                   verticalalignment='top', horizontalalignment='right', bbox=props)
-
-            ax.set_xlabel('Current vs Lookforward Mean (bps)', fontsize=10)
+        ax = plt.subplot2grid((5, 4), (3, idx), fig=fig)
+        data = current_returns[window_len]
+        if data.size:
+            ax.hist(data, bins=50, alpha=0.75, color='darkorange', edgecolor='black', density=True)
+            mu, sigma = stats.norm.fit(data)
+            x = np.linspace(data.min(), data.max(), 200)
+            ax.plot(x, stats.norm.pdf(x, mu, sigma), 'r-', linewidth=2)
+            ax.axvline(0, color='black', linestyle='--', linewidth=1)
+            ax.set_title(f'Price vs Forward Return\nWindow {window_len}t', fontsize=11, fontweight='bold')
+            ax.set_xlabel('Return (%)', fontsize=10)
             ax.set_ylabel('Density', fontsize=10)
-            ax.set_title(f'Current vs Lookforward Mean\nWindow: {window_len}t', fontsize=11, fontweight='bold')
-            ax.legend(fontsize=8, loc='upper left')
             ax.grid(True, alpha=0.3)
+            ax.text(0.95, 0.9, f'μ={mu:.3f}\nσ={sigma:.3f}', transform=ax.transAxes,
+                    fontsize=9, bbox={"boxstyle": 'round', "facecolor": 'white', "alpha": 0.8},
+                    ha='right', va='top')
 
-    # Row 4: Lookforward vs Lookback Mean Scatter Plots with Regression
-    for idx, window_len in enumerate(window_lengths):
-        ax = plt.subplot2grid((6, 4), (4, idx), fig=fig)
+    # Bottom row comparisons
+    ax_box_base = plt.subplot2grid((5, 4), (4, 0), fig=fig)
+    base_data_for_box = [base_returns[w] for w in window_lengths if base_returns[w].size]
+    base_labels = [f'{w}t' for w in window_lengths if base_returns[w].size]
+    if base_data_for_box:
+        ax_box_base.boxplot(base_data_for_box, tick_labels=base_labels)
+        ax_box_base.set_title('Mean Return Distribution', fontsize=11, fontweight='bold')
+        ax_box_base.set_ylabel('Return (%)', fontsize=10)
+        ax_box_base.grid(True, alpha=0.3)
+        ax_box_base.axhline(0, color='red', linestyle='--', linewidth=1)
+    else:
+        ax_box_base.text(0.5, 0.5, 'No data available', transform=ax_box_base.transAxes,
+                         ha='center', va='center')
+        ax_box_base.axis('off')
 
-        lookback_mean = targets[f"lf_lookback_mean_{window_len}t"]
-        lookforward_mean = targets[f"lf_lookforward_mean_{window_len}t"]
+    ax_box_scaled = plt.subplot2grid((5, 4), (4, 1), fig=fig)
+    scaled_data_for_box = [scaled_returns[w] for w in window_lengths if scaled_returns[w].size]
+    scaled_labels = [f'{w}t' for w in window_lengths if scaled_returns[w].size]
+    if scaled_data_for_box:
+        ax_box_scaled.boxplot(scaled_data_for_box, tick_labels=scaled_labels)
+        ax_box_scaled.set_title('Scaled Return Distribution', fontsize=11, fontweight='bold')
+        ax_box_scaled.set_ylabel('Return (%)', fontsize=10)
+        ax_box_scaled.grid(True, alpha=0.3)
+        ax_box_scaled.axhline(0, color='red', linestyle='--', linewidth=1)
+    else:
+        ax_box_scaled.text(0.5, 0.5, 'No data available', transform=ax_box_scaled.transAxes,
+                           ha='center', va='center')
+        ax_box_scaled.axis('off')
 
-        # Get valid data
-        valid_mask = ~lookback_mean.is_nan() & ~lookforward_mean.is_nan()
+    ax_scatter = plt.subplot2grid((5, 4), (4, 2), fig=fig)
+    if len(window_lengths) >= 2:
+        first_window = window_lengths[0]
+        last_window = window_lengths[-1]
+        first_series = (targets[f"lf_return_{first_window}t"] * 100)
+        last_series = (targets[f"lf_return_{last_window}t"] * 100)
+        valid_mask = ~first_series.is_nan() & ~last_series.is_nan()
         if valid_mask.any():
-            lookback_data = lookback_mean.filter(valid_mask).to_numpy()
-            lookforward_data = lookforward_mean.filter(valid_mask).to_numpy()
+            first_values = first_series.filter(valid_mask).to_numpy()
+            last_values = last_series.filter(valid_mask).to_numpy()
+            if len(first_values) > 5000:
+                sample_idx = np.random.choice(len(first_values), 5000, replace=False)
+                first_values = first_values[sample_idx]
+                last_values = last_values[sample_idx]
+            ax_scatter.scatter(first_values, last_values, alpha=0.3, s=8, color='purple')
+            ax_scatter.set_title(f'{first_window}t vs {last_window}t Returns', fontsize=11, fontweight='bold')
+            ax_scatter.set_xlabel(f'{first_window}t Return (%)', fontsize=10)
+            ax_scatter.set_ylabel(f'{last_window}t Return (%)', fontsize=10)
+            ax_scatter.grid(True, alpha=0.3)
+            min_val = min(first_values.min(), last_values.min())
+            max_val = max(first_values.max(), last_values.max())
+            ax_scatter.plot([min_val, max_val], [min_val, max_val], 'r--', linewidth=1)
+        else:
+            ax_scatter.text(0.5, 0.5, 'Insufficient overlap', transform=ax_scatter.transAxes,
+                            ha='center', va='center')
+            ax_scatter.axis('off')
+    else:
+        ax_scatter.axis('off')
 
-            # Sample for visualization (max 5000 points for clarity)
-            if len(lookback_data) > 5000:
-                sample_indices = np.random.choice(len(lookback_data), 5000, replace=False)
-                lookback_data = lookback_data[sample_indices]
-                lookforward_data = lookforward_data[sample_indices]
-
-            # Create scatter plot
-            ax.scatter(lookback_data, lookforward_data, alpha=0.3, s=5, color='navy')
-
-            # Calculate linear regression
-            reg_result = stats.linregress(lookback_data, lookforward_data)
-            slope = float(reg_result.slope)  # type: ignore[attr-defined]
-            intercept = float(reg_result.intercept)  # type: ignore[attr-defined]
-            r_value = float(reg_result.rvalue)  # type: ignore[attr-defined]
-
-            # Plot regression line
-            x_line = np.array([lookback_data.min(), lookback_data.max()])
-            y_line = slope * x_line + intercept
-            ax.plot(x_line, y_line, 'r-', linewidth=2, label=f'y={slope:.3f}x+{intercept:.5f}')
-
-            # Plot diagonal (perfect correlation) for reference
-            ax.plot(x_line, x_line, 'g--', linewidth=1.5, alpha=0.5, label='y=x (perfect)')
-
-            # Add correlation metrics as inset
-            r_squared = r_value ** 2
-            textstr = f'R² = {r_squared:.4f}\nρ = {r_value:.4f}\nslope = {slope:.4f}'
-            props = {"boxstyle": 'round', "facecolor": 'lightblue', "alpha": 0.8}
-            ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=9,
-                   verticalalignment='top', horizontalalignment='left', bbox=props)
-
-            ax.set_xlabel('Lookback Mean', fontsize=10)
-            ax.set_ylabel('Lookforward Mean', fontsize=10)
-            ax.set_title(f'Lookforward vs Lookback\nWindow: {window_len}t', fontsize=11, fontweight='bold')
-            ax.legend(fontsize=7, loc='lower right')
-            ax.grid(True, alpha=0.3)
-
-    # Row 5: Comparative Analysis
-
-    # Plot 5.1: Log Returns across all window lengths (box plot)
-    ax = plt.subplot2grid((6, 4), (5, 0), fig=fig)
-    log_returns_data = []
-    labels = []
-    for window_len in window_lengths:
-        log_return = targets[f"lf_log_return_{window_len}t"]
-        valid_data = log_return.filter(~log_return.is_nan()).to_numpy()
-        if len(valid_data) > 0:
-            log_returns_data.append(valid_data)
-            labels.append(f'{window_len}t')
-
-    if log_returns_data:
-        ax.boxplot(log_returns_data, tick_labels=labels)
-        ax.set_xlabel('Window Length', fontsize=10)
-        ax.set_ylabel('Log Return (bps)', fontsize=10)
-        ax.set_title('Log Returns Comparison', fontsize=11, fontweight='bold')
-        ax.grid(True, alpha=0.3)
-        ax.axhline(0, color='red', linestyle='--', linewidth=1)
-
-    # Plot 5.2: Standard deviation vs window length
-    ax = plt.subplot2grid((6, 4), (5, 1), fig=fig)
-    stds = []
-    window_labels = []
-    for window_len in window_lengths:
-        log_return = targets[f"lf_log_return_{window_len}t"]
-        valid_data = log_return.filter(~log_return.is_nan()).to_numpy()
-        if len(valid_data) > 0:
-            stds.append(np.std(valid_data))
-            window_labels.append(window_len)
-
-    if stds:
-        ax.plot(window_labels, stds, marker='o', linewidth=2, markersize=8, color='darkblue')
-        ax.set_xlabel('Window Length (ticks)', fontsize=10)
-        ax.set_ylabel('Std Dev (bps)', fontsize=10)
-        ax.set_title('Volatility vs Window Length', fontsize=11, fontweight='bold')
-        ax.grid(True, alpha=0.3)
-
-    # Plot 5.3: Scatter plot - 1000t vs 10000t log returns
-    ax = plt.subplot2grid((6, 4), (5, 2), fig=fig)
-    log_1000 = targets["lf_log_return_1000t"]
-    log_10000 = targets["lf_log_return_10000t"]
-
-    valid_mask = ~log_1000.is_nan() & ~log_10000.is_nan()
-    if valid_mask.any():
-        valid_1000 = log_1000.filter(valid_mask).to_numpy()
-        valid_10000 = log_10000.filter(valid_mask).to_numpy()
-
-        # Sample for visualization (max 5000 points)
-        if len(valid_1000) > 5000:
-            sample_indices = np.random.choice(len(valid_1000), 5000, replace=False)
-            valid_1000 = valid_1000[sample_indices]
-            valid_10000 = valid_10000[sample_indices]
-
-        ax.scatter(valid_1000, valid_10000, alpha=0.3, s=10, color='purple')
-        ax.set_xlabel('1000t Log Return (bps)', fontsize=10)
-        ax.set_ylabel('10000t Log Return (bps)', fontsize=10)
-        ax.set_title('Short vs Long Window Returns', fontsize=11, fontweight='bold')
-        ax.grid(True, alpha=0.3)
-
-        # Add diagonal line
-        min_val = min(valid_1000.min(), valid_10000.min())
-        max_val = max(valid_1000.max(), valid_10000.max())
-        ax.plot([min_val, max_val], [min_val, max_val], 'r--', linewidth=1, alpha=0.5)
-
-    # Plot 5.4: Time series sample (last 2000 points)
-    ax = plt.subplot2grid((6, 4), (5, 3), fig=fig)
+    ax_ts = plt.subplot2grid((5, 4), (4, 3), fig=fig)
+    mid_idx = min(len(window_lengths) // 2, len(window_lengths) - 1)
+    ts_window = window_lengths[mid_idx]
+    ts_series = (targets[f"lf_return_{ts_window}t"] * 100)
+    valid_indices = np.where(~ts_series.is_nan().to_numpy())[0]
     sample_len = 2000
-    log_2500 = targets["lf_log_return_2500t"]
+    if valid_indices.size:
+        selected_indices = valid_indices[-sample_len:] if valid_indices.size > sample_len else valid_indices
+        series_values = ts_series.to_numpy()[selected_indices]
+        ax_ts.plot(range(len(series_values)), series_values, linewidth=1, color='teal', alpha=0.7)
+        ax_ts.axhline(0, color='red', linestyle='--', linewidth=1)
+        ax_ts.set_title(f'{ts_window}t Return Time Series', fontsize=11, fontweight='bold')
+        ax_ts.set_xlabel('Tick', fontsize=10)
+        ax_ts.set_ylabel('Return (%)', fontsize=10)
+        ax_ts.grid(True, alpha=0.3)
+    else:
+        ax_ts.text(0.5, 0.5, 'No valid samples', transform=ax_ts.transAxes,
+                   ha='center', va='center')
+        ax_ts.axis('off')
 
-    # Get last N valid points
-    valid_indices = np.where(~log_2500.is_nan().to_numpy())[0]
-    if len(valid_indices) >= sample_len:
-        sample_indices = valid_indices[-sample_len:]
-        sample_data = log_2500.to_numpy()[sample_indices]
+    plt.tight_layout(rect=(0, 0, 1, 0.94))
 
-        ax.plot(range(len(sample_data)), sample_data, linewidth=1, color='teal', alpha=0.7)
-        ax.axhline(0, color='red', linestyle='--', linewidth=1)
-        ax.set_xlabel('Time (ticks)', fontsize=10)
-        ax.set_ylabel('Log Return (bps)', fontsize=10)
-        ax.set_title('2500t Log Return Time Series\n(Last 2000 samples)', fontsize=11, fontweight='bold')
-        ax.grid(True, alpha=0.3)
-
-    plt.tight_layout(rect=(0, 0, 1, 0.96))  # Leave space for suptitle
-
-    # Save plot
     import os
     os.makedirs("outputs", exist_ok=True)
     output_path = f"outputs/lookback_lookforward_analysis_{symbol}.png"

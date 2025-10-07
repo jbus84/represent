@@ -196,25 +196,9 @@ build-log-return-labels:
 
 # Parameter Optimization Workflow
 optimize-parameters-only:
-	@echo "🧬 Running Parameter Optimization Only"
-	@echo "======================================"
-	@echo "🎯 Optimizing parameters for existing symbol datasets"
-	@echo "⚠️  This assumes input datasets already exist in:"
-	@echo "   • /Users/danielfisher/data/databento/symbol_datasets/inputs/*.parquet"
-	@echo ""
-	@echo "⏱️  Expected runtime: 2-8 hours depending on dataset sizes"
-	@echo "💾 Memory usage: ~2GB peak"
-	@echo ""
-	@echo "🚀 Starting optimization with adaptive sampling..."
-	PYTHONPATH=. python scripts/symbol_optimization_runner.py
-	@cp -r outputs/optimization_results /Users/danielfisher/data/databento/symbol_datasets/
-	@echo "✅ Parameter optimization complete!"
-	@echo ""
-	@echo "📊 Results saved to:"
-	@echo "   • /Users/danielfisher/data/databento/symbol_datasets/outputs/optimization_results/OPTIMIZATION_RESULTS.md"
-	@echo "   • /Users/danielfisher/data/databento/symbol_datasets/outputs/optimization_results/parameter_comparison.csv"
-	@echo "   • /Users/danielfisher/data/databento/symbol_datasets/outputs/optimization_results/*.png"
-	@echo "   • /Users/danielfisher/data/databento/symbol_datasets/outputs/optimization_results/optimized_parameters/"
+	@echo "❌ Parameter optimization workflows have been removed from represent."
+	@echo "   The previous implementation depended on the tstrends library."
+	@exit 1
 
 create-symbol-inputs:
 	@echo "📂 Creating clean symbol input datasets (without target columns)"
@@ -230,70 +214,29 @@ create-symbol-inputs:
 	@ls -lh /Users/danielfisher/data/databento/symbol_datasets/inputs/*.parquet 2>/dev/null || echo "   (No datasets found)"
 
 optimize-parameters:
-	@echo "🧬 Running Parameter Optimization on All Symbol Datasets"
-	@echo "========================================================="
-	@echo "🎯 This will optimize parameters for each symbol dataset individually"
-	@echo "⏱️  Expected runtime: 2-8 hours depending on dataset sizes"
-	@echo "💾 Memory usage: ~2GB peak"
-	@echo ""
-	@echo "🚀 Starting optimization..."
-	PYTHONPATH=. python scripts/symbol_optimization_runner.py
-	@cp -r outputs/optimization_results /Users/danielfisher/data/databento/symbol_datasets/
-	@echo "✅ Parameter optimization complete!"
-	@echo ""
-	@echo "📊 Results saved to:"
-	@echo "   • /Users/danielfisher/data/databento/symbol_datasets/outputs/optimization_results/OPTIMIZATION_RESULTS.md"
-	@echo "   • /Users/danielfisher/data/databento/symbol_datasets/outputs/optimization_results/parameter_comparison.csv"
-	@echo "   • /Users/danielfisher/data/databento/symbol_datasets/outputs/optimization_results/*.png"
-	@echo "   • /Users/danielfisher/data/databento/symbol_datasets/outputs/optimization_results/optimized_parameters/"
+	@echo "❌ Parameter optimization workflows have been removed from represent."
+	@echo "   The previous implementation depended on the tstrends library."
+	@exit 1
 
-run-symbol-optimization: create-symbol-inputs optimize-parameters
-	@echo "🎉 Complete Symbol Optimization Workflow Finished!"
-	@echo "=================================================="
-	@echo "✅ Clean input datasets created (without target columns)"
-	@echo "✅ Parameters optimized for each symbol individually"
-	@echo "✅ Comprehensive report generated with visualizations"
-	@echo ""
-	@echo "📊 Results saved to:"
-	@echo "   • /Users/danielfisher/data/databento/symbol_datasets/inputs/ - Clean input datasets"
-	@echo "   • /Users/danielfisher/data/databento/symbol_datasets/outputs/optimization_results/ - Optimized parameters"
-	@echo ""
+run-symbol-optimization:
+	@echo "❌ Parameter optimization workflows have been removed from represent."
+	@echo "   The previous implementation depended on the tstrends library."
+	@exit 1
 	@echo "📈 Next steps:"
 	@echo "   1. Review outputs/optimization_results/OPTIMIZATION_RESULTS.md"
 	@echo "   2. Use optimized parameters for production labeling on clean inputs"
 	@echo "   3. Run 'make generate-optimization-report' to update visualizations"
 
 generate-optimization-report:
-	@echo "📊 Generating Optimization Report and Visualizations"
-	@echo "===================================================="
-	@echo "🎯 Creating parameter comparison tables and charts..."
-	PYTHONPATH=. python -c "\
-from represent.parameter_storage import ParameterStorage; \
-storage = ParameterStorage('outputs/optimization_results/optimized_parameters'); \
-storage.export_to_markdown('outputs/optimization_results/OPTIMIZATION_RESULTS.md'); \
-storage.visualize_parameter_distributions(save_path='outputs/optimization_results/parameter_distributions_all.png'); \
-storage.create_returns_comparison(save_path='outputs/optimization_results/returns_comparison.png'); \
-print('✅ Report and visualizations updated!')"
-	@echo "📄 Updated files:"
-	@echo "   • outputs/optimization_results/OPTIMIZATION_RESULTS.md"
-	@echo "   • outputs/optimization_results/parameter_distributions_*.png"
-	@echo "   • outputs/optimization_results/returns_comparison.png"
+	@echo "❌ Optimization reports are no longer available."
+	@echo "   The supporting workflow depended on the tstrends library."
+	@exit 1
 
 # Optimized Classification Generation
 generate-optimized-classifications:
-	@echo "🎯 Generating Optimized Classification Datasets"
-	@echo "=============================================="
-	@echo "🔍 Using optimized parameters to create labeled datasets for all classification methods"
-	@echo "📊 Methods: GA Labeling, Binary CTL, Ternary CTL, Quantile Classification"
-	@echo ""
-	PYTHONPATH=. uv run python scripts/generate_optimized_classifications.py
-	@echo "✅ Optimized classification datasets generated!"
-	@echo ""
-	@echo "📊 Generated datasets saved to:"
-	@ls -lh /Users/danielfisher/data/databento/symbol_datasets/optimized_classifications/*.parquet 2>/dev/null || echo "   (No datasets found)"
-	@echo ""
-	@echo "📄 Classification report:"
-	@ls -lh /Users/danielfisher/data/databento/symbol_datasets/optimized_classifications/OPTIMIZED_CLASSIFICATIONS_REPORT.md 2>/dev/null || echo "   (Report not found)"
+	@echo "❌ Optimized classification workflows have been removed from represent."
+	@echo "   The previous implementation depended on the tstrends library."
+	@exit 1
 
 generate-ga-classifications:
 	@echo "🧬 Generating GA Labeling Classifications (All Symbols)"
@@ -302,37 +245,20 @@ generate-ga-classifications:
 	@echo "✅ GA Labeling classifications generated for all symbols!"
 
 generate-ctl-classifications:
-	@echo "📊 Generating CTL Classifications (All Symbols)"
-	@echo "=============================================="
-	PYTHONPATH=. uv run python scripts/generate_optimized_classifications.py --method binary_ctl
-	PYTHONPATH=. uv run python scripts/generate_optimized_classifications.py --method ternary_ctl
-	@echo "✅ Binary and Ternary CTL classifications generated for all symbols!"
+	@echo "❌ CTL classification workflows have been removed from represent."
+	@echo "   The previous implementation depended on the tstrends library."
+	@exit 1
 
 generate-quantile-classifications:
-	@echo "📈 Generating Quantile Classifications (All Symbols)"
-	@echo "=================================================="
-	PYTHONPATH=. uv run python scripts/generate_optimized_classifications.py --method quantile_classification
-	@echo "✅ Quantile classifications generated for all symbols!"
+	@echo "❌ Optimized quantile classification workflow has been removed."
+	@exit 1
 
 generate-symbol-classifications:
-	@echo "🎯 Generate Classifications for Specific Symbol"
-	@echo "=============================================="
-	@echo "Usage: make generate-symbol-classifications SYMBOL=M6AH5"
-	@echo "Available symbols: M6AH5, M6AM4, M6AM5, M6AU4, M6AU5, M6AZ4"
-	@echo ""
-	$(if $(SYMBOL), \
-		PYTHONPATH=. uv run python scripts/generate_optimized_classifications.py --symbol $(SYMBOL), \
-		@echo "❌ Please specify SYMBOL=<symbol_name>")
+	@echo "❌ Optimized classification workflows have been removed from represent."
+	@echo "   The previous implementation depended on the tstrends library."
+	@exit 1
 
-complete-optimized-workflow: create-symbol-inputs optimize-parameters generate-optimized-classifications generate-optimization-report
-	@echo "🎉 Complete Optimized Classification Workflow Finished!"
-	@echo "======================================================"
-	@echo "✅ Clean input datasets created"
-	@echo "✅ Parameters optimized for all symbols and methods"
-	@echo "✅ Optimized classification datasets generated"
-	@echo "✅ Comprehensive reports and visualizations created"
-	@echo ""
-	@echo "📊 Results available in:"
-	@echo "   • /Users/danielfisher/data/databento/symbol_datasets/inputs/ - Clean inputs"
-	@echo "   • /Users/danielfisher/data/databento/symbol_datasets/optimized_classifications/ - Labeled datasets" 
-	@echo "   • outputs/optimization_results/ - Parameter analysis and reports"
+complete-optimized-workflow:
+	@echo "❌ The optimization workflow has been removed from represent."
+	@echo "   The previous implementation depended on the tstrends library."
+	@exit 1

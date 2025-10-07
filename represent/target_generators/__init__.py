@@ -24,20 +24,6 @@ from .regression import (
     VolatilityScaledReturnsGenerator,
 )
 
-# TStrends-based generators (optional - requires tstrends library)
-try:
-    from .tstrends_labeling import (  # noqa: F401
-        BinaryCTLGenerator,
-        OracleBinaryTrendGenerator,
-        OracleTernaryTrendGenerator,
-        TernaryCTLGenerator,
-        TunedTrendGenerator,
-    )
-
-    TSTRENDS_GENERATORS_AVAILABLE = True
-except ImportError:
-    TSTRENDS_GENERATORS_AVAILABLE = False
-
 # GA Labeling generator
 try:
     from .ga_labeling import GALabelingGenerator  # noqa: F401
@@ -62,18 +48,6 @@ __all__ = [
     "VolatilityScaledReturnsGenerator",
     "RemainingValueTunerGenerator",
 ]
-
-# Add TStrends generators to exports if available
-if TSTRENDS_GENERATORS_AVAILABLE:
-    __all__.extend(
-        [
-            "BinaryCTLGenerator",
-            "TernaryCTLGenerator",
-            "OracleBinaryTrendGenerator",
-            "OracleTernaryTrendGenerator",
-            "TunedTrendGenerator",
-        ]
-    )
 
 # Add GA labeling generator to exports if available
 if GA_LABELING_AVAILABLE:

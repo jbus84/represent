@@ -250,7 +250,6 @@ When working on this codebase:
 - `represent/target_generators/classification.py` - Classification generators
 - `represent/target_generators/regression.py` - Regression generators
 - `represent/target_generators/ga_labeling.py` - Genetic algorithm labeling (NEW)
-- `represent/target_generators/tstrends_labeling.py` - Academic TStrends methods
 - `represent/target_generators/factory.py` - Generator factory pattern
 
 ### Optimization

@@ -23,7 +23,6 @@ Lookback Lookfward log return: `uv run python scripts/process_symbols_with_lookb
 - **📊 Normalized LOB Representations**: Transform raw tick data into ML-ready tensor formats
 - **🎯 Modular Target Generation**: 15+ labeling approaches from classification to evolutionary optimization
 - **⚡ High Performance**: 1500+ samples/second processing with lazy loading
-- **🧠 Research Integration**: Academic TStrends methods with Bayesian parameter optimization
 - **📈 Multi-Feature Support**: Volume, variance, and trade count representations
 - **🎨 Comprehensive Visualization**: Side-by-side comparison of all labeling approaches
 
@@ -36,9 +35,6 @@ uv add represent
 # Using pip
 pip install represent
 
-# With academic TStrends integration (optional)
-uv add represent
-uv add "git+https://github.com/agpenas/tstrends.git"
 ```
 
 ## 🏗️ Core Architecture
@@ -110,10 +106,6 @@ print(f"Generated {len([col for col in dataset.columns if '_label' in col or '_t
 |-----------|-------------|------------------|------------|
 | `quantile_classification` | Percentile-based balanced labels | Multi-class direction prediction | `nbins=13` |
 | `ga_labeling` ⭐ | **Genetic algorithm optimized** | Performance-optimized trading | `pop_size=30`, `max_gen=31` |
-| `binary_ctl` | Academic binary trend labeling | Research benchmarking | `omega=0.0` (optimized) |
-| `ternary_ctl` | Academic ternary trend labeling | 3-class trend analysis | `thres=0.0446`, `window=501` |
-| `oracle_binary` | Optimal binary labels | Theoretical performance bounds | `tx_cost=9.33e-07` |
-| `oracle_ternary` | Optimal ternary labels | Advanced benchmarking | `tx_cost=0.008`, `neutral=0.183` |
 
 ### **Regression Methods**
 

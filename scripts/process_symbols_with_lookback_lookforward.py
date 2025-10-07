@@ -5,14 +5,13 @@ Process All Symbols with Lookback-Lookforward Regression Targets
 This script uses ModularDatasetBuilder to process symbol datasets with the
 lookback-lookforward returns generator for symmetric window analysis:
   - Compares lookback and lookforward window means
-  - Multiple time scales (1000, 2500, 5000, 10000 ticks)
-  - 6 metrics per window: lookback_mean, lookforward_mean, log_return,
-    current_vs_lookback_mean, current_vs_lookforward_mean, current_price
+  - Multiple time scales (100, 250, 500, 1000 ticks)
+  - 3 metrics per window: mean return, scaled mean return, price return
 
 Use case: Multi-scale trend analysis with symmetric windows for predicting
 whether the future trend will match or diverge from recent history.
 
-Output: Target-only files with keys (row_idx, timestamp, symbol) + 24 regression target columns
+Output: Target-only files with keys (row_idx, timestamp, symbol) + 12 regression target columns
 """
 
 import sys
@@ -33,7 +32,9 @@ def get_lookback_lookforward_generators(symbol_name: str) -> list:
     Create lookback-lookforward regression target generator.
 
     Uses symmetric windows to compare recent history with future trends.
-    Each window produces 6 metrics showing relationship between past and future.
+    Each window produces three percentage returns describing the relationship
+    between the historical window, a scaled version of that window, and the
+    forward-looking window.
 
     Args:
         symbol_name: Symbol being processed (for logging)
@@ -43,18 +44,16 @@ def get_lookback_lookforward_generators(symbol_name: str) -> list:
     """
     generators = [
         # Lookback-Lookforward Returns Generator
-        # Generates 24 targets: 4 windows × 6 metrics each
+        # Generates 12 targets: 4 windows × 3 metrics each
         TargetGeneratorFactory.create(
             "lookback_lookforward_returns",
-            window_lengths=[1000, 2500, 5000, 10000],  # Multi-scale analysis
+            window_lengths=[100, 250, 500, 1000],  # Multi-scale analysis
+            scale_factor=0.5,
             target_prefix="lf",
-            # Output columns per window (e.g., for 1000-tick window):
-            # - lf_lookback_mean_1000t: Mean price over lookback window (includes current)
-            # - lf_lookforward_mean_1000t: Mean price over lookforward window (excludes current)
-            # - lf_log_return_1000t: Log return between window means (basis points)
-            # - lf_current_vs_lookback_mean_1000t: current - lookback mean (basis points)
-            # - lf_current_vs_lookforward_mean_1000t: current - lookforward mean (basis points)
-            # - lf_current_price_1000t: Price at end of lookback window
+            # Output columns per window (e.g., for 250-tick window):
+            # - lf_return_250t: percentage change between window means
+            # - lf_scaled_return_250t: scaled lookback vs forward percentage change
+            # - lf_current_return_250t: current price vs forward percentage change
         ),
     ]
 
@@ -63,8 +62,8 @@ def get_lookback_lookforward_generators(symbol_name: str) -> list:
         info = gen.get_target_info()
         print(f"      • {info['description']}")
         print(f"        Targets: {len(info['target_names'])} total")
-        print(f"        Windows: [1000, 2500, 5000, 10000] ticks")
-        print(f"        Metrics per window: 6 (means, returns, differences)")
+        print(f"        Windows: {info['parameters']['window_lengths']} ticks")
+        print("        Metrics per window: 3 (returns)")
 
     return generators
 
@@ -91,7 +90,7 @@ def process_symbol_with_lookback_lookforward(input_file: Path, output_dir: Path)
         generators = get_lookback_lookforward_generators(symbol_name)
 
         # Use ModularDatasetBuilder with chunked processing
-        print(f"   🔨 Building targets with lookback-lookforward generator...")
+        print("   🔨 Building targets with lookback-lookforward generator...")
         builder = ModularDatasetBuilder(generators, verbose=True)
 
         # Process using chunked infrastructure for memory efficiency
@@ -114,7 +113,7 @@ def process_symbol_with_lookback_lookforward(input_file: Path, output_dir: Path)
 
         print(f"   ✅ Processing complete - {len(targets_df)} samples generated")
         print(f"   💾 Saved to: {output_file}")
-        print(f"   🏷️  Total targets: {len(all_target_names)} (4 windows × 6 metrics)")
+        print(f"   🏷️  Total targets: {len(all_target_names)} (4 windows × 3 metrics)")
         print(f"   📋 Output columns: {targets_df.columns}")
 
         # Return detailed results
@@ -149,16 +148,13 @@ def main():
     print("    • Current:     mid_prices[i]      (end of lookback)")
     print("    • Lookforward: [i + 1, i + N]     (N points, excludes current)")
     print()
-    print("METRICS GENERATED (6 per window):")
-    print("  1. lookback_mean          - Mean price over lookback window")
-    print("  2. lookforward_mean       - Mean price over lookforward window")
-    print("  3. log_return             - Log return between window means (bps)")
-    print("  4. current_vs_lookback    - Current - lookback mean (bps)")
-    print("  5. current_vs_lookforward - Current - lookforward mean (bps)")
-    print("  6. current_price          - Price at window center")
+    print("METRICS GENERATED (3 per window):")
+    print("  1. return           - Percentage change between lookback and lookforward means")
+    print("  2. scaled_return    - Percentage change using scaled lookback mean")
+    print("  3. current_return   - Percentage change between current price and lookforward mean")
     print()
-    print("WINDOWS: [1000, 2500, 5000, 10000] ticks")
-    print("TOTAL TARGETS: 24 (4 windows × 6 metrics)")
+    print("WINDOWS: [100, 250, 500, 1000] ticks")
+    print("TOTAL TARGETS: 12 (4 windows × 3 metrics)")
     print()
     print("USE CASE:")
     print("  • Multi-scale trend analysis")
@@ -204,7 +200,7 @@ def main():
             if results.get('success', False):
                 successful_symbols += 1
                 total_samples_generated += results.get('sample_count', 0)
-                print(f"   🎉 Symbol complete: {results['sample_count']:,} samples with 24 targets each")
+                print(f"   🎉 Symbol complete: {results['sample_count']:,} samples with 12 targets each")
             else:
                 print(f"   ⚠️  Symbol processing failed: {results.get('error', 'Unknown error')}")
 
@@ -221,9 +217,9 @@ def main():
     print("=" * 80)
     print(f"   Successfully processed: {successful_symbols}/{len(symbol_files)} symbols")
     print(f"   Total samples generated: {total_samples_generated:,}")
-    print("   Total targets per sample: 24")
-    print("      • 4 window sizes: [1000, 2500, 5000, 10000] ticks")
-    print("      • 6 metrics per window: means, returns, differences")
+    print("   Total targets per sample: 12")
+    print("      • 4 window sizes: [100, 250, 500, 1000] ticks")
+    print("      • 3 metrics per window: returns")
     print(f"   Output directory: {output_dir}")
 
     # List output files
@@ -246,9 +242,9 @@ def main():
         f.write("CONFIGURATION\n")
         f.write("=" * 60 + "\n")
         f.write("Generator: lookback_lookforward_returns\n")
-        f.write("  - Window lengths: [1000, 2500, 5000, 10000] ticks\n")
-        f.write("  - Metrics per window: 6\n")
-        f.write("  - Total targets: 24\n")
+        f.write("  - Window lengths: [100, 250, 500, 1000] ticks\n")
+        f.write("  - Metrics per window: 3\n")
+        f.write("  - Total targets: 12\n")
         f.write("  - Target prefix: 'lf'\n\n")
 
         f.write("=" * 60 + "\n")
@@ -260,14 +256,11 @@ def main():
         f.write("  Lookforward: [i + 1, i + N]     (N points, excludes current)\n\n")
 
         f.write("=" * 60 + "\n")
-        f.write("METRICS (6 per window)\n")
+        f.write("METRICS (3 per window)\n")
         f.write("=" * 60 + "\n")
-        f.write("1. lookback_mean          - Mean price over lookback window\n")
-        f.write("2. lookforward_mean       - Mean price over lookforward window\n")
-        f.write("3. log_return             - Log return between means (bps)\n")
-        f.write("4. current_vs_lookback    - Current - lookback mean (bps)\n")
-        f.write("5. current_vs_lookforward - Current - lookforward mean (bps)\n")
-        f.write("6. current_price          - Price at window center\n\n")
+        f.write("1. return           - (lookforward_mean - lookback_mean) / lookback_mean\n")
+        f.write("2. scaled_return    - (lookforward_mean - scaled_lookback_mean) / scaled_lookback_mean\n")
+        f.write("3. current_return   - (lookforward_mean - current_price) / current_price\n\n")
 
         f.write("=" * 60 + "\n")
         f.write("RESULTS\n")
@@ -276,19 +269,16 @@ def main():
         f.write(f"Symbols successful: {successful_symbols}\n")
         f.write(f"Success rate: {100*successful_symbols/len(symbol_files):.1f}%\n")
         f.write(f"Total samples: {total_samples_generated:,}\n")
-        f.write("Targets per sample: 24\n\n")
+        f.write("Targets per sample: 12\n\n")
 
         f.write("=" * 60 + "\n")
         f.write("TARGET DESCRIPTIONS\n")
         f.write("=" * 60 + "\n")
-        f.write("Example columns for 1000-tick window:\n")
-        f.write("  lf_lookback_mean_1000t\n")
-        f.write("  lf_lookforward_mean_1000t\n")
-        f.write("  lf_log_return_1000t\n")
-        f.write("  lf_current_vs_lookback_mean_1000t\n")
-        f.write("  lf_current_vs_lookforward_mean_1000t\n")
-        f.write("  lf_current_price_1000t\n\n")
-        f.write("Repeated for windows: 2500, 5000, 10000 ticks\n\n")
+        f.write("Example columns for 250-tick window:\n")
+        f.write("  lf_return_250t\n")
+        f.write("  lf_scaled_return_250t\n")
+        f.write("  lf_current_return_250t\n\n")
+        f.write("Repeated for windows: 100, 500, 1000 ticks\n\n")
 
         f.write("=" * 60 + "\n")
         f.write("OUTPUT FILES\n")
@@ -310,12 +300,12 @@ def main():
         f.write("=" * 60 + "\n")
         f.write("NEXT STEPS\n")
         f.write("=" * 60 + "\n")
-        f.write("1. Train regression models on 24 target dimensions\n")
-        f.write("2. Predict log_return targets for directional signals\n")
-        f.write("3. Use current_vs_* targets for entry timing\n")
+        f.write("1. Train regression models on 12 target dimensions\n")
+        f.write("2. Predict percentage return targets for directional signals\n")
+        f.write("3. Use current_return targets for entry timing\n")
         f.write("4. Combine multiple window predictions for confidence\n")
-        f.write("5. Compare lookback vs lookforward for mean reversion signals\n")
-        f.write("6. Use longer windows (5k/10k) for trend confirmation\n")
+        f.write("5. Compare return vs scaled_return for robustness\n")
+        f.write("6. Use longer windows (500/1000 ticks) for trend confirmation\n")
 
     print(f"\n📋 Processing summary saved to: {summary_file}")
     print()
@@ -324,20 +314,20 @@ def main():
     print("=" * 80)
     print("1. Load lookback-lookforward targets from output directory")
     print("2. Train regression models (LightGBM/XGBoost recommended)")
-    print("3. Focus on log_return targets for directional predictions")
-    print("4. Use current_vs_* targets for entry/exit timing")
+    print("3. Focus on percentage returns for directional predictions")
+    print("4. Use current_return targets for entry/exit timing")
     print("5. Combine multiple window scales for robust signals")
     print()
     print("Example trading signals:")
     print("  # Mean reversion signal")
-    print("  lookback_high = pred_lookback_mean > pred_lookforward_mean")
-    print("  current_below = pred_current_vs_lookback < 0")
-    print("  buy_signal = lookback_high & current_below  # Expect reversion up")
+    print("  forward_outpaces_history = pred_return < 0")
+    print("  current_below_forward = pred_current_return > 0")
+    print("  buy_signal = forward_outpaces_history & current_below_forward")
     print()
     print("  # Trend continuation signal")
-    print("  positive_return = pred_log_return > 2  # > 2 bps")
-    print("  multiple_windows = all([pred_1k, pred_2.5k, pred_5k] > 0)")
-    print("  long_signal = positive_return & multiple_windows  # Strong trend")
+    print("  positive_return = pred_return > 0.01  # > 1% forward mean gain")
+    print("  consistent_across_windows = all([pred_100t, pred_250t, pred_500t] > 0)")
+    print("  long_signal = positive_return & consistent_across_windows")
     print("=" * 80)
 
 
