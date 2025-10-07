@@ -694,6 +694,169 @@ class VolatilityScaledReturnsGenerator(TargetGenerator):
         return ["mid_price"]
 
 
+class LookbackLookforwardReturnsGenerator(TargetGenerator):
+    """
+    Generates regression targets based on lookback/lookforward window mean comparisons.
+
+    This generator computes the mean price over symmetric lookback and lookforward windows,
+    then expresses the forward movement as percentage returns. For each configured window
+    length it produces:
+      • return: (lookforward_mean - lookback_mean) / lookback_mean
+      • scaled_return: (lookforward_mean - scaled_lookback_mean) / scaled_lookback_mean
+      • current_return: (lookforward_mean - current_price) / current_price
+    """
+
+    def __init__(
+        self,
+        window_lengths: list[int] | None = None,
+        target_prefix: str = "lookback_lookforward",
+        scale_factor: float = 0.1,
+    ):
+        """
+        Initialize lookback-lookforward returns generator.
+
+        Args:
+            window_lengths: List of window lengths in ticks (defaults to [100, 250, 500, 1000])
+            target_prefix: Prefix for target column names
+            scale_factor: Factor to scale the lookback window
+        """
+        self.window_lengths = window_lengths or [100, 250, 500, 1000]
+        self.target_prefix = target_prefix
+        self.scale_factor = scale_factor
+
+        # Generate all target column names
+        self.target_names = []
+        for window_len in self.window_lengths:
+            self.target_names.extend([
+                f"{target_prefix}_return_{window_len}t",
+                f"{target_prefix}_scaled_return_{window_len}t",
+                f"{target_prefix}_current_return_{window_len}t",
+            ])
+
+    def generate_targets(self, df: pl.DataFrame, symbol: str | None = None) -> pl.DataFrame:
+        """Generate lookback-lookforward regression targets for all window lengths."""
+        self.validate_input(df)
+
+        # Create base target DataFrame with keys
+        target_df = self._create_base_target_df(df, symbol)
+
+        mid_prices = df["mid_price"].to_numpy()
+        mid_prices = mid_prices.astype(float, copy=False)
+        valid_prices = np.isfinite(mid_prices) & (mid_prices > 0)
+        filled_prices = np.where(valid_prices, mid_prices, 0.0)
+        cumsum = np.insert(np.cumsum(filled_prices, dtype=float), 0, 0.0)
+        valid_cumsum = np.insert(np.cumsum(valid_prices.astype(np.int64)), 0, 0)
+
+        # Calculate targets for all window lengths
+        target_columns = []
+
+        for window_len in self.window_lengths:
+            returns, scaled_returns, current_returns = self._calculate_window_metrics(
+                mid_prices, cumsum, valid_cumsum, window_len
+            )
+
+            # Add all columns for this window length
+            target_columns.extend([
+                pl.Series(f"{self.target_prefix}_return_{window_len}t", returns),
+                pl.Series(f"{self.target_prefix}_scaled_return_{window_len}t", scaled_returns),
+                pl.Series(f"{self.target_prefix}_current_return_{window_len}t", current_returns),
+
+            ])
+
+        # Add all target columns
+        target_df = target_df.with_columns(target_columns)
+
+        return target_df
+
+    def _calculate_window_metrics(
+        self,
+        mid_prices: np.ndarray,
+        cumsum: np.ndarray,
+        valid_cumsum: np.ndarray,
+        window_len: int,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Calculate all metrics for a specific window length.
+
+        Args:
+            mid_prices: Array of mid prices
+            cumsum: Cumulative sum of valid mid prices (invalid filled with 0) with leading zero
+            valid_cumsum: Cumulative count of valid (>0) prices with leading zero
+            window_len: Length of lookback/lookforward windows
+
+        Returns:
+            Tuple of (returns, scaled_returns, current_returns)
+        """
+        n = len(mid_prices)
+
+        returns = np.full(n, np.nan, dtype=float)
+        scaled_returns = np.full(n, np.nan, dtype=float)
+        current_returns = np.full(n, np.nan, dtype=float)
+
+        if n < (2 * window_len):
+            return returns, scaled_returns, current_returns
+
+        valid_indices = np.arange(window_len, n - window_len, dtype=int)
+        if valid_indices.size == 0:
+            return returns, scaled_returns, current_returns
+
+        lookback_sums = cumsum[valid_indices + 1] - cumsum[valid_indices + 1 - window_len]
+        lookforward_sums = cumsum[valid_indices + 1 + window_len] - cumsum[valid_indices + 1]
+        lookback_counts = (
+            valid_cumsum[valid_indices + 1] - valid_cumsum[valid_indices + 1 - window_len]
+        )
+        lookforward_counts = (
+            valid_cumsum[valid_indices + 1 + window_len] - valid_cumsum[valid_indices + 1]
+        )
+        lookback_mean = lookback_sums / window_len
+        lookforward_mean = lookforward_sums / window_len
+
+        scaled_length = max(1, min(window_len, int(np.ceil(window_len * self.scale_factor))))
+        scaled_sums = cumsum[valid_indices + 1] - cumsum[valid_indices + 1 - scaled_length]
+        scaled_counts = (
+            valid_cumsum[valid_indices + 1] - valid_cumsum[valid_indices + 1 - scaled_length]
+        )
+        scaled_mean = scaled_sums / scaled_length
+
+        current_price = mid_prices[valid_indices]
+
+        base_mask = (lookback_counts == window_len) & (lookforward_counts == window_len)
+        if base_mask.any():
+            base_returns = (lookforward_mean[base_mask] - lookback_mean[base_mask]) / lookback_mean[base_mask]
+            returns[valid_indices[base_mask]] = base_returns
+
+        scaled_mask = (scaled_counts == scaled_length) & (lookforward_counts == window_len)
+        if scaled_mask.any():
+            scaled_values = (lookforward_mean[scaled_mask] - scaled_mean[scaled_mask]) / scaled_mean[scaled_mask]
+            scaled_returns[valid_indices[scaled_mask]] = scaled_values
+
+        current_mask = (current_price > 0) & (lookforward_counts == window_len)
+        if current_mask.any():
+            current_values = (lookforward_mean[current_mask] - current_price[current_mask]) / current_price[current_mask]
+            current_returns[valid_indices[current_mask]] = current_values
+
+        return returns, scaled_returns, current_returns
+
+    def get_target_info(self) -> dict[str, Any]:
+        """Return metadata about this generator."""
+        return {
+            "target_names": self.target_names,
+            "target_type": "regression",
+            "description": f"Lookback/lookforward window mean comparisons for {len(self.window_lengths)} window lengths",
+            "parameters": {
+                "window_lengths": self.window_lengths,
+            },
+        }
+
+    @property
+    def target_type(self) -> str:
+        return "regression"
+
+    @property
+    def required_columns(self) -> list[str]:
+        return ["mid_price"]
+
+
 class RemainingValueTunerGenerator(TargetGenerator):
     """
     Generates regression targets using remaining value tuning approach.

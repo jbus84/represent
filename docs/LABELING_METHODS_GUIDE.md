@@ -573,31 +573,12 @@ TargetGeneratorFactory.create(
 
 ### Optimization Methodology
 
-#### Bayesian Optimization Setup
-```python
-from represent.parameter_optimization import ParameterOptimizer
-
-# Standard optimization configuration
-optimizer = ParameterOptimizer(
-    fee_pips=0.7,           # Realistic 0.7 pip transaction costs
-    initial_points=10,      # Random exploration points
-    n_calls=50,            # Total optimization evaluations
-    random_state=42,       # Reproducible results
-    verbose=True           # Detailed progress reporting
-)
-
-# Returns-based objective function
-def objective(params):
-    """Minimize negative returns (maximize actual returns)"""
-    # 1. Create generator with trial parameters
-    # 2. Generate trading signals
-    # 3. Simulate realistic trading with transaction costs
-    # 4. Return negative returns (for minimization)
-    return -trading_returns
-```
+> ⚠️ Parameter optimization has been removed from the library. The previous implementation
+> relied on the external `tstrends` package and has been deprecated in favour of
+> lighter-weight, fully self-contained targets.
 
 #### Multi-Objective Constraints
-All optimization includes practical trading constraints:
+Historical optimization included practical trading constraints:
 
 - **Minimum Trades**: Statistical significance requirements
 - **Win Rate Bounds**: Avoid overfitting to extreme win rates  

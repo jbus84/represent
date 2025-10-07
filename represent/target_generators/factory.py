@@ -131,6 +131,7 @@ def _register_builtin_generators():
             CumulativeReturnsGenerator,
             DirectionalMFEGenerator,
             LogReturnHorizonsGenerator,
+            LookbackLookforwardReturnsGenerator,
             PriceMovementGenerator,
             RemainingValueTunerGenerator,
             VolatilityGenerator,
@@ -139,6 +140,9 @@ def _register_builtin_generators():
 
         TargetGeneratorFactory.register("directional_mfe", DirectionalMFEGenerator)
         TargetGeneratorFactory.register("log_return_horizons", LogReturnHorizonsGenerator)
+        TargetGeneratorFactory.register(
+            "lookback_lookforward_returns", LookbackLookforwardReturnsGenerator
+        )
         TargetGeneratorFactory.register("price_movement", PriceMovementGenerator)
         TargetGeneratorFactory.register("volatility", VolatilityGenerator)
         TargetGeneratorFactory.register("cumulative_returns", CumulativeReturnsGenerator)
@@ -149,24 +153,6 @@ def _register_builtin_generators():
 
     except ImportError:
         pass  # Regression generators not available
-
-    try:
-        from .tstrends_labeling import (
-            BinaryCTLGenerator,
-            OracleBinaryTrendGenerator,
-            OracleTernaryTrendGenerator,
-            TernaryCTLGenerator,
-            TunedTrendGenerator,
-        )
-
-        TargetGeneratorFactory.register("binary_ctl", BinaryCTLGenerator)
-        TargetGeneratorFactory.register("ternary_ctl", TernaryCTLGenerator)
-        TargetGeneratorFactory.register("oracle_binary", OracleBinaryTrendGenerator)
-        TargetGeneratorFactory.register("oracle_ternary", OracleTernaryTrendGenerator)
-        TargetGeneratorFactory.register("tuned_trend", TunedTrendGenerator)
-
-    except ImportError:
-        pass  # TStrends generators not available
 
     # GA Labeling generator
     try:
