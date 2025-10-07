@@ -2,6 +2,32 @@
 
 <!-- version list -->
 
+## v1.16.0 (2025-10-07)
+
+### Features
+
+- Add LookbackLookforwardReturnsGenerator for symmetric window analysis
+  ([`bf0cd4b`](https://github.com/jbus84/represent/commit/bf0cd4be850c407263aee8776ab853acea7a65a7))
+
+- Add multi-symbol support and summary statistics table
+  ([`6a1e424`](https://github.com/jbus84/represent/commit/6a1e424989aea4c6a9275c50f968b5d36821bb41))
+
+- Add normal distribution fits to analysis plots
+  ([`1acd19b`](https://github.com/jbus84/represent/commit/1acd19ba97a8a3153ec5fa4efa52f39fa4762011))
+
+- Add scatter plots showing lookback vs lookforward correlation
+  ([`6e633c6`](https://github.com/jbus84/represent/commit/6e633c603166fbbd7b4e5c47c7fc971bd95de7db))
+
+- Produce new regression targets
+  ([`5e991ee`](https://github.com/jbus84/represent/commit/5e991ee00e85558163b283e7134e0c2f9df25ba1))
+
+- Update analysis to use real market data
+  ([`e4476db`](https://github.com/jbus84/represent/commit/e4476dbcb04a5a79d9283d2c9004bd8d484ac128))
+
+- **fixes**: Return percentages
+  ([`547641e`](https://github.com/jbus84/represent/commit/547641ee563005098b12331af25f18d549c87a29))
+
+
 ## v1.15.0 (2025-09-30)
 
 ### Bug Fixes
