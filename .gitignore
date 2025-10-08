@@ -18,3 +18,7 @@ wheels/
 
 .DS_Store
 DBN*
+
+# Local artifacts
+pdfs/2110.05479v2.pdf
+.matplotlib/

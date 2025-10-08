@@ -3,6 +3,8 @@ High-performance market depth processing pipeline.
 Optimized for <10ms array generation and zero-copy operations.
 """
 
+from typing import cast
+
 import numpy as np
 import polars as pl
 
@@ -19,12 +21,11 @@ from .constants import (
     FEATURE_INDEX_MAP,
     FEATURE_TYPES,
     MAX_FEATURES,
-    PRICE_LEVELS,
     VOLUME_DTYPE,
     FeatureType,
     get_output_shape,
 )
-from .data_structures import OutputBuffer, PriceLookupTable, VolumeGrid
+from .data_structures import OutputBuffer, VolumeGrid
 
 
 class MarketDepthProcessor:
@@ -95,17 +96,54 @@ class MarketDepthProcessor:
         # Sort features by index for consistent ordering
         self.features = sorted(self.features, key=lambda f: FEATURE_INDEX_MAP[f])
 
+        # Cache ladder geometry
+        self.price_range = self.config.price_range
+        self.grid_price_levels = cast(int, self.config.price_levels)
+        self.collapse_stride = cast(int, self.config.collapse_stride_value)
+        self.output_price_levels = cast(int, self.config.effective_price_levels)
+
+        bin_groups = cast(tuple[tuple[int, ...], ...] | None, self.config.bin_groups)
+
+        self._collapse_groups: list[np.ndarray] | None
+
+        if bin_groups is not None:
+            self._collapse_groups = [
+                np.asarray(group, dtype=np.int32) for group in bin_groups
+            ]
+            self.collapse_stride = 1
+        elif self.config.target_price_levels is not None:
+            target_levels = cast(int, self.config.target_price_levels)
+            target_range = (target_levels - 2) // 2
+            indices = np.arange(self.price_range)
+            self._collapse_groups = [
+                np.asarray(group, dtype=np.int32) for group in np.array_split(indices, target_range)
+            ]
+            self.collapse_stride = 1
+        else:
+            self._collapse_groups = None
+
         # Calculate time_bins from config
         time_bins = self.config.samples // self.config.ticks_per_bin
-        self.output_shape = get_output_shape(self.features, time_bins=time_bins)
+        self.output_shape = get_output_shape(
+            self.features, time_bins=time_bins, price_levels=self.output_price_levels
+        )
 
         # Pre-allocate all data structures to avoid runtime allocations
         # One grid per feature type
-        self._ask_grids = {feature: VolumeGrid(time_bins=time_bins) for feature in self.features}
-        self._bid_grids = {feature: VolumeGrid(time_bins=time_bins) for feature in self.features}
+        self._ask_grids = {
+            feature: VolumeGrid(time_bins=time_bins, price_levels=self.grid_price_levels)
+            for feature in self.features
+        }
+        self._bid_grids = {
+            feature: VolumeGrid(time_bins=time_bins, price_levels=self.grid_price_levels)
+            for feature in self.features
+        }
         # One output buffer per feature to avoid sharing
         self._output_buffers = {
-            feature: OutputBuffer(time_bins=time_bins) for feature in self.features
+            feature: OutputBuffer(
+                time_bins=time_bins, price_levels=self.output_price_levels
+            )
+            for feature in self.features
         }
 
         # Pre-allocate temporary arrays for processing (per feature)
@@ -113,15 +151,11 @@ class MarketDepthProcessor:
         self._temp_bid_volumes: dict[str, np.ndarray] = {}
         for feature in self.features:
             self._temp_ask_volumes[feature] = np.empty(
-                (PRICE_LEVELS, time_bins), dtype=VOLUME_DTYPE
+                (self.grid_price_levels, time_bins), dtype=VOLUME_DTYPE
             )
             self._temp_bid_volumes[feature] = np.empty(
-                (PRICE_LEVELS, time_bins), dtype=VOLUME_DTYPE
+                (self.grid_price_levels, time_bins), dtype=VOLUME_DTYPE
             )
-
-        # Cache for price lookup table (will be created when needed)
-        self._price_lookup: PriceLookupTable | None = None
-        self._cached_mid_price: float = 0.0
 
         # Pre-compile Polars expressions for performance
         self._price_conversion_expressions: list[pl.Expr] | None = None
@@ -175,26 +209,41 @@ class MarketDepthProcessor:
         time_bin_expr = (pl.int_range(0, input_length) // ticks_per_bin).alias("tick_bin")
         return df.with_columns(time_bin_expr)
 
-    def _calculate_mid_price(self, df: pl.DataFrame) -> float:
-        """Calculate mid price from last row with minimal overhead."""
-        last_row = df.tail(1)
-        ask_price = last_row[ASK_ANCHOR_COLUMN][0]
-        bid_price = last_row[BID_ANCHOR_COLUMN][0]
-        return float((ask_price + bid_price) / 2)
+    def _compute_mid_prices_per_bin(self, df: pl.DataFrame, expected_bins: int) -> np.ndarray:
+        """Compute per-bin mid prices in micro-pip units."""
 
-    def _get_or_create_price_lookup(self, mid_price: float) -> PriceLookupTable:
-        """Get cached price lookup table or create new one if mid price changed."""
-        if self._price_lookup is None or abs(mid_price - self._cached_mid_price) > 0.5:
-            self._price_lookup = PriceLookupTable(mid_price)
-            self._cached_mid_price = mid_price
-        return self._price_lookup
+        mid_expr = (
+            (pl.col(ASK_ANCHOR_COLUMN) + pl.col(BID_ANCHOR_COLUMN)) / 2
+        ).round().cast(pl.Int64).alias("mid_price")
+
+        grouped = (
+            df.lazy()
+                .select(["tick_bin", mid_expr])
+                .group_by("tick_bin")
+                .agg(pl.col("mid_price").mean().round().cast(pl.Int64))
+                .sort("tick_bin")
+                .collect()
+        )
+
+        mid_prices = grouped["mid_price"].to_numpy().astype(np.int64)
+
+        if len(mid_prices) == 0:
+            return np.zeros(expected_bins, dtype=np.int64)
+
+        if len(mid_prices) < expected_bins:
+            padding = np.full(expected_bins - len(mid_prices), mid_prices[-1], dtype=np.int64)
+            mid_prices = np.concatenate([mid_prices, padding])
+        elif len(mid_prices) > expected_bins:
+            mid_prices = mid_prices[:expected_bins]
+
+        return mid_prices
 
     def _process_side_data_vectorized(
         self,
         df: pl.DataFrame,
         price_columns: list[str],
         data_columns_map: dict[str, list[str]],
-        lookup_table: PriceLookupTable,
+        mid_prices: np.ndarray,
         grids: dict[str, VolumeGrid],
     ) -> None:
         """Process ask or bid side data with full vectorization for multiple features.
@@ -203,7 +252,7 @@ class MarketDepthProcessor:
             df: Input DataFrame
             price_columns: List of price column names
             data_columns_map: Map of feature name to column names (e.g., {'volume': vol_cols, 'trade_counts': count_cols})
-            lookup_table: Price lookup table
+            mid_prices: Array of mid prices per time bin in micro-pip units
             grids: Map of feature name to VolumeGrid
         """
         # Clear all grids first
@@ -223,68 +272,87 @@ class MarketDepthProcessor:
         # Convert prices to numpy arrays for vectorized processing
         prices_array = grouped_prices.select(price_columns).to_numpy()  # Shape: (time_bins, 10)
 
-        # Vectorized price-to-index conversion (shared across features)
-        prices_flat = prices_array.flatten()
-        indices_flat = lookup_table.vectorized_lookup(prices_flat)
-        indices_array = indices_flat.reshape(prices_array.shape)
+        if prices_array.size == 0:
+            return
 
-        # Create coordinate arrays for valid mappings (shared)
+        bins_in_frame = prices_array.shape[0]
+        if len(mid_prices) < bins_in_frame:
+            # Pad missing bins with the last known mid price to maintain alignment
+            fill_value = mid_prices[-1] if len(mid_prices) else 0
+            padding = np.full(bins_in_frame - len(mid_prices), fill_value, dtype=np.int64)
+            effective_mid_prices = np.concatenate([mid_prices, padding])
+        else:
+            effective_mid_prices = mid_prices[:bins_in_frame]
+
+        offsets = prices_array - effective_mid_prices[:, None]
+        offsets_int = offsets.astype(np.int64)
+
+        indices_array = np.full(prices_array.shape, -1, dtype=np.int32)
+        valid_price_mask = prices_array > 0
+
+        bid_mask = (offsets_int < 0) & (offsets_int >= -self.price_range)
+        ask_mask = (offsets_int > 0) & (offsets_int <= self.price_range)
+
+        bid_mask &= valid_price_mask
+        ask_mask &= valid_price_mask
+
+        if bid_mask.any():
+            indices_array[bid_mask] = (
+                np.abs(offsets_int[bid_mask]).astype(np.int32) - 1
+            )
+        if ask_mask.any():
+            indices_array[ask_mask] = (
+                self.price_range + 1 + offsets_int[ask_mask]
+            ).astype(np.int32)
+
         valid_mask = indices_array >= 0
 
-        if valid_mask.any():
-            # Get coordinates of valid entries (shared)
-            time_indices, _ = np.where(valid_mask)
-            y_coords = indices_array[valid_mask]
-            x_coords = time_indices
+        if not valid_mask.any():
+            return
 
-            # Process each feature type separately
-            for feature, data_columns in data_columns_map.items():
-                if feature not in self.features:
-                    continue
+        time_indices, _ = np.where(valid_mask)
+        y_coords = indices_array[valid_mask]
+        x_coords = time_indices
 
-                grid = grids[feature]
+        for feature, data_columns in data_columns_map.items():
+            if feature not in self.features:
+                continue
 
-                # Group data by time bins for this feature
-                if feature == FeatureType.VOLUME.value:
-                    # Use median for volume data
-                    grouped_data = (
-                        df.lazy()
-                        .select([*data_columns, "tick_bin"])
-                        .group_by("tick_bin")
-                        .agg([pl.col(col).median() for col in data_columns])
-                        .sort("tick_bin")
-                        .collect()
-                    )
-                elif feature == FeatureType.TRADE_COUNTS.value:
-                    # Use sum for trade counts
-                    grouped_data = (
-                        df.lazy()
-                        .select([*data_columns, "tick_bin"])
-                        .group_by("tick_bin")
-                        .agg([pl.col(col).sum() for col in data_columns])
-                        .sort("tick_bin")
-                        .collect()
-                    )
-                elif feature == FeatureType.VARIANCE.value:
-                    # For variance, calculate variance of volume data per time bin
-                    # This follows the notebook implementation: .var() on volume columns
-                    grouped_data = (
-                        df.lazy()
-                        .select([*data_columns, "tick_bin"])
-                        .group_by("tick_bin")
-                        .agg([pl.col(col).var() for col in data_columns])
-                        .sort("tick_bin")
-                        .collect()
-                    )
-                else:
-                    continue
+            grid = grids[feature]
 
-                # Convert to numpy for all features
-                data_array = grouped_data.select(data_columns).to_numpy()  # Shape: (time_bins, 10)
+            if feature == FeatureType.VOLUME.value:
+                grouped_data = (
+                    df.lazy()
+                    .select([*data_columns, "tick_bin"])
+                    .group_by("tick_bin")
+                    .agg([pl.col(col).median() for col in data_columns])
+                    .sort("tick_bin")
+                    .collect()
+                )
+            elif feature == FeatureType.TRADE_COUNTS.value:
+                grouped_data = (
+                    df.lazy()
+                    .select([*data_columns, "tick_bin"])
+                    .group_by("tick_bin")
+                    .agg([pl.col(col).sum() for col in data_columns])
+                    .sort("tick_bin")
+                    .collect()
+                )
+            elif feature == FeatureType.VARIANCE.value:
+                grouped_data = (
+                    df.lazy()
+                    .select([*data_columns, "tick_bin"])
+                    .group_by("tick_bin")
+                    .agg([pl.col(col).var() for col in data_columns])
+                    .sort("tick_bin")
+                    .collect()
+                )
+            else:
+                continue
 
-                # Apply valid mask and set volumes in grid
-                data_values = data_array[valid_mask]
-                grid.set_volumes(y_coords, x_coords, data_values)
+            data_array = grouped_data.select(data_columns).to_numpy()
+            data_values = data_array[valid_mask]
+            grid.set_volumes(y_coords, x_coords, data_values)
 
     def process(self, df: pl.DataFrame) -> np.ndarray:
         """
@@ -310,9 +378,9 @@ class MarketDepthProcessor:
         # Step 2: Add time bins (pre-compiled expression) - adapt to input size
         df_processed = self._add_time_bins(df_processed, input_length)
 
-        # Step 3: Calculate mid price and get lookup table
-        mid_price = self._calculate_mid_price(df_processed)
-        lookup_table = self._get_or_create_price_lookup(mid_price)
+        # Step 3: Calculate per-bin mid prices for centering
+        time_bins_resolved = cast(int, self.config.time_bins)
+        mid_prices = self._compute_mid_prices_per_bin(df_processed, time_bins_resolved)
 
         # Step 4: Prepare data column mappings for each feature
         ask_data_columns: dict[str, list[str]] = {}
@@ -332,20 +400,24 @@ class MarketDepthProcessor:
 
         # Step 5: Process ask side (vectorized, all features)
         self._process_side_data_vectorized(
-            df_processed, ASK_PRICE_COLUMNS, ask_data_columns, lookup_table, self._ask_grids
+            df_processed, ASK_PRICE_COLUMNS, ask_data_columns, mid_prices, self._ask_grids
         )
 
         # Step 6: Process bid side (vectorized, all features)
         self._process_side_data_vectorized(
-            df_processed, BID_PRICE_COLUMNS, bid_data_columns, lookup_table, self._bid_grids
+            df_processed, BID_PRICE_COLUMNS, bid_data_columns, mid_prices, self._bid_grids
         )
 
         # Step 7: Calculate cumulative volumes and generate output for each feature
         if len(self.features) == 1:
             # Single feature: return 2D array (402, 500)
             feature = self.features[0]
-            ask_cumulative = self._ask_grids[feature].get_cumulative_volume(reverse=False)
-            bid_cumulative = self._bid_grids[feature].get_cumulative_volume(reverse=True)
+            ask_cumulative = self._ask_grids[feature].get_cumulative_volume(
+                reverse=False, stride=self.collapse_stride, groups=self._collapse_groups
+            )
+            bid_cumulative = self._bid_grids[feature].get_cumulative_volume(
+                reverse=True, stride=self.collapse_stride, groups=self._collapse_groups
+            )
             result = self._output_buffers[feature].compute_normalized_difference(
                 ask_cumulative, bid_cumulative
             )
@@ -355,8 +427,12 @@ class MarketDepthProcessor:
             feature_arrays: list[np.ndarray] = []
 
             for feature in self.features:
-                ask_cumulative = self._ask_grids[feature].get_cumulative_volume(reverse=False)
-                bid_cumulative = self._bid_grids[feature].get_cumulative_volume(reverse=True)
+                ask_cumulative = self._ask_grids[feature].get_cumulative_volume(
+                    reverse=False, stride=self.collapse_stride, groups=self._collapse_groups
+                )
+                bid_cumulative = self._bid_grids[feature].get_cumulative_volume(
+                    reverse=True, stride=self.collapse_stride, groups=self._collapse_groups
+                )
                 feature_result = self._output_buffers[feature].compute_normalized_difference(
                     ask_cumulative, bid_cumulative
                 )

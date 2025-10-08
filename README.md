@@ -64,6 +64,67 @@ print(f"Output shape: {tensor_data.shape}")  # (3, 402, 500)
 # 3 features × 402 price levels × 500 time bins
 ```
 
+#### Choosing a Market-Depth Geometry
+
+Each `MarketDepthProcessorConfig` describes **how the ladder is collapsed** before it reaches your
+model. The options below are mutually exclusive; pick the one that matches your use case.
+
+| Name | Intent | Key Parameters |
+|------|--------|----------------|
+| **Baseline 402** | Original ±20 pip, 1-pip resolution | `price_range=200` (defaults) |
+| **Wide → 100** | ±39.2 pip coverage, 100 evenly pooled rows | `price_range=392`, `target_price_levels=100` |
+| **Wide → 50** | Same wide capture, more aggressive collapse | `price_range=384`, `target_price_levels=50` |
+| **Pip Bins** | Variable bin widths (1 → 2 → 3 pips) centred on each bin’s mid price | `price_range=400`, `bin_spec=[PriceBinSpec(...)]` |
+
+Example snippets:
+
+```python
+# Baseline (legacy ladder)
+base_cfg = MarketDepthProcessorConfig()
+
+# Wide capture collapsed to 100 rows
+wide_100_cfg = MarketDepthProcessorConfig(
+    price_range=392,
+    target_price_levels=100,
+)
+
+# Variable pip bins (Wu et al., 2022 style)
+pip_bin_cfg = MarketDepthProcessorConfig(
+    price_range=400,
+    bin_spec=[
+        PriceBinSpec(limit_pips=10, bin_size_pips=1),
+        PriceBinSpec(limit_pips=20, bin_size_pips=2),
+        PriceBinSpec(limit_pips=None, bin_size_pips=3),
+    ],
+)
+```
+
+All variants share a translation-invariant grid: every time bin is centred on **its own mid price**,
+so the lattice stays stable even when the absolute price drifts. If you need the mid-price path for
+your model, record it separately while you feed the depth tensor forward.
+
+#### Feature Channels
+
+Set `features=[...]` to control which side-channel is emitted per time bin. Each option maps through
+the same binning schedule, so the ladder lines up across channels:
+
+- `"volume"` (default) – cumulative bid/ask depth, normalised to ±1.
+- `"trade_counts"` – aggregated order counts per bin; great for queue churn signals.
+- `"variance"` – within-bin variance of volume levels; highlights volatility pockets.
+
+Supplying multiple features returns a stacked tensor `(N_features, price_levels, time_bins)`.
+
+#### Regenerating Comparison Plots
+
+To visualise how each configuration behaves (volume, counts, variance), rerun:
+
+```bash
+MPLCONFIGDIR=.matplotlib .venv/bin/python scripts/generate_market_depth_collapse_plots.py
+```
+
+The command refreshes the artefacts under `outputs/market_depth_collapse/` that are referenced in
+`docs/market_depth_collapse_comparison.md`.
+
 ### 2. **Modular Target Generation**
 Generate sophisticated labels using pluggable target generators:
 

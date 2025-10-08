@@ -4,6 +4,8 @@ The new architecture primarily uses lazy loading from parquet,
 but these structures are still needed for the core processing pipeline.
 """
 
+from collections.abc import Sequence
+
 import numpy as np
 
 from .constants import OUTPUT_DTYPE, PRICE_LEVELS, VOLUME_DTYPE
@@ -66,14 +68,16 @@ class PriceLookupTable:
 class VolumeGrid:
     """Pre-allocated 2D grid for volume mapping."""
 
-    def __init__(self, time_bins: int = 500):
+    def __init__(self, time_bins: int = 500, price_levels: int = PRICE_LEVELS):
         """Initialize grid with pre-allocated memory.
 
         Args:
             time_bins: Number of time bins (defaults to 500 for backward compatibility)
+            price_levels: Number of price levels in the ladder
         """
         self.time_bins = time_bins
-        self._grid = np.zeros((PRICE_LEVELS, time_bins), dtype=VOLUME_DTYPE)
+        self.price_levels = price_levels
+        self._grid = np.zeros((price_levels, time_bins), dtype=VOLUME_DTYPE)
 
     def clear(self):
         """Reset grid to zero."""
@@ -81,7 +85,7 @@ class VolumeGrid:
 
     def add_volume(self, price_idx: int, time_idx: int, volume: float):
         """Add volume at specific grid position."""
-        if 0 <= price_idx < PRICE_LEVELS and 0 <= time_idx < self.time_bins:
+        if 0 <= price_idx < self.price_levels and 0 <= time_idx < self.time_bins:
             self._grid[price_idx, time_idx] += volume
 
     @property
@@ -99,7 +103,7 @@ class VolumeGrid:
         # Filter valid coordinates
         valid_mask = (
             (y_coords >= 0)
-            & (y_coords < PRICE_LEVELS)
+            & (y_coords < self.price_levels)
             & (x_coords >= 0)
             & (x_coords < self.time_bins)
         )
@@ -111,27 +115,64 @@ class VolumeGrid:
         # Set values at valid positions
         self._grid[valid_y, valid_x] = valid_volumes
 
-    def get_cumulative_volume(self, reverse: bool = False) -> np.ndarray:
-        """Get cumulative volume along price axis."""
+    def _collapse_side(
+        self, side: np.ndarray, stride: int, groups: Sequence[np.ndarray] | None
+    ) -> np.ndarray:
+        """Collapse consecutive rows on one side of the book."""
+        if groups is not None:
+            return np.stack([side[group].sum(axis=0) for group in groups], axis=0)
+
+        if stride == 1:
+            return side
+
+        if side.shape[0] % stride != 0:
+            raise ValueError("price_range must be divisible by collapse stride")
+
+        collapsed_rows = side.reshape(side.shape[0] // stride, stride, self.time_bins).sum(axis=1)
+        return collapsed_rows
+
+    def _collapse_grid(self, stride: int, groups: Sequence[np.ndarray] | None) -> np.ndarray:
+        """Collapse bid/ask ladders while keeping the two mid rows intact."""
+        if stride == 1 and groups is None:
+            return self._grid
+
+        price_levels = self.price_levels
+        price_range = (price_levels - 2) // 2
+
+        bid = self._grid[:price_range]
+        mid = self._grid[price_range : price_range + 2]
+        ask = self._grid[price_range + 2 :]
+
+        bid_collapsed = self._collapse_side(bid, stride, groups)
+        ask_collapsed = self._collapse_side(ask, stride, groups)
+
+        return np.concatenate((bid_collapsed, mid, ask_collapsed), axis=0)
+
+    def get_cumulative_volume(
+        self, reverse: bool = False, stride: int = 1, groups: Sequence[np.ndarray] | None = None
+    ) -> np.ndarray:
+        """Get cumulative volume along price axis with optional collapse."""
+        grid = self._collapse_grid(stride, groups)
         if reverse:
-            return np.flip(np.cumsum(np.flip(self._grid, axis=0), axis=0), axis=0)
-        else:
-            return np.cumsum(self._grid, axis=0)
+            return np.flip(np.cumsum(np.flip(grid, axis=0), axis=0), axis=0)
+        return np.cumsum(grid, axis=0)
 
 
 class OutputBuffer:
     """Pre-allocated buffer for final normalized output."""
 
-    def __init__(self, time_bins: int = 500):
+    def __init__(self, time_bins: int = 500, price_levels: int = PRICE_LEVELS):
         """Initialize output buffer.
 
         Args:
             time_bins: Number of time bins (defaults to 500 for backward compatibility)
+            price_levels: Number of price levels represented in the output tensor
         """
         self.time_bins = time_bins
-        self._buffer = np.zeros((PRICE_LEVELS, time_bins), dtype=OUTPUT_DTYPE)
-        self._temp_combined = np.empty((PRICE_LEVELS, time_bins), dtype=VOLUME_DTYPE)
-        self._temp_abs = np.empty((PRICE_LEVELS, time_bins), dtype=VOLUME_DTYPE)
+        self.price_levels = price_levels
+        self._buffer = np.zeros((price_levels, time_bins), dtype=OUTPUT_DTYPE)
+        self._temp_combined = np.empty((price_levels, time_bins), dtype=VOLUME_DTYPE)
+        self._temp_abs = np.empty((price_levels, time_bins), dtype=VOLUME_DTYPE)
 
     def prepare_output(self, ask_grid: np.ndarray, bid_grid: np.ndarray) -> np.ndarray:
         """Prepare normalized combined output using notebook approach."""

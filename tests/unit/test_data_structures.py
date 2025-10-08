@@ -61,6 +61,31 @@ class TestVolumeGrid:
         assert np.all(custom_grid._grid == 0.0)
         assert custom_grid._grid.shape == (402, 300)
 
+    def test_volume_grid_group_collapse(self):
+        """Collapsing with explicit groups should aggregate rows correctly."""
+        time_bins = 2
+        price_levels = 10  # price_range = 4
+        grid = VolumeGrid(time_bins=time_bins, price_levels=price_levels)
+
+        # Populate bid side rows with increasing integers
+        for idx in range(4):
+            grid._grid[idx] = np.full(time_bins, idx + 1)
+
+        # Populate ask side rows with distinct values
+        for idx in range(4):
+            grid._grid[6 + idx] = np.full(time_bins, (idx + 1) * 10)
+
+        groups = [np.array([0, 1]), np.array([2, 3])]
+
+        collapsed = grid._collapse_grid(stride=1, groups=groups)
+        assert collapsed.shape == (len(groups) * 2 + 2, time_bins)
+        # Bid collapse should sum rows (1+2) and (3+4)
+        np.testing.assert_array_equal(collapsed[0], np.full(time_bins, 3))
+        np.testing.assert_array_equal(collapsed[1], np.full(time_bins, 7))
+        # Ask collapse should sum rows (10+20) and (30+40)
+        np.testing.assert_array_equal(collapsed[-2], np.full(time_bins, 30))
+        np.testing.assert_array_equal(collapsed[-1], np.full(time_bins, 70))
+
 
 class TestOutputBuffer:
     """Test OutputBuffer data structure."""

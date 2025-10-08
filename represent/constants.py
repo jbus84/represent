@@ -82,7 +82,9 @@ FEATURE_INDEX_MAP: Final[dict[str, int]] = {
 
 # Extended output shapes
 def get_output_shape(
-    features: list[str] | list[FeatureType], time_bins: int = 500
+    features: list[str] | list[FeatureType],
+    time_bins: int = 500,
+    price_levels: int = PRICE_LEVELS,
 ) -> tuple[int, ...]:
     """Get output shape based on feature selection.
 
@@ -91,6 +93,6 @@ def get_output_shape(
         time_bins: Number of time bins (defaults to 500 for backward compatibility)
     """
     if len(features) == 1:
-        return (PRICE_LEVELS, time_bins)  # (402, time_bins)
+        return (price_levels, time_bins)  # (N_levels, time_bins)
     else:
-        return (len(features), PRICE_LEVELS, time_bins)  # (N, 402, time_bins)
+        return (len(features), price_levels, time_bins)  # (N, N_levels, time_bins)
