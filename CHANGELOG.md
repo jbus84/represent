@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.17.0 (2025-10-08)
+
+### Documentation
+
+- **depth**: Add logic
+  ([`628d8b5`](https://github.com/jbus84/represent/commit/628d8b5e7f19c1d465436febb2767c888b23ab5b))
+
+### Features
+
+- **depth**: Add new market depth logic
+  ([`18c2fdd`](https://github.com/jbus84/represent/commit/18c2fddeed226afe9470da2049a8a0be5b5e1162))
+
+
 ## v1.16.0 (2025-10-07)
 
 ### Features

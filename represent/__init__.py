@@ -18,7 +18,7 @@ Key Features:
 - Performance-optimized two-phase processing
 """
 
-__version__ = "1.16.0"
+__version__ = "1.17.0"
 
 # V5.0.0 - Symbol-Split-Merge Architecture API
 
