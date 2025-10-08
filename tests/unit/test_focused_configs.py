@@ -8,6 +8,7 @@ from represent.configs import (
     DatasetBuilderConfig,
     GlobalThresholdConfig,
     MarketDepthProcessorConfig,
+    PriceBinSpec,
     create_compatible_configs,
     create_dataset_builder_config,
     create_processor_config,
@@ -258,7 +259,58 @@ class TestConfigValidation:
             GlobalThresholdConfig(sample_fraction=1.5)  # Must be <= 1
 
         with pytest.raises(ValueError):
-            MarketDepthProcessorConfig(samples=10000)  # Must be >= 25000
+            MarketDepthProcessorConfig(collapse_stride=0)
+
+        with pytest.raises(ValueError):
+            MarketDepthProcessorConfig(price_range=201, collapse_stride=4)
+
+        with pytest.raises(ValueError):
+            MarketDepthProcessorConfig(price_range=200, collapse_stride=2, target_price_levels=100)
+
+        with pytest.raises(ValueError):
+            MarketDepthProcessorConfig(price_range=100, target_price_levels=500)
+
+        with pytest.raises(ValueError):
+            MarketDepthProcessorConfig(
+                bin_spec=[PriceBinSpec(limit_pips=10, bin_size_pips=1)],
+                collapse_stride=2,
+            )
+
+        with pytest.raises(ValueError):
+            MarketDepthProcessorConfig(
+                price_range=200,
+                bin_spec=[
+                    PriceBinSpec(limit_pips=5, bin_size_pips=1),
+                    PriceBinSpec(limit_pips=4, bin_size_pips=1),
+                ],
+            )
+
+    def test_target_price_levels_configuration(self):
+        """Target price levels should compute effective shapes automatically."""
+        config = MarketDepthProcessorConfig(price_range=392, target_price_levels=100)
+        assert config.effective_price_levels == 100
+        assert config.output_shape == (100, 500)
+
+        processor_config = create_processor_config(
+            price_range=384, target_price_levels=50, features=["volume", "variance"]
+        )
+        assert processor_config.effective_price_levels == 50
+        assert processor_config.output_shape == (2, 50, 500)
+
+    def test_bin_spec_configuration(self):
+        """Bin spec should produce deterministic grouping and shapes."""
+        config = MarketDepthProcessorConfig(
+            price_range=200,
+            bin_spec=[
+                PriceBinSpec(limit_pips=5, bin_size_pips=1),
+                PriceBinSpec(limit_pips=10, bin_size_pips=2),
+                PriceBinSpec(limit_pips=None, bin_size_pips=5),
+            ],
+        )
+
+        assert config.bin_groups is not None
+        assert len(config.bin_groups) > 0
+        assert config.effective_price_levels == len(config.bin_groups) * 2 + 2
 
 
 class TestConfigIntegration:
@@ -291,3 +343,16 @@ class TestConfigIntegration:
 
         # Output shape should be computed correctly
         assert processor_cfg.output_shape == (3, 402, 500)  # 3 features = 3D tensor
+
+    def test_target_price_level_integration(self):
+        """Ensure create_compatible_configs handles target price levels."""
+        _, _, processor_cfg = create_compatible_configs(
+            price_range=392, target_price_levels=100
+        )
+        assert processor_cfg.effective_price_levels == 100
+
+    def test_bin_spec_integration(self):
+        """Ensure create_compatible_configs forwards bin specifications."""
+        bin_spec = [PriceBinSpec(limit_pips=10, bin_size_pips=1), PriceBinSpec(limit_pips=None, bin_size_pips=2)]
+        _, _, processor_cfg = create_compatible_configs(price_range=200, bin_spec=bin_spec)
+        assert processor_cfg.bin_groups is not None

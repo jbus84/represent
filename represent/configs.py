@@ -5,7 +5,9 @@ This replaces the monolithic RepresentConfig with three focused Pydantic models,
 each containing only the parameters needed by its respective module.
 """
 
-from pydantic import BaseModel, Field, computed_field, field_validator
+from typing import cast
+
+from pydantic import BaseModel, Field, computed_field, field_validator, model_validator
 
 
 class DatasetBuilderConfig(BaseModel):
@@ -107,18 +109,53 @@ class GlobalThresholdConfig(BaseModel):
         return v
 
 
-class MarketDepthProcessorConfig(BaseModel):
-    """
-    Configuration for MarketDepthProcessor module.
+class PriceBinSpec(BaseModel):
+    """Specification describing variable-width pip bins."""
 
-    Focused on converting market data into normalized tensor representations
-    for machine learning applications.
-    """
+    limit_pips: float | None = Field(
+        default=None,
+        gt=0.0,
+        description="Upper bound in pips for this bin size; None means extend to the end",
+    )
+    bin_size_pips: float = Field(
+        gt=0.0,
+        description="Size of each bin within this range, measured in pips",
+    )
+
+
+class MarketDepthProcessorConfig(BaseModel):
+    """Configuration for MarketDepthProcessor module."""
 
     # Feature parameters
     features: list[str] = Field(
         default=["volume"],
         description="Features to extract: ['volume', 'variance', 'trade_counts']",
+    )
+
+    # Ladder geometry
+    price_range: int = Field(
+        default=200,
+        gt=0,
+        description="Half-width of the captured ladder in micro-pip steps (total rows = 2*price_range + 2)",
+    )
+    collapse_stride: int | None = Field(
+        default=None,
+        ge=1,
+        description="Optional stride to collapse adjacent price levels after indexing",
+    )
+    target_price_levels: int | None = Field(
+        default=None,
+        ge=4,
+        description="Optional explicit number of post-collapse price levels",
+    )
+    pip_size: float = Field(
+        default=0.0001,
+        gt=0.0,
+        description="Nominal pip size used when interpreting bin_spec",
+    )
+    bin_spec: list[PriceBinSpec] | None = Field(
+        default=None,
+        description="Variable-width pip bins ordered from the mid outward",
     )
 
     # Tensor dimension parameters
@@ -143,19 +180,138 @@ class MarketDepthProcessorConfig(BaseModel):
             raise ValueError(f"Invalid features: {invalid}. Valid: {valid_features}")
         return v
 
-    @computed_field
+    @model_validator(mode="after")
+    def validate_price_range_alignment(self) -> "MarketDepthProcessorConfig":
+        if self.collapse_stride is not None and self.collapse_stride < 1:
+            raise ValueError("collapse_stride must be greater than zero when provided")
+
+        if self.collapse_stride is not None and self.target_price_levels is not None:
+            raise ValueError("Provide either collapse_stride or target_price_levels, not both")
+
+        if self.bin_spec is not None:
+            if self.collapse_stride is not None or self.target_price_levels is not None:
+                raise ValueError("bin_spec cannot be combined with collapse_stride or target_price_levels")
+            if not self.bin_spec:
+                raise ValueError("bin_spec must contain at least one entry")
+
+        if self.target_price_levels is not None:
+            if (self.target_price_levels - 2) % 2 != 0:
+                raise ValueError("target_price_levels must satisfy (levels - 2) being divisible by 2")
+
+            target_range = (self.target_price_levels - 2) // 2
+            if target_range <= 0:
+                raise ValueError("target_price_levels must be greater than 2")
+
+            if target_range > self.price_range:
+                raise ValueError("target_price_levels cannot exceed captured price_range resolution")
+
+            if self.price_range % target_range != 0:
+                raise ValueError(
+                    "price_range must be divisible by half of target_price_levels minus one"
+                )
+
+        if self.collapse_stride is not None and self.price_range % self.collapse_stride != 0:
+            raise ValueError(
+                "price_range must be divisible by collapse_stride so pooled bins stay symmetric"
+            )
+
+        if self.bin_spec is not None:
+            bin_groups = self._compute_bin_groups()
+            object.__setattr__(self, "_bin_groups", tuple(bin_groups))
+
+        return self
+
+    @computed_field(return_type=int)
     def time_bins(self) -> int:
         """Auto-computed time bins based on samples and ticks_per_bin."""
         return self.samples // self.ticks_per_bin
 
-    @computed_field
+    @computed_field(return_type=int)
+    def price_levels(self) -> int:
+        """Full-resolution price ladder size used during indexing."""
+        return self.price_range * 2 + 2
+
+    @computed_field(return_type=int)
+    def collapse_stride_value(self) -> int:
+        """Resolved collapse stride after validation."""
+        if self.bin_spec is not None or self.target_price_levels is not None:
+            return 1
+        return self.collapse_stride or 1
+
+    @computed_field(return_type=int)
+    def effective_price_levels(self) -> int:
+        """Price ladder after optional collapse stride is applied."""
+        if self.bin_spec is not None:
+            groups = cast(tuple[tuple[int, ...], ...], getattr(self, "_bin_groups", ()))
+            return len(groups) * 2 + 2
+        if self.target_price_levels is not None:
+            return self.target_price_levels
+
+        stride = cast(int, self.collapse_stride_value)
+        effective_range = self.price_range // stride
+        return effective_range * 2 + 2
+
+    @computed_field(return_type=tuple[tuple[int, ...], ...] | None)
+    def bin_groups(self) -> tuple[tuple[int, ...], ...] | None:
+        """Immutable representation of per-side bin groupings."""
+        return getattr(self, "_bin_groups", None)
+
+    def _compute_bin_groups(self) -> list[tuple[int, ...]]:
+        """Compute bid/ask aggregation groups from bin_spec."""
+        if self.bin_spec is None:
+            return []
+
+        ratio = self.pip_size / self.micro_pip_size
+        if ratio <= 0:
+            raise ValueError("pip_size must be greater than micro_pip_size")
+
+        if abs(round(ratio) - ratio) > 1e-6:
+            raise ValueError("pip_size must be a multiple of micro_pip_size")
+        steps_per_pip = int(round(ratio))
+
+        total_steps = self.price_range
+        groups: list[tuple[int, ...]] = []
+        consumed = 0
+        previous_limit_steps = 0
+
+        for spec in self.bin_spec:
+            limit_steps = total_steps
+            if spec.limit_pips is not None:
+                limit_steps = min(total_steps, int(round(spec.limit_pips * steps_per_pip)))
+                if limit_steps <= previous_limit_steps:
+                    raise ValueError("bin_spec limits must be strictly increasing")
+
+            bin_steps = int(round(spec.bin_size_pips * steps_per_pip))
+            if bin_steps <= 0:
+                raise ValueError("bin_size_pips produces zero-width bins")
+
+            segment_end = limit_steps
+            while consumed < min(segment_end, total_steps):
+                next_consumed = min(consumed + bin_steps, min(segment_end, total_steps))
+                if next_consumed == consumed:
+                    break
+                groups.append(tuple(range(consumed, next_consumed)))
+                consumed = next_consumed
+
+            previous_limit_steps = limit_steps
+
+            if consumed >= total_steps:
+                break
+
+        if consumed < total_steps:
+            raise ValueError("bin_spec does not cover entire price_range")
+
+        return groups
+
+    @computed_field(return_type=tuple[int, ...])
     def output_shape(self) -> tuple[int, ...]:
         """Auto-computed output tensor shape based on features."""
         time_bins = self.samples // self.ticks_per_bin
+        price_levels = cast(int, self.effective_price_levels)
         if len(self.features) == 1:
-            return (402, time_bins)  # 2D tensor for single feature
+            return (price_levels, time_bins)  # 2D tensor for single feature
         else:
-            return (len(self.features), 402, time_bins)  # 3D tensor for multiple features
+            return (len(self.features), price_levels, time_bins)  # 3D tensor for multiple features
 
 
 # Convenience factory functions for common configurations
@@ -204,6 +360,11 @@ def create_processor_config(
     samples: int = 50000,
     ticks_per_bin: int = 100,
     micro_pip_size: float = 0.00001,
+    price_range: int = 200,
+    collapse_stride: int | None = None,
+    target_price_levels: int | None = None,
+    pip_size: float = 0.0001,
+    bin_spec: list[PriceBinSpec] | None = None,
 ) -> MarketDepthProcessorConfig:
     """Create a MarketDepthProcessorConfig with common parameters."""
     if features is None:
@@ -214,6 +375,11 @@ def create_processor_config(
         samples=samples,
         ticks_per_bin=ticks_per_bin,
         micro_pip_size=micro_pip_size,
+        price_range=price_range,
+        collapse_stride=collapse_stride,
+        target_price_levels=target_price_levels,
+        pip_size=pip_size,
+        bin_spec=bin_spec,
     )
 
 
@@ -228,6 +394,11 @@ def create_compatible_configs(
     ticks_per_bin: int = 100,
     micro_pip_size: float = 0.00001,
     jump_size: int = 100,
+    price_range: int = 200,
+    collapse_stride: int | None = None,
+    target_price_levels: int | None = None,
+    pip_size: float = 0.0001,
+    bin_spec: list[PriceBinSpec] | None = None,
 ) -> tuple[DatasetBuilderConfig, GlobalThresholdConfig, MarketDepthProcessorConfig]:
     """
     Create compatible configurations for all three modules.
@@ -266,6 +437,11 @@ def create_compatible_configs(
         samples=samples,
         ticks_per_bin=ticks_per_bin,
         micro_pip_size=micro_pip_size,
+        price_range=price_range,
+        collapse_stride=collapse_stride,
+        target_price_levels=target_price_levels,
+        pip_size=pip_size,
+        bin_spec=bin_spec,
     )
 
     return dataset_config, threshold_config, processor_config

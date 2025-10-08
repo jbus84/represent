@@ -7,7 +7,7 @@ import numpy as np
 import polars as pl
 import pytest
 
-from represent.configs import MarketDepthProcessorConfig
+from represent.configs import MarketDepthProcessorConfig, PriceBinSpec
 from represent.constants import (
     ASK_COUNT_COLUMNS,
     BID_COUNT_COLUMNS,
@@ -19,7 +19,10 @@ from represent.market_depth_processor import (
     create_processor,
     process_market_data,
 )
-from tests.unit.fixtures.sample_data import generate_realistic_market_data
+from tests.unit.fixtures.sample_data import (
+    create_simple_test_data,
+    generate_realistic_market_data,
+)
 
 
 class TestExtendedFeatures:
@@ -239,6 +242,62 @@ class TestExtendedFeatures:
         assert volume_result.dtype == np.float32
         assert counts_result.dtype == np.float32
 
+    def test_bin_spec_trade_counts_alignment(self):
+        """Trade count features should follow the same bins as volume under bin_spec."""
+
+        data = create_simple_test_data()
+        bin_spec = [
+            PriceBinSpec(limit_pips=2, bin_size_pips=0.5),
+            PriceBinSpec(limit_pips=None, bin_size_pips=1.0),
+        ]
+
+        config = MarketDepthProcessorConfig(
+            price_range=100,
+            samples=1000,
+            ticks_per_bin=20,
+            micro_pip_size=0.00001,
+            bin_spec=bin_spec,
+        )
+
+        processor = MarketDepthProcessor(config=config, features=["volume", "trade_counts"])
+        result = processor.process(data)
+
+        expected_levels = config.effective_price_levels
+        assert result.shape == (2, expected_levels, config.time_bins)
+
+        ask_volume_mask = processor._ask_grids["volume"].grid > 0
+        ask_counts_mask = processor._ask_grids["trade_counts"].grid > 0
+        bid_volume_mask = processor._bid_grids["volume"].grid > 0
+        bid_counts_mask = processor._bid_grids["trade_counts"].grid > 0
+
+        assert np.array_equal(ask_volume_mask, ask_counts_mask)
+        assert np.array_equal(bid_volume_mask, bid_counts_mask)
+
+    def test_bin_spec_variance_feature(self):
+        """Variance feature should remain valid when using bin_spec."""
+
+        data = create_simple_test_data()
+        bin_spec = [
+            PriceBinSpec(limit_pips=2, bin_size_pips=0.5),
+            PriceBinSpec(limit_pips=None, bin_size_pips=1.0),
+        ]
+
+        config = MarketDepthProcessorConfig(
+            price_range=100,
+            samples=1000,
+            ticks_per_bin=20,
+            micro_pip_size=0.00001,
+            bin_spec=bin_spec,
+        )
+
+        processor = MarketDepthProcessor(config=config, features=["variance"])
+        result = processor.process(data)
+
+        expected_levels = config.effective_price_levels
+        assert result.shape == (expected_levels, config.time_bins)
+        assert np.all(np.isfinite(result))
+        assert not np.allclose(result, 0.0, atol=1e-6)
+
 
 class TestFeaturePerformance:
     """Test performance aspects of extended features."""
@@ -389,5 +448,25 @@ class TestBackwardCompatibility:
         # Results should be different due to different features
         assert not np.array_equal(result1, result2)
 
-        # Processors should have different internal state objects (even if values might be the same)
-        assert processor1._price_lookup is not processor2._price_lookup
+        # Processors should maintain distinct grid state (even if values might align)
+        assert processor1._ask_grids is not processor2._ask_grids
+
+
+class TestMidPriceCentering:
+    """Ensure the lattice remains centered on the mid price."""
+
+    def test_mid_price_alignment_is_stable(self):
+        data = generate_realistic_market_data(50000)
+        config = MarketDepthProcessorConfig(
+            features=["volume"], samples=50000, ticks_per_bin=100, micro_pip_size=0.00001
+        )
+
+        processor = MarketDepthProcessor(config=config, features=["volume"])
+        processor.process(data)
+
+        bid_grid = processor._bid_grids["volume"].grid
+        non_zero_mask = bid_grid > 0
+        best_rows = [np.argmax(col) for col in non_zero_mask.T if col.any()]
+
+        assert best_rows, "Expected non-zero bid rows"
+        assert len(set(best_rows)) == 1
